@@ -1,40 +1,102 @@
 {
-  "entries": [
-    {"date": "2026-08-15", "title": "Astro-Crawler Kernsystem", "tag": "nachgetragen aus Projektverlauf",
-     "desc": "Crawler für ClearOutside (Wolken L/M/H), Meteoblue (Seeing/Jetstream), DWD-Unwetterwarnungen mit Punkt-in-Polygon, BrightSky-Bodendaten; SQLite-Historie; Telegram-Bot mit Alarmen (Gewitter/Regen/Entwarnung/Rating-Wechsel, 90-min-Cooldown); Split-Timing: Heavy-Timer alle 30 min (Playwright), Radar-Timer alle 5 min (HTTP only).",
-     "usage": "Bot: /status /spots /rate W S T — Daten: ~/.astro_crawler.db"},
-    {"date": "2026-08-15", "title": "PWA \"Astro Command Center\"", "tag": "nachgetragen aus Projektverlauf",
-     "desc": "Karte (Leaflet) mit rating-farbigen Markern, Detail-Panel mit Ampel-Indikatoren pro Parameter, Lichtverschmutzungs-Layer (Lorenz-Tiles via lokalem Proxy-Cache), DWD-Warnpolygone als Overlay, Rotlicht-Modus, Offline-Service-Worker, GPS-Live-Standort via /api/watch. Erreichbar über Tailscale-HTTPS.",
-     "usage": "https://seriousjoke.tailcc473e.ts.net — GPS-Button setzt Live-Standort"},
-    {"date": "2026-08-15", "title": "Skyfield-Astronomie + Beobachtungsprofile", "tag": "nachgetragen aus Projektverlauf",
-     "desc": "Lokale Ephemeriden (de421.bsp): Mond (Kulmination, >30°-Fenster), astronomische Dunkelheit, Planeten-Fenster. Profile DSO vs. Planetarisch mit unterschiedlichen Schwellen (DSO: Seeing >3.0\" hart, Beschlags-Score hart für den offenen 150P-Newton ohne Tauheizung; Planetarisch: Seeing >2.0\" hart, Mond egal). BrightSky-Nachtverlauf (Temp/Feuchte/Böen) für 600D und EQ5.",
-     "usage": "Bot: /mode dso|planet — PWA: 🌌/🪐-Button"},
-    {"date": "2026-08-15", "title": "Clear-Sky-Alarm", "tag": "nachgetragen aus Projektverlauf",
-     "desc": "Push, wenn Bewölkung <20% für die nächsten 2 Stunden UND astronomische Nacht gleichzeitig; danach automatisch deaktiviert (kein Spam). Max. 24 h aktiv.",
-     "usage": "Bot: /clear weinheim  oder  /clear 50.0000006 8.0000006"},
-    {"date": "2026-08-16", "title": "Session-Start-Snapshot", "tag": "nachgetragen aus Projektverlauf",
-     "desc": "/session start verknüpft die Startbedingungen (Heavy-Crawl der Location) mit der Session; jedes /rate während der offenen Session koppelt an DIESE Startbedingungen statt an die Lage beim Eintippen (für spätere ML-Kalibrierung). Nächstes start ersetzt automatisch, Auto-Ablauf nach 14 h.",
-     "usage": "Bot: /session start  →  /rate W S T  →  optional /session end"},
-    {"date": "2026-08-16", "title": "Standort-Update (5 Spots)", "tag": "nachgetragen aus Projektverlauf",
-     "desc": "Hemsbach (Sulzbach) und Weinheim auf vor Ort vermessene Koordinaten aktualisiert (Namen unverändert, Historie läuft durch); Neu: Viernheim (Heddesheimer Str.). Insgesamt: Neckarplatten, Hemsbach, Weinheim, Spinelli Park, Viernheim.",
-     "usage": "Automatisch — Marker in der PWA"},
-    {"date": "2026-08-16", "title": "Meridian-Flip-Reminder", "tag": "nachgetragen aus Projektverlauf",
-     "desc": "/track berechnet die nächste obere Kulmination (skyfield, statischer Messier-Katalog M1-M110) und pusht 15-20 Min vorher 'gleich flippen'. Erkennt zirkumpolare Objekte, deren Kulmination tagsüber liegt.",
-     "usage": "Bot: /track M81"},
-    {"date": "2026-08-16", "title": "FWHM-Sync-Endpunkt", "tag": "nachgetragen aus Projektverlauf",
-     "desc": "Nachtrags-Endpunkt für gemessene FWHM-Werte nach Sessionende (z. B. aus SharpCap), schreibt in fwhm_log. Ungültige Zeilen werden gezählt übersprungen.",
-     "usage": "POST /api/fwhm_sync {\"measurements\": [{\"ts\": \"…\", \"fwhm\": 2.4}, …]}"},
-    {"date": "2026-08-16", "title": "Vorausschau + Golden Window", "tag": "nachgetragen aus Projektverlauf",
-     "desc": "Stündliche Vorausschau aller Werte bis Sonnenaufgang (gleiche Quellen, keine Extra-Requests) als neuer Panel-Tab. Golden Window: bestes zusammenhängende Fenster der Nacht nach Profil-Schwellen, mit Begründung. Latest-wins-JSON, keine DB-Aufblähung.",
-     "usage": "PWA: Marker antippen → Tab 'Vorausschau'"},
-    {"date": "2026-08-17", "title": "Bortle-Empfehlung", "tag": "nachgetragen aus Projektverlauf",
-     "desc": "Zenit-Lichtverschmutzung per Pixel-Sampling aus den Lorenz-Tiles (16-Zonen-Palette aus der Original-Legende): Zone, mag/arcsec², ≈Bortle — plus Filter-Tipp je Profil (Antlia Triband / Omegon UHC).",
-     "usage": "Automatisch im Panel (Zeile 'Zenit-Lichtverschm.')"},
-    {"date": "2026-08-17", "title": "Nacht-Fenster-Korrekturen", "tag": "nachgetragen aus Projektverlauf",
-     "desc": "Dunkelheitsfenster korrekt vor UND während der Nacht (vorher: um 20:30 wurde die gestrige Nacht geliefert, nachts wurde der Dunkel-Beginn abgeschnitten, morgens die bürgerliche statt astronomische Dämmerung beendet). Mond-Cache mit 6-h-TTL.",
-     "usage": "Automatisch"},
-    {"date": "2026-08-17", "title": "Changelog + Git-Deploy-Tracking", "tag": "neu",
-     "desc": "Diese Ansicht: append-only changelog.json, bei jedem Feature-Deploy ein Eintrag mehr. Zusätzlich versionsverfolgt git jetzt jeden Deploy (Commit im Deploy-Skript).",
-     "usage": "Zahnrad-Menü → 'Änderungen'"}
-  ]
+ "entries": [
+  {
+   "date": "2026-08-15",
+   "title": "Astro-Crawler Kernsystem",
+   "tag": "nachgetragen aus Projektverlauf",
+   "desc": "Crawler für ClearOutside (Wolken L/M/H), Meteoblue (Seeing/Jetstream), DWD-Unwetterwarnungen mit Punkt-in-Polygon, BrightSky-Bodendaten; SQLite-Historie; Telegram-Bot mit Alarmen (Gewitter/Regen/Entwarnung/Rating-Wechsel, 90-min-Cooldown); Split-Timing: Heavy-Timer alle 30 min (Playwright), Radar-Timer alle 5 min (HTTP only).",
+   "usage": "Bot: /status /spots /rate W S T — Daten: ~/.astro_crawler.db"
+  },
+  {
+   "date": "2026-08-15",
+   "title": "PWA \"Astro Command Center\"",
+   "tag": "nachgetragen aus Projektverlauf",
+   "desc": "Karte (Leaflet) mit rating-farbigen Markern, Detail-Panel mit Ampel-Indikatoren pro Parameter, Lichtverschmutzungs-Layer (Lorenz-Tiles via lokalem Proxy-Cache), DWD-Warnpolygone als Overlay, Rotlicht-Modus, Offline-Service-Worker, GPS-Live-Standort via /api/watch. Erreichbar über Tailscale-HTTPS.",
+   "usage": "https://seriousjoke.tailcc473e.ts.net — GPS-Button setzt Live-Standort"
+  },
+  {
+   "date": "2026-08-15",
+   "title": "Skyfield-Astronomie + Beobachtungsprofile",
+   "tag": "nachgetragen aus Projektverlauf",
+   "desc": "Lokale Ephemeriden (de421.bsp): Mond (Kulmination, >30°-Fenster), astronomische Dunkelheit, Planeten-Fenster. Profile DSO vs. Planetarisch mit unterschiedlichen Schwellen (DSO: Seeing >3.0\" hart, Beschlags-Score hart für den offenen 150P-Newton ohne Tauheizung; Planetarisch: Seeing >2.0\" hart, Mond egal). BrightSky-Nachtverlauf (Temp/Feuchte/Böen) für 600D und EQ5.",
+   "usage": "Bot: /mode dso|planet — PWA: 🌌/🪐-Button"
+  },
+  {
+   "date": "2026-08-15",
+   "title": "Clear-Sky-Alarm",
+   "tag": "nachgetragen aus Projektverlauf",
+   "desc": "Push, wenn Bewölkung <20% für die nächsten 2 Stunden UND astronomische Nacht gleichzeitig; danach automatisch deaktiviert (kein Spam). Max. 24 h aktiv.",
+   "usage": "Bot: /clear weinheim  oder  /clear 50.0000006 8.0000006"
+  },
+  {
+   "date": "2026-08-16",
+   "title": "Session-Start-Snapshot",
+   "tag": "nachgetragen aus Projektverlauf",
+   "desc": "/session start verknüpft die Startbedingungen (Heavy-Crawl der Location) mit der Session; jedes /rate während der offenen Session koppelt an DIESE Startbedingungen statt an die Lage beim Eintippen (für spätere ML-Kalibrierung). Nächstes start ersetzt automatisch, Auto-Ablauf nach 14 h.",
+   "usage": "Bot: /session start  →  /rate W S T  →  optional /session end"
+  },
+  {
+   "date": "2026-08-16",
+   "title": "Standort-Update (5 Spots)",
+   "tag": "nachgetragen aus Projektverlauf",
+   "desc": "Hemsbach (Sulzbach) und Weinheim auf vor Ort vermessene Koordinaten aktualisiert (Namen unverändert, Historie läuft durch); Neu: Viernheim (Heddesheimer Str.). Insgesamt: Neckarplatten, Hemsbach, Weinheim, Spinelli Park, Viernheim.",
+   "usage": "Automatisch — Marker in der PWA"
+  },
+  {
+   "date": "2026-08-16",
+   "title": "Meridian-Flip-Reminder",
+   "tag": "nachgetragen aus Projektverlauf",
+   "desc": "/track berechnet die nächste obere Kulmination (skyfield, statischer Messier-Katalog M1-M110) und pusht 15-20 Min vorher 'gleich flippen'. Erkennt zirkumpolare Objekte, deren Kulmination tagsüber liegt.",
+   "usage": "Bot: /track M81"
+  },
+  {
+   "date": "2026-08-16",
+   "title": "FWHM-Sync-Endpunkt",
+   "tag": "nachgetragen aus Projektverlauf",
+   "desc": "Nachtrags-Endpunkt für gemessene FWHM-Werte nach Sessionende (z. B. aus SharpCap), schreibt in fwhm_log. Ungültige Zeilen werden gezählt übersprungen.",
+   "usage": "POST /api/fwhm_sync {\"measurements\": [{\"ts\": \"…\", \"fwhm\": 2.4}, …]}"
+  },
+  {
+   "date": "2026-08-16",
+   "title": "Vorausschau + Golden Window",
+   "tag": "nachgetragen aus Projektverlauf",
+   "desc": "Stündliche Vorausschau aller Werte bis Sonnenaufgang (gleiche Quellen, keine Extra-Requests) als neuer Panel-Tab. Golden Window: bestes zusammenhängende Fenster der Nacht nach Profil-Schwellen, mit Begründung. Latest-wins-JSON, keine DB-Aufblähung.",
+   "usage": "PWA: Marker antippen → Tab 'Vorausschau'"
+  },
+  {
+   "date": "2026-08-17",
+   "title": "Bortle-Empfehlung",
+   "tag": "nachgetragen aus Projektverlauf",
+   "desc": "Zenit-Lichtverschmutzung per Pixel-Sampling aus den Lorenz-Tiles (16-Zonen-Palette aus der Original-Legende): Zone, mag/arcsec², ≈Bortle — plus Filter-Tipp je Profil (Antlia Triband / Omegon UHC).",
+   "usage": "Automatisch im Panel (Zeile 'Zenit-Lichtverschm.')"
+  },
+  {
+   "date": "2026-08-17",
+   "title": "Nacht-Fenster-Korrekturen",
+   "tag": "nachgetragen aus Projektverlauf",
+   "desc": "Dunkelheitsfenster korrekt vor UND während der Nacht (vorher: um 20:30 wurde die gestrige Nacht geliefert, nachts wurde der Dunkel-Beginn abgeschnitten, morgens die bürgerliche statt astronomische Dämmerung beendet). Mond-Cache mit 6-h-TTL.",
+   "usage": "Automatisch"
+  },
+  {
+   "date": "2026-08-17",
+   "title": "Changelog + Git-Deploy-Tracking",
+   "tag": "neu",
+   "desc": "Diese Ansicht: append-only changelog.json, bei jedem Feature-Deploy ein Eintrag mehr. Zusätzlich versionsverfolgt git jetzt jeden Deploy (Commit im Deploy-Skript).",
+   "usage": "Zahnrad-Menü → 'Änderungen'"
+  },
+  {
+   "date": "2026-08-17",
+   "title": "Wind-Eskalation für aktive Sessions",
+   "tag": "neu",
+   "desc": "Bei laufender /session: Böen >40 km/h → sofortige Warnung (60-min-Cooldown); >60 km/h → Abbruch-Push ('Teleskop einpacken'), aber erst nach Bestätigung im zweiten Radar-Tick (~10 min Debounce gegen Ausreißer-Böen). Basis ist der frische 2-h-Böenwert je Tick.",
+   "usage": "Automatisch — nur aktiv nach /session start"
+  },
+  {
+   "date": "2026-08-17",
+   "title": "Secrets aus dem Code (Git-fähig)",
+   "tag": "neu",
+   "desc": "TELEGRAM_TOKEN/CHAT_ID liegen in ~/.env (Mini-Loader, keine Extra-Abhängigkeit), .env.example im Repo, Git-Historie sauber neu initialisiert. Token-Revocation beim BotFather empfohlen.",
+   "usage": "~/.env pflegen; python astro_crawler.py --setup-telegram schreibt dort hinein"
+  }
+ ]
 }

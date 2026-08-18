@@ -142,6 +142,8 @@ class SiteReport:
     precip_2h: Optional[float] = None    # mm (BrightSky/DWD)
     clouds_2h: Optional[list] = None     # % je Stunde, naechste 2 h (transient,
                                          # nur fuer /clear-Pruefung, nicht in DB)
+    gusts_2h: Optional[float] = None     # km/h, Boeen max 2h, FRISCH je Radar-
+                                         # Tick (Basis fuer Wind-Debounce)
     wind_speed: Optional[float] = None   # km/h, Max. 2 h (BrightSky/DWD)
     dewpoint_spread: Optional[float] = None  # K, Min. 2 h: Temp - Taupunkt
     # Nachtverlauf aus BrightSky (TTL-gecacht, siehe check_brightsky_night)
@@ -692,6 +694,10 @@ def check_brightsky_ground(lat: float, lon: float, rep: SiteReport):
         rep.precip_2h = round(precip, 2)
         # Stündliches Wolken-Array der naechsten 2 h mitfuehren (fuer /clear)
         rep.clouds_2h = [w.get("cloud_cover") for w in rows]
+        # Boeen-Max im 2-h-Fenster: frisch je Tick (dieser Call ist ungecachtet)
+        # - Basis fuer die Wind-Eskalation mit echtem 2-Tick-Debounce
+        g2 = [w["wind_gust_speed"] for w in rows if w.get("wind_gust_speed") is not None]
+        rep.gusts_2h = max(g2) if g2 else None
         winds = [w["wind_speed"] for w in rows if w.get("wind_speed") is not None]
         if winds:
             rep.wind_speed = max(winds)
@@ -1172,6 +1178,84 @@ def check_clear_alert(reports: list):
     else:
         log.info("[Clear] noch nicht: max %s%% ( <%s gefordert), dunkel=%s",
                  max(clouds), CLEAR_MAX_CLOUD_PCT, dark_ok)
+
+
+# ---------------------------------------------------------------------------
+# Wind-Eskalation (sicherheitsrelevant): nur bei AKTIVER Session aktiv.
+#   >40 km/h Boeen -> sofortige Warnung (60-min Cooldown, kein Debounce)
+#   >60 km/h Boeen -> Abbruch-Push, aber erst nach Bestaetigung im zweiten
+#                    Radar-Tick (~10 min) - eine Ausreisserboe allein soll
+#                    keine Panik-Nachricht mitten in einer ruhigen Nacht
+#                    ausloesen. Basis ist gusts_2h (frisch je Tick).
+# ---------------------------------------------------------------------------
+
+WIND_WARN_KMH = 40.0
+WIND_ABORT_KMH = 60.0
+WIND_WARN_COOLDOWN_MIN = 60
+
+
+def check_wind_alert(reports: list):
+    sess = db_open_session()
+    if not sess:
+        return
+    session_loc = sess[2]
+    # Session-Standort bevorzugt, sonst Maximum ueber alle Standorte
+    rep = next((r for r in reports if r.name == session_loc), None)
+    if rep is None:
+        cand = [r for r in reports if r.gusts_2h is not None]
+        rep = max(cand, key=lambda r: r.gusts_2h) if cand else None
+    if rep is None or rep.gusts_2h is None:
+        return
+    gusts = rep.gusts_2h
+    now = datetime.now()
+    state = load_state()
+    state.setdefault("last_alert", {})
+
+    if gusts > WIND_ABORT_KMH:
+        first_seen = state.get("wind60_since")
+        if not first_seen:
+            state["wind60_since"] = now.isoformat(timespec="seconds")
+            save_state(state)
+            log.warning("[Wind] Boeen %.0f km/h > 60 - warte auf Bestaetigung "
+                        "im naechsten Radar-Tick (%s)", gusts, rep.name)
+            return
+        age_min = (now - datetime.fromisoformat(first_seen)).total_seconds() / 60
+        if age_min >= 4:  # naechster 5-min-Tick hat dazwischen gelegen
+            state.pop("wind60_since", None)
+            state["last_alert"]["wind40"] = now.isoformat(timespec="seconds")
+            save_state(state)
+            log.warning("[Wind] ABBRUCH: Boeen %.0f km/h bestaetigt (%.0f min)",
+                        gusts, age_min)
+            send_telegram(
+                f"🛑 Windböen >60 km/h! EQ5 Pro gefährdet. Teleskop "
+                f"einpacken.\n[{rep.name}] {gusts:.0f} km/h bestätigt seit "
+                f"{age_min:.0f} min (Session seit {sess[1][11:16]} aktiv).")
+        else:
+            save_state(state)  # noch nicht genug Zeit - weiter beobachten
+            log.info("[Wind] Boeen %.0f km/h, Bestaetigung seit %.0f min - "
+                     "warte", gusts, age_min)
+        return
+
+    # unter Abbruchschwelle: Debounce-State resetten
+    state.pop("wind60_since", None)
+
+    if gusts > WIND_WARN_KMH:
+        la = state["last_alert"].get("wind40")
+        if la and (now - datetime.fromisoformat(la)).total_seconds() / 60 \
+                < WIND_WARN_COOLDOWN_MIN:
+            save_state(state)
+            log.info("[Wind] Warnung %.0f km/h - Cooldown aktiv", gusts)
+            return
+        state["last_alert"]["wind40"] = now.isoformat(timespec="seconds")
+        save_state(state)
+        log.warning("[Wind] Warnung: Boehen %.0f km/h (%s)", gusts, rep.name)
+        send_telegram(
+            f"⚠️ Windböen {gusts:.0f} km/h am Standort {rep.name}.\n"
+            f"Montierung im Blick behalten - Abbruchgrenze liegt bei "
+            f"{WIND_ABORT_KMH:.0f} km/h.")
+    else:
+        save_state(state)
+        log.info("[Wind] ok: %.0f km/h (%s)", gusts, rep.name)
 
 
 # ---------------------------------------------------------------------------
@@ -2556,6 +2640,13 @@ async def run_cycle(locations: list, headless: bool, send_dashboard: bool,
             check_clear_alert(reports)
         except Exception as e:
             log.warning("[Clear] Prüfung fehlgeschlagen: %s", e)
+
+        # Wind-Eskalation: nur bei aktiver Session (Warnung >40, Abbruch >60
+        # mit 2-Tick-Debounce)
+        try:
+            check_wind_alert(reports)
+        except Exception as e:
+            log.warning("[Wind] Prüfung fehlgeschlagen: %s", e)
 
         # 1x taeglich: Meilenstein-Check fuer /rate-Feedback (20/50 Sessions)
         try:
