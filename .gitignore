@@ -1,0 +1,17 @@
+# Home-Repo: nur Projektdateien tracken, alles andere ignorieren.
+# Whitelist-Muster: erst alles ausschliessen, dann Projektteile freigeben.
+/*
+
+# --- Projekt: Crawler + Deploy ---
+!/astro_crawler.py
+!/astro_deploy.sh
+!/messier.csv
+!/.gitignore
+/.env
+!/.env.example
+
+# --- Projekt: PWA/Backend ---
+!/astro-app/
+/astro-app/tilecache/
+/astro-app/verification-screenshots/
+/astro-app/backend/__pycache__/

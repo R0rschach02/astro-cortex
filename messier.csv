@@ -1,0 +1,111 @@
+messier;name;type;ra_hours;dec_degrees
+M1;Crab Nebula;Super­nova remnant;5.5755;22.0000
+M2;Globular cluster;Globular cluster;21.5575;-0.8167
+M3;Globular cluster;Globular cluster;13.7032;28.3667
+M4;Spider Globular Cluster;Globular cluster;16.3931;-26.5167
+M5;Rose Cluster;Globular cluster;15.3092;2.0667
+M6;Butterfly Cluster;Open cluster;17.0000;-32.2167
+M7;Ptolemy's Cluster;Open cluster;17.8976;-34.7833
+M8;Lagoon Nebula;Nebula with cluster;18.0603;-24.3833
+M9;Globular cluster;Globular cluster;17.3199;-18.5000
+M10;Globular cluster;Globular cluster;16.9525;-4.0833
+M11;Wild Duck Cluster;Open cluster;18.0000;-6.2667
+M12;Globular cluster;Globular cluster;16.7873;-1.9333
+M13;Great Hercules Cluster;Globular cluster;16.6948;36.4500
+M14;Globular cluster;Globular cluster;17.6267;-3.2333
+M15;Great Pegasus Cluster;Globular cluster;21.4995;12.1667
+M16;Eagle Nebula;H II region nebula with cluster;18.3133;-13.8167
+M17;Omega, Swan, Horseshoe, Lobster, or Checkmark Nebula;H II region nebula with cluster;18.3406;-16.1667
+M18;Black Swan Cluster;Open cluster;18.0000;-17.1333
+M19;Globular cluster;Globular cluster;17.0438;-26.2667
+M20;Trifid Nebula;H II region nebula with cluster;18.0397;-23.0167
+M21;Webb's Cross Cluster;Open cluster;18.0000;-22.5000
+M22;Great Sagittarius Cluster;Globular cluster;18.6066;-23.9000
+M23;Open cluster;Open cluster;17.0000;-19.0167
+M24;Small Sagittarius Star Cloud;Milky Way star cloud;18.2833;-18.5500
+M25;Open cluster;Open cluster;18.0000;-19.2500
+M26;Open cluster;Open cluster;18.0000;-9.4000
+M27;Dumbbell Nebula;Planetary nebula;19.9934;22.7167
+M28;Globular cluster;Globular cluster;18.4091;-24.8667
+M29;Cooling Tower Cluster;Open cluster;20.3989;38.5167
+M30;Jellyfish Cluster;Globular cluster;21.6728;-23.1667
+M31;Andromeda Galaxy;Spiral galaxy;0.7123;41.2667
+M32;Andromeda Satellite #1;Dwarf elliptical galaxy;0.7116;40.8500
+M33;Triangulum/Pinwheel Galaxy;Spiral galaxy;1.5639;30.6500
+M34;Spiral Cluster;Open cluster;2.0000;42.7667
+M35;Shoe-Buckle Cluster;Open cluster;6.0000;24.3500
+M36;Pinwheel Cluster;Open cluster;5.6033;34.1333
+M37;Salt and Pepper Cluster;Open cluster;5.8717;32.5500
+M38;Starfish Cluster;Open cluster;5.4783;35.8500
+M39;Pyramid Cluster;Open cluster;21.5283;48.4333
+M40;Winnecke 4;Optical Double;12.3701;58.0667
+M41;Little Beehive Cluster;Open cluster;6.0000;-20.7667
+M42;Great Orion Nebula;H II region nebula;5.5881;-5.3833
+M43;De Mairan's Nebula;H II region nebula (part of the Orion Nebula);5.0000;-5.2667
+M44;Beehive Cluster or Praesepe;Open cluster;8.0000;19.9833
+M45;Pleiades, Seven Sisters or Subaru;Open cluster;3.7900;24.1167
+M46;Open cluster;Open cluster;7.0000;-14.8167
+M47;Open cluster;Open cluster;7.0000;-14.5000
+M48;Open cluster;Open cluster;8.0000;-5.7500
+M49;Elliptical galaxy;Elliptical galaxy;12.4963;8.0000
+M50;Heart-Shaped Cluster;Open cluster;7.0000;-8.3333
+M51;Whirlpool Galaxy;Spiral galaxy;13.4980;47.1833
+M52;Scorpion Cluster;Open cluster;23.0000;61.5833
+M53;Globular cluster;Globular cluster;13.2154;18.1667
+M54;Globular cluster;Globular cluster;18.9176;-30.4667
+M55;Specter Cluster;Globular cluster;19.6666;-30.9500
+M56;Globular cluster;Globular cluster;19.2766;30.1833
+M57;Ring Nebula;Planetary nebula;18.8931;33.0167
+M58;Barred Spiral galaxy;Barred Spiral galaxy;12.6288;11.8167
+M59;Elliptical galaxy;Elliptical galaxy;12.7006;11.6333
+M60;Elliptical galaxy;Elliptical galaxy;12.7277;11.5500
+M61;Swelling Spiral Galaxy;Spiral galaxy;12.3652;4.4667
+M62;Flickering Globular;Globular cluster;17.0202;-30.1000
+M63;Sunflower Galaxy;Spiral galaxy;13.2637;42.0167
+M64;Black Eye Galaxy;Spiral galaxy;12.9455;21.6667
+M65;Leo Triplet;Barred Spiral galaxy;11.3155;13.0833
+M66;Leo Triplet;Barred Spiral galaxy;11.3375;12.9833
+M67;King Cobra or Golden Eye Cluster;Open cluster;8.0000;11.8167
+M68;Globular cluster;Globular cluster;12.6578;-26.7333
+M69;Globular cluster;Globular cluster;18.5231;-32.3333
+M70;Globular cluster;Globular cluster;18.7202;-32.2833
+M71;Angelfish Cluster;Globular cluster;19.8962;18.7667
+M72;Globular cluster;Globular cluster;20.8910;-12.5333
+M73;Asterism;Asterism;20.9817;-12.6333
+M74;Phantom Galaxy[91];Spiral galaxy;1.6116;15.7833
+M75;Globular cluster;Globular cluster;20.1013;-21.9167
+M76;Little Dumbbell Nebula;Planetary nebula;1.0000;51.5667
+M77;Cetus A or Squid Galaxy;Spiral galaxy;2.7113;-0.0000
+M78;Diffuse nebula;Diffuse nebula;5.7796;0.0000
+M79;Globular cluster;Globular cluster;5.4029;-24.5167
+M80;Globular cluster;Globular cluster;16.2840;-22.9667
+M81;Bode's Galaxy;Spiral galaxy;9.9259;69.0500
+M82;Cigar Galaxy;Starburst galaxy;9.9312;69.6667
+M83;Southern Pinwheel Galaxy;Barred Spiral galaxy;13.6169;-29.8500
+M84;Lenticular galaxy;Lenticular galaxy;12.4177;12.8833
+M85;Lenticular galaxy;Lenticular galaxy;12.4233;18.1833
+M86;Lenticular galaxy;Lenticular galaxy;12.4366;12.9333
+M87;Virgo A;Elliptical galaxy;12.5137;12.3833
+M88;Spiral galaxy;Spiral galaxy;12.5331;14.4167
+M89;Elliptical galaxy;Elliptical galaxy;12.5944;12.5500
+M90;Carabin Galaxy;Spiral galaxy;12.6138;13.1500
+M91;Barred Spiral galaxy;Barred Spiral galaxy;12.5907;14.4833
+M92;Globular cluster;Globular cluster;17.2854;43.1333
+M93;Critter Cluster;Open cluster;7.0000;-23.8667
+M94;Crocodile Eye or Cat's Eye Galaxy;Spiral galaxy;12.8481;41.1167
+M95;Barred Spiral galaxy;Barred Spiral galaxy;10.7327;11.7000
+M96;Spiral galaxy;Spiral galaxy;10.7794;11.8167
+M97;Owl Nebula;Planetary nebula;11.2466;55.0167
+M98;Spiral galaxy;Spiral galaxy;12.2301;14.9000
+M99;St. Catherine's Wheel;Spiral galaxy;12.3138;14.4000
+M100;Mirror Galaxy;Spiral galaxy;12.3819;15.8167
+M101;Pinwheel Galaxy;Spiral galaxy;14.0535;54.3333
+M102;Spindle Galaxy;Lenticular galaxy;15.1082;55.7500
+M103;Open cluster;Open cluster;1.0000;60.7000
+M104;Sombrero Galaxy;Spiral galaxy;12.6665;-11.6167
+M105;Elliptical galaxy;Elliptical galaxy;10.7971;12.5667
+M106;Spiral galaxy;Spiral galaxy;12.3160;47.3000
+M107;Crucifix Cluster;Globular cluster;16.5422;-13.0500
+M108;Surfboard Galaxy;Barred Spiral galaxy;11.1919;55.6667
+M109;Vacuum Cleaner Galaxy;Barred Spiral galaxy;11.9600;53.3667
+M110;Andromeda Satellite #2;Dwarf elliptical galaxy;0.6728;41.6833

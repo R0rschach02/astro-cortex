@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Astro Command Center</title>
+  <meta name="theme-color" content="#0b0e13">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="vendor/leaflet.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Kopfleiste: Titel, Aktualitaet, Steuerung -->
+  <header id="topbar">
+    <div id="title">ASTRO&nbsp;CC</div>
+    <button id="btn-mode" class="hbtn mode" title="Profil: DSO / Planetarisch">DSO</button>
+    <div id="freshness" class="freshness">lade…</div>
+    <button id="btn-refresh" class="hbtn" title="Jetzt aktualisieren">&#8635;</button>
+    <button id="btn-night" class="hbtn" title="Rotlicht-Modus umschalten">&#9789;</button>
+    <button id="btn-gps" class="hbtn" title="Live-Standort setzen (GPS)">&#9678;</button>
+    <button id="btn-config" class="hbtn" title="Server-Adresse konfigurieren">&#9881;</button>
+  </header>
+
+  <!-- Karte -->
+  <main id="map"></main>
+
+  <!-- Detail-Panel (Tap auf Marker): Jetzt-Status + Vorausschau-Tab -->
+  <section id="panel" class="hidden">
+    <button id="panel-close" class="hbtn">&#10005;</button>
+    <div class="tabs">
+      <button id="tab-now" class="tab active">Jetzt</button>
+      <button id="tab-fc" class="tab">Vorausschau</button>
+    </div>
+    <div id="panel-content"></div>
+  </section>
+
+  <!-- Zahnrad-Menü (Popup) -->
+  <div id="cfg-menu" class="hidden">
+    <button id="menu-config" class="menu-item">&#9881; Server konfigurieren…</button>
+    <button id="menu-changelog" class="menu-item">&#128220; Änderungen</button>
+  </div>
+
+  <!-- Änderungsprotokoll (Overlay) -->
+  <section id="changelog" class="overlay hidden">
+    <button id="changelog-close" class="hbtn">&#10005;</button>
+    <h2>Änderungen</h2>
+    <div id="changelog-list"></div>
+  </section>
+
+  <script src="vendor/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,215 @@
+/* Astro Command Center - tablet-first, 48px+ Touch-Ziele,
+   Tag-Theme (hell) als Default, Rotlicht-Theme (body.night) als Umschalter. */
+
+:root {
+  --bg: #0b0e13;            /* dunkle Grundstimmung passt zu Astronomie */
+  --panel-bg: #141a24;
+  --text: #e8edf4;
+  --text-dim: #93a1b3;
+  --accent: #4fc3f7;
+  --go: #35d07f;
+  --maybe: #f5c542;
+  --nogo: #ff5252;
+  --border: #26303f;
+}
+body.night {
+  /* Rotlicht: nur Rot-Toene auf Schwarz, Nachtsicht bleibt erhalten */
+  --bg: #000000;
+  --panel-bg: #100000;
+  --text: #ff4a2a;
+  --text-dim: #b33618;
+  --accent: #ff4a2a;
+  --go: #ff6a3c;
+  --maybe: #ff5522;
+  --nogo: #ff2a00;
+  --border: #551400;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; margin: 0; }
+body {
+  display: flex; flex-direction: column;
+  background: var(--bg); color: var(--text);
+  font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  overscroll-behavior: none;
+}
+
+/* ---- Kopfleiste ---- */
+#topbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; background: var(--panel-bg);
+  border-bottom: 1px solid var(--border);
+  padding-top: max(8px, env(safe-area-inset-top));
+}
+#title { font-weight: 700; letter-spacing: 1px; font-size: 19px; }
+.freshness { flex: 1; text-align: right; color: var(--text-dim); font-size: 13px; }
+.hbtn {
+  min-width: 48px; height: 48px; border: 1px solid var(--border);
+  border-radius: 10px; background: var(--bg); color: var(--text);
+  font-size: 20px; line-height: 1; cursor: pointer;
+}
+.hbtn:active { background: var(--border); }
+body.night #btn-night { border-color: var(--text); box-shadow: 0 0 8px var(--text); }
+
+/* ---- Karte ---- */
+#map { flex: 1; min-height: 0; }
+/* Rotlicht: auch die Kartenkacheln rot-einfärben (dunkel, entsättigt, rot) */
+body.night .leaflet-tile {
+  filter: grayscale(1) brightness(0.45) sepia(1) hue-rotate(-45deg) saturate(3.5);
+}
+body.night .leaflet-container { background: #000; }
+.leaflet-control-attribution {
+  background: rgba(0,0,0,.5); color: var(--text-dim); font-size: 10px;
+}
+
+/* ---- Standort-Marker ---- */
+.spot-marker { position: relative; width: 46px; height: 46px; cursor: pointer; }
+.spot-dot {
+  position: absolute; inset: 9px; border-radius: 50%;
+  border: 3px solid rgba(0,0,0,.55);
+  box-shadow: 0 0 10px 1px currentColor;
+}
+.spot-dot.rating-GO     { background: var(--go);   color: var(--go); }
+.spot-dot.rating-MAYBE  { background: var(--maybe);color: var(--maybe); }
+.spot-dot.rating-NO-GO  { background: var(--nogo); color: var(--nogo); }
+.spot-dot.rating-NA     { background: var(--text-dim); color: var(--text-dim); }
+.spot-dot.alert::after {
+  content: "!"; position: absolute; top: -7px; right: -7px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--nogo); color: #fff; font: bold 13px/18px sans-serif;
+  text-align: center;
+}
+.spot-label {
+  position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+  white-space: nowrap; font-size: 11px; font-weight: 600;
+  color: var(--text); text-shadow: 0 1px 3px #000, 0 0 6px #000;
+}
+
+/* ---- Detail-Panel ---- */
+#panel {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 1200;
+  max-height: 62vh; overflow-y: auto;
+  background: var(--panel-bg); border-top: 2px solid var(--border);
+  border-radius: 16px 16px 0 0; padding: 14px 16px 22px;
+  padding-bottom: max(22px, env(safe-area-inset-bottom));
+}
+#panel.hidden { display: none; }
+#panel-close { position: absolute; top: 8px; right: 10px; }
+#panel h2 { margin: 2px 0 4px; font-size: 20px; }
+#panel .sub { color: var(--text-dim); font-size: 13px; margin-bottom: 10px; }
+.kv { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; }
+.kv .k { color: var(--text-dim); font-size: 13px; }
+.kv .v { font-weight: 600; }
+.kv .v.good { color: var(--go); } .kv .v.bad { color: var(--nogo); }
+.badge {
+  display: inline-block; padding: 2px 10px; border-radius: 999px;
+  font-size: 13px; font-weight: 700; margin: 2px 4px 8px 0;
+  background: var(--border); color: var(--text);
+}
+.badge.GO { background: var(--go); color: #06281a; }
+.badge.MAYBE { background: var(--maybe); color: #33270a; }
+.badge.NO-GO { background: var(--nogo); color: #fff; }
+
+/* Beschlags-Score-Badge (offener Newton ohne Tauheizung) */
+.badge.dew-hoch   { background: var(--nogo);  color: #fff; font-size: 15px; }
+.badge.dew-mittel { background: var(--maybe); color: #33270a; }
+.badge.dew-gering { background: var(--border); color: var(--text); }
+
+/* Profil-Umschalter (DSO/Planetarisch) in der Kopfleiste */
+#btn-mode { font-size: 22px; padding: 0 6px; }
+#btn-mode.mode { border-color: var(--accent); }
+
+/* ---- Tabs im Detail-Panel (Jetzt / Vorausschau) ---- */
+.tabs { display: flex; gap: 8px; margin: 4px 0 10px; }
+.tab {
+  flex: 1; min-height: 44px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--bg); color: var(--text); font-size: 15px; font-weight: 600;
+}
+.tab.active { border-color: var(--accent); color: var(--accent); }
+
+/* ---- Golden Window Karte ---- */
+.golden {
+  border: 2px solid var(--go); border-radius: 14px; padding: 10px 14px;
+  margin: 6px 0 12px; background: rgba(53, 208, 127, .08);
+}
+.golden.none { border-color: var(--border); background: transparent; }
+.g-title { font-size: 17px; font-weight: 700; }
+.golden:not(.none) .g-title { color: var(--go); }
+.g-time { font-size: 26px; font-weight: 800; margin: 2px 0; }
+.g-why { color: var(--text-dim); font-size: 13px; }
+
+/* ---- Stunden-Tabelle der Vorausschau ---- */
+.fc-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.fc-table th {
+  text-align: right; color: var(--text-dim); font-weight: 600;
+  padding: 4px 6px; border-bottom: 1px solid var(--border); font-size: 12px;
+}
+.fc-table td { text-align: right; padding: 5px 6px; border-bottom: 1px solid var(--border); }
+.fc-table th:first-child, .fc-table td:first-child { text-align: left; }
+.fc-table tr.row-ok td { background: rgba(53, 208, 127, .10); }
+.c-g { color: var(--go); } .c-y { color: var(--maybe); }
+.c-r { color: var(--nogo); } .c-na { color: var(--text-dim); opacity: .55; }
+.c-h { font-weight: 700; }
+
+/* ---- Zahnrad-Menü (Popup) ---- */
+#cfg-menu {
+  position: absolute; top: 64px; right: 10px; z-index: 1300;
+  background: var(--panel-bg); border: 1px solid var(--border);
+  border-radius: 12px; padding: 6px; min-width: 240px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.5);
+}
+#cfg-menu.hidden { display: none; }
+.menu-item {
+  display: block; width: 100%; min-height: 44px; text-align: left;
+  background: transparent; color: var(--text); border: 0;
+  border-radius: 8px; padding: 10px 12px; font-size: 15px; cursor: pointer;
+}
+.menu-item:active { background: var(--border); }
+
+/* ---- Changelog-Overlay ---- */
+.overlay {
+  position: absolute; inset: 0; z-index: 1400; overflow-y: auto;
+  background: var(--bg); padding: 16px 14px 30px;
+  padding-top: max(16px, env(safe-area-inset-top));
+}
+.overlay.hidden { display: none; }
+.overlay h2 { margin: 4px 0 12px; }
+.cl-entry {
+  border: 1px solid var(--border); border-radius: 12px;
+  padding: 10px 12px; margin-bottom: 10px; background: var(--panel-bg);
+}
+.cl-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.cl-date { color: var(--text-dim); font-size: 12px; }
+.cl-title { font-weight: 700; font-size: 15px; flex: 1; }
+.cl-tag {
+  font-size: 10px; color: var(--text-dim);
+  border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px;
+}
+.cl-desc { font-size: 13px; margin-top: 6px; color: var(--text); }
+.cl-usage {
+  margin-top: 6px; font-size: 12px; color: var(--accent);
+  font-family: ui-monospace, monospace;
+}
+
+.mono { font-variant-numeric: tabular-nums; }
+.dim { color: var(--text-dim); font-weight: 400; }
+
+/* ---- Ampel-Punkte (Status-Indikator pro Parameter) ---- */
+.dot {
+  display: inline-block; width: 12px; height: 12px; border-radius: 50%;
+  margin-right: 6px; vertical-align: baseline;
+  box-shadow: 0 0 4px 0 currentColor;
+}
+.dot.d-g { background: var(--go);    color: var(--go); }
+.dot.d-y { background: var(--maybe); color: var(--maybe); }
+.dot.d-r { background: var(--nogo);  color: var(--nogo); }
+.dot.d-na { background: var(--text-dim); color: var(--text-dim); opacity: .4; box-shadow: none; }
+
+/* ---- Gruppen-Header im Detail-Panel (Datenfrische je Gruppe) ---- */
+.grp {
+  display: flex; align-items: center; gap: 2px;
+  margin: 12px 0 6px; font-size: 13px; color: var(--text-dim);
+  border-bottom: 1px solid var(--border); padding-bottom: 4px;
+}
+.grp .age { margin-left: auto; font-size: 12px; }
+.kv .k { white-space: nowrap; }

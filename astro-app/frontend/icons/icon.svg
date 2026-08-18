@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Generisches Teleskop-Icon: einfach austauschbar via icons/ + manifest -->
+  <rect width="512" height="512" rx="96" fill="#0b0e13"/>
+  <circle cx="256" cy="256" r="170" fill="none" stroke="#26303f" stroke-width="6"/>
+  <!-- Sternenhintergrund -->
+  <g fill="#e8edf4">
+    <circle cx="120" cy="120" r="7"/><circle cx="400" cy="150" r="5"/>
+    <circle cx="360" cy="380" r="6"/><circle cx="150" cy="360" r="4"/>
+    <circle cx="410" cy="300" r="4"/><circle cx="90" cy="250" r="5"/>
+  </g>
+  <!-- Teleskop auf Stativ -->
+  <g stroke="#4fc3f7" stroke-width="22" stroke-linecap="round">
+    <line x1="150" y1="330" x2="366" y2="172"/>
+  </g>
+  <rect x="330" y="118" width="86" height="104" rx="16" transform="rotate(-33 373 170)"
+        fill="#4fc3f7"/>
+  <g stroke="#e8edf4" stroke-width="18" stroke-linecap="round">
+    <line x1="236" y1="352" x2="236" y2="440"/>
+    <line x1="236" y1="352" x2="170" y2="440"/>
+    <line x1="236" y1="352" x2="302" y2="440"/>
+  </g>
+  <circle cx="256" cy="256" r="10" fill="#f5c542"/>
+</svg>
