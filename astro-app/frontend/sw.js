@@ -1,8 +1,8 @@
-/* Service Worker v6 - Changelog-Ansicht + Zahnrad-Menü. */
+/* Service Worker v7 - 3-Nächte-Vorausschau, Segmente, Seeing-Horizont. */
 "use strict";
 
-const SHELL_CACHE = "astro-shell-v6";
-const API_CACHE = "astro-api-v6";
+const SHELL_CACHE = "astro-shell-v7";
+const API_CACHE = "astro-api-v7";
 const SHELL = [
   ".", "index.html", "app.js", "style.css", "manifest.webmanifest",
   "vendor/leaflet.js", "vendor/leaflet.css",

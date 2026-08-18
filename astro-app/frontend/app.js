@@ -102,35 +102,59 @@ function cell(v, fmtFn) {
   return `<td class="${cls ? "c-" + cls : "c-na"}">${v ?? "–"}</td>`;
 }
 
+function nightLabel(night) {
+  const d = new Date();
+  const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  const tom = new Date(d.getTime() + 86400000);
+  const tomorrow = `${tom.getFullYear()}-${String(tom.getMonth()+1).padStart(2,'0')}-${String(tom.getDate()).padStart(2,'0')}`;
+  if (night === today) return "Heute Nacht";
+  if (night === tomorrow) return "Morgen Nacht (+1)";
+  return `Nacht auf ${esc(night.slice(8,10))}.${esc(night.slice(5,7))}. (+2)`;
+}
+
 function forecastHtml(fc) {
   const g = fc.golden;
+  const others = (fc.golden_windows || []).filter(w => w !== g);
   const goldenCard = g
     ? `<div class="golden">
-         <div class="g-title">✨ Golden Window</div>
+         <div class="g-title">✨ Golden Window ${g.night === new Date().toISOString().slice(0,10) ? "heute Nacht" : ""}</div>
          <div class="g-time">${esc(g.start)} – ${esc(g.end)} Uhr</div>
          <div class="g-why">${g.reasons.map(esc).join(" · ")}</div>
+         ${others.length ? `<div class="g-why" style="margin-top:4px">Weitere: ${others.map(w =>
+            `${w.night.slice(5)} ${esc(w.start)}-${esc(w.end)} (${w.hours}h)`).join(" · ")}</div>` : ""}
        </div>`
     : `<div class="golden none">
-         <div class="g-title">Kein brauchbares Fenster in dieser Nacht</div>
+         <div class="g-title">Kein brauchbares Fenster in den nächsten Nächten</div>
          <div class="g-why">${esc(CURRENT_PROFILE === "planet"
               ? "Seeing/Jetstream/Wolken erfüllen nie gleichzeitig die Kriterien"
               : "Es fehlt vermutlich an Dunkelheit, Wolken oder Seeing")}</div>
        </div>`;
-  const rows = fc.series.map(h => `
+  // Stunden nach Nacht gruppieren (Segmente), innerhalb chronologisch
+  const segs = [];
+  for (const h of fc.series) {
+    if (!segs.length || segs[segs.length-1].night !== h.night)
+      segs.push({night: h.night, rows: []});
+    segs[segs.length-1].rows.push(h);
+  }
+  const rows = segs.map(seg => `
+    <tr class="night-sep"><td colspan="8">${nightLabel(seg.night)}</td></tr>` +
+    seg.rows.map(h => `
     <tr class="${h.ok ? "row-ok" : ""}">
       <td class="c-h">${esc(h.hhmm)}</td>
       ${cell(h.clouds, TH.clouds)}
-      ${cell(h.seeing, TH.seeing)}
+      ${h.beyond_seeing ? '<td class="c-na" title="Meteoblue-Horizont überschritten">–</td>'
+                        : cell(h.seeing, TH.seeing)}
       ${cell(h.wind, TH.wind)}
       ${cell(h.tau, TH.tau)}
       ${cell(h.rain, TH.rain)}
       <td class="${h.dark ? "c-g" : "c-na"}">${h.dark ? "🌙" : "☀"}</td>
       <td class="${h.moon_up ? "c-y" : "c-na"}">${h.moon_up ? "🌕" : ""}</td>
-    </tr>`).join("");
+    </tr>`).join("")).join("");
   return `
     <div class="sub mono">Prognose ${esc(fc.ts || "")} · Profil ${esc(fc.profile)} ·
-      Wolkenquelle ${esc(fc.sources && fc.sources.clouds || "?")} ·
-      Dunkel ${esc(fc.dark_window || "n/a")}</div>
+      Seeing bis ${esc((fc.seeing_horizon || "").slice(11,16) || "Horizont")} ·
+      Wolken: ${esc(fc.sources && fc.sources.clouds || "?")}/OM ·
+      Dunkel heute ${esc(fc.dark_window || "n/a")}</div>
     ${goldenCard}
     <table class="fc-table mono">
       <thead><tr><th>Std</th><th>Wolk%</th><th>See"</th><th>Wind</th>

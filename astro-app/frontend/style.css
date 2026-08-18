@@ -213,3 +213,10 @@ body.night .leaflet-container { background: #000; }
 }
 .grp .age { margin-left: auto; font-size: 12px; }
 .kv .k { white-space: nowrap; }
+
+/* Nacht-Segmenttrenner in der Vorausschau-Tabelle */
+.fc-table tr.night-sep td {
+  text-align: left; font-weight: 700; color: var(--accent);
+  padding-top: 10px; background: transparent;
+  border-bottom: 2px solid var(--border);
+}

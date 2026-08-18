@@ -165,9 +165,12 @@ class SiteReport:
     planets: Optional[dict] = None       # {"jupiter": {max_alt, culm, window}, ...}
     # Vorausschau-Reihen (transient, NICHT in der DB - latest-wins als JSON):
     # gefuellt von den Quellen-Scrapern, kombiniert von build_forecast()
-    fc_clouds: Optional[list] = None     # [{ts, total, low, mid, high, rain}]
-    fc_seeing: Optional[list] = None     # [{ts, seeing, idx, jet}]
+    fc_clouds: Optional[list] = None     # [{ts, total, low, mid, high, rain}] (Nacht-1-Quelle: CO)
+    fc_clouds_om: Optional[list] = None  # gleiche Form, IMMER aus Open-Meteo (72 h;
+                                         # deckt Nacht 2+3, ClearOutside liefert nur ~24 h)
+    fc_seeing: Optional[list] = None     # [{ts, seeing, idx, jet}] alle Meteoblue-Tage
     fc_ground: Optional[list] = None     # [{ts, cloud, precip, prob, wind, tau}]
+    dark_windows: Optional[list] = None  # ["HH:MM-HH:MM"] je Nacht (bis zu 3)
     errors: list = field(default_factory=list)
 
     def compute_dew_risk(self):
@@ -528,17 +531,16 @@ async def scrape_meteoblue(context, lat: float, lon: float, rep: SiteReport):
         night = night[:8]
         log.info("[%s] Nacht-Fenster (%dh+): %s", source, h_now, night[:8])
 
-        # Vorausschau-Reihe: KOMPLETTE Nacht (kein 8-h-Deckel, bis Sonnenaufgang
-        # reicht day1 bis Stunde 8 abzudecken) - Rating-Aggregation unveraendert
+        # Vorausschau-Reihe: ALLE verfuegbaren Tagesbloecke (Meteoblue liefert
+        # ohne Abo heute + 2 Folgetage) - Rating-Aggregation unveraendert
         fc_night = []
         base = datetime.now()
-        for day_idx, rows in enumerate(day_rows[:2]):
+        for day_idx, rows in enumerate(day_rows):
             for (h, seeing, i1, i2, jet) in rows:
-                if (day_idx == 0 and h >= h_now) or (day_idx == 1 and h <= 8):
-                    ts = (base + timedelta(days=day_idx)).replace(
-                        hour=h, minute=0, second=0, microsecond=0)
-                    fc_night.append({"ts": ts.isoformat(timespec="minutes"),
-                                     "seeing": seeing, "idx": i1, "jet": jet})
+                ts = (base + timedelta(days=day_idx)).replace(
+                    hour=h, minute=0, second=0, microsecond=0)
+                fc_night.append({"ts": ts.isoformat(timespec="minutes"),
+                                 "seeing": seeing, "idx": i1, "jet": jet})
         rep.fc_seeing = fc_night
 
         if night:
@@ -720,22 +722,18 @@ def check_brightsky_ground(lat: float, lon: float, rep: SiteReport):
 
 
 def check_open_meteo_clouds(lat: float, lon: float, rep: SiteReport):
-    """Sekundaer-Fallback fuer die Wolken-SCHICHTEN (Live verifiziert 2026-08):
-    Open-Meteo liefert cloud_cover_low/mid/high + precipitation_probability
-    stundenweise, key-frei und OHNE Bot-Schutz - haengt also an keinem
-    Cloudflare-Budget (anders als ClearOutside).
-    Kaskade: ClearOutside -> Open-Meteo (Schichten) -> BrightSky (nur Total).
-    Frueh-Return nur, wenn Wolken UND Jetstream schon vorliegen - sonst
-    fragen wir fuer den Jetstream-Proxy (300 hPa) trotzdem an."""
-    if rep.clouds_total is not None and rep.jetstream is not None:
-        return
+    """Open-Meteo - ab sofort ZWEITQUELLE mit Pflicht-Abruf (nicht mehr nur
+    ClearOutside-Fallback): die 72-h-Wolkenreihe deckt die Naechte 2+3 der
+    Vorausschau, da ClearOutside nur ~24 h liefert. Kein Bot-Schutz, haengt
+    an keinem Cloudflare-Budget. Rating-Kaskade unveraendert:
+    ClearOutside -> Open-Meteo (Schichten) -> BrightSky (nur Total)."""
     try:
         params = urllib.parse.urlencode({
             "latitude": lat, "longitude": lon,
             "hourly": "cloud_cover,cloud_cover_low,cloud_cover_mid,"
                       "cloud_cover_high,precipitation_probability,"
                       "wind_speed_300hPa",   # Jetstream-Proxy (Meteoblue-Fallback)
-            "forecast_days": 2, "timezone": "Europe/Berlin",  # 2 Tage: Nachtfenster
+            "forecast_days": 4, "timezone": "Europe/Berlin",  # 3 Naechte
         })
         log.info("[OpenMeteo] GET api.open-meteo.com/v1/forecast?%s", params)
         data = http_get_json(f"https://api.open-meteo.com/v1/forecast?{params}",
@@ -753,6 +751,24 @@ def check_open_meteo_clouds(lat: float, lon: float, rep: SiteReport):
         total = wmax("cloud_cover")
         low, mid, high = wmax("cloud_cover_low"), wmax("cloud_cover_mid"), \
             wmax("cloud_cover_high")
+
+        # 72-h-Reihe IMMER (deckt Naechte 2+3; Nacht 1 wird in build_forecast
+        # durch die ClearOutside-Reihe verfeinert, wenn vorhanden)
+        times = h.get("time", [])
+        now_h = datetime.now().hour
+        om_series = []
+        for i in range(now_h, min(now_h + 72, len(times))):
+            def g(key, i=i):
+                v = h.get(key) or []
+                return v[i] if i < len(v) and v[i] is not None else None
+            om_series.append({"ts": times[i], "total": g("cloud_cover"),
+                              "low": g("cloud_cover_low"),
+                              "mid": g("cloud_cover_mid"),
+                              "high": g("cloud_cover_high"),
+                              "rain": g("precipitation_probability")})
+        if om_series:
+            rep.fc_clouds_om = om_series
+
         if total is not None and rep.clouds_total is None:
             rep.clouds_total, rep.clouds_low = total, low
             rep.clouds_mid, rep.clouds_high = mid, high
@@ -761,22 +777,9 @@ def check_open_meteo_clouds(lat: float, lon: float, rep: SiteReport):
                 rep.rain_prob = wmax("precipitation_probability")
             log.info("[OpenMeteo] Schicht-Fallback: total=%s L/M/H=%s/%s/%s "
                      "rain=%s", total, low, mid, high, rep.rain_prob)
-            # Vorausschau-Reihe: 16 h ab jetzt (deckt die ganze Nacht),
-            # ts direkt aus OM-time-Feld (Europe/Berlin)
-            times = h.get("time", [])
-            now_h = datetime.now().hour
-            series = []
-            for i in range(now_h, min(now_h + 16, len(times))):
-                def g(key):
-                    v = h.get(key) or []
-                    return v[i] if i < len(v) and v[i] is not None else None
-                series.append({"ts": times[i], "total": g("cloud_cover"),
-                               "low": g("cloud_cover_low"),
-                               "mid": g("cloud_cover_mid"),
-                               "high": g("cloud_cover_high"),
-                               "rain": g("precipitation_probability")})
-            if series:
-                rep.fc_clouds = series
+            # Wenn ClearOutside nichts lieferte, ist OM auch die Nacht-1-Serie
+            if not rep.fc_clouds:
+                rep.fc_clouds = om_series
         # Jetstream-Fallback (nur falls Meteoblue nichts lieferte): Wind in
         # 300 hPa als Proxy - liegt etwas tiefer als Meteoblues 200-hPa-Jet,
         # liefert aber die Groessenordnung. OM gibt km/h -> m/s.
@@ -787,7 +790,7 @@ def check_open_meteo_clouds(lat: float, lon: float, rep: SiteReport):
                 log.info("[OpenMeteo] Jetstream-Proxy (300 hPa): %s m/s",
                          rep.jetstream)
     except Exception as e:
-        log.warning("[OpenMeteo] Fallback fehlgeschlagen: %s", type(e).__name__)
+        log.warning("[OpenMeteo] Abfrage fehlgeschlagen: %s", type(e).__name__)
         log.debug("[OpenMeteo] Traceback:\n%s", traceback.format_exc())
 
 
@@ -861,25 +864,32 @@ def check_brightsky_night(lat: float, lon: float, rep: SiteReport):
 
     try:
         now = datetime.now(timezone.utc)
+        # 56-h-Fenster: deckt 3 Nächte für die Vorausschau (hours-Reihe).
+        # Die min/max-Aggregate unten bleiben auf die ERSTE Nacht begrenzt.
         params = urllib.parse.urlencode({
             "lat": lat, "lon": lon,
             "date": now.strftime("%Y-%m-%dT%H:%M"),
-            "last_date": (now + timedelta(hours=11)).strftime("%Y-%m-%dT%H:%M"),
+            "last_date": (now + timedelta(hours=56)).strftime("%Y-%m-%dT%H:%M"),
         })
         log.info("[BrightSky-Nacht] GET ?%s", params)
         data = http_get_json(f"https://api.brightsky.dev/weather?{params}",
                              timeout=10)
         rows = data.get("weather", [])
+        # Erste Nacht = Zeitraum bis zum ersten Sonnenaufgang (~11 h ab jetzt)
+        first_night_cutoff = datetime.fromisoformat(
+            rows[0]["timestamp"]) if rows else now
+        first_night_cutoff = (first_night_cutoff.astimezone(_berlin())
+                              + timedelta(hours=12))
 
         # Nur echte Nachtstunden zaehlen (lokale Berliner Zeit 20:00-05:59)
         night_rows = []
         for w in rows:
             try:
-                local_h = datetime.fromisoformat(w["timestamp"]).astimezone(
-                    _berlin()).hour
+                local = datetime.fromisoformat(w["timestamp"]).astimezone(
+                    _berlin())
             except Exception:
                 continue
-            if local_h >= 20 or local_h < 6:
+            if (local.hour >= 20 or local.hour < 6) and local < first_night_cutoff:
                 night_rows.append(w)
         if not night_rows:
             night_rows = rows  # Fallback: alles (frueh morgens gecrawlt)
@@ -1385,14 +1395,38 @@ def compute_moon(lat: float, lon: float) -> dict:
             set_s = _fmt_hm(t)
     moon.update({"rise": rise_s, "set": set_s})
 
-    # --- Astronomische Dunkelheit (Sonne < -18 Grad) ---
+    # --- Astronomische Dunkelheit (Sonne < -18 Grad), bis zu 3 Naechte ---
     # Grid nach LINKS erweitert (start - 6 h): In einer laufenden Nacht
     # begann die Dunkelheit VOR 'start' - ohne Erweiterung wuerde das
     # Fenster beim 'jetzt' abgeschnitten statt beim wahren Eintritt
-    # (z.B. 22:49) interpoliert. Fix 17.08. fuer 'Dunkel 00:00-...'-Anomalie.
-    sun_grid = ts.tt_jd(np.linspace(start_t.tt - 0.25, sunrise_t.tt, 600))
+    # interpoliert. Multi-Intervall: ein Fenster je Nacht (bis 3).
+    sun_grid = ts.tt_jd(np.linspace(start_t.tt - 0.25, start_t.tt + 3.3, 2000))
     sun_alt = obs.at(sun_grid).observe(eph["sun"]).apparent().altaz()[0].degrees
-    dark = window_above(-sun_alt, 18.0, sun_grid)  # Hoehe<=-18 <=> -hoehe>=18
+    neg = -sun_alt
+
+    def _seg_window(i0, i1):
+        def interp(i_a, i_b):
+            a0, a1 = neg[i_a], neg[i_b]
+            if a1 == a0:
+                return sun_grid[i_b]
+            f = (18.0 - a0) / (a1 - a0)
+            return ts.tt_jd(sun_grid[i_a].tt + f * (sun_grid[i_b].tt - sun_grid[i_a].tt))
+        t0 = interp(i0 - 1, i0) if i0 > 0 else sun_grid[i0]
+        t1 = interp(i1, i1 + 1) if i1 + 1 < len(neg) else sun_grid[i1]
+        return f"{_fmt_hm(t0)}-{_fmt_hm(t1)}"
+
+    above = np.nonzero(neg >= 18.0)[0]
+    dark_windows = []
+    if len(above):
+        seg = [above[0]]
+        for i in above[1:]:
+            if i == seg[-1] + 1:
+                seg.append(i)
+            else:
+                dark_windows.append(_seg_window(seg[0], seg[-1]))
+                seg = [i]
+        dark_windows.append(_seg_window(seg[0], seg[-1]))
+    dark = dark_windows[0] if dark_windows else None
 
     # --- Planeten (de421: Barycenter genuegt fuer Hoehenwinkel) ---
     planets = {}
@@ -1402,7 +1436,8 @@ def compute_moon(lat: float, lon: float) -> dict:
         except Exception as e:
             log.warning("[Nacht] %s nicht berechenbar: %s", pl, type(e).__name__)
 
-    moon.update({"dark": dark, "planets": planets,
+    moon.update({"dark": dark, "dark_windows": dark_windows[:3],
+                 "planets": planets,
                  "night": f"{_fmt_hm(start_t)}-{_fmt_hm(sunrise_t)}"})
     return moon
 
@@ -1466,6 +1501,7 @@ def attach_moon(rep: SiteReport):
         rep.moon_rise = m["rise"]
         rep.moon_set = m["set"]
         rep.dark_window = m.get("dark")
+        rep.dark_windows = m.get("dark_windows") or ([m["dark"]] if m.get("dark") else None)
         rep.planets = m.get("planets")
     rep.compute_dew_risk()
 
@@ -1546,12 +1582,20 @@ def _hour_score(hour: dict, profile: str) -> tuple[bool, list]:
 
 
 def build_forecast(rep: SiteReport, profile: str = "dso"):
-    """Reihen kombinieren, Stunden bewerten, bestes zusammenhaengendes
-    Fenster (min. 1 h, stündliches Raster) suchen und als JSON ablegen."""
+    """Reihen kombinieren, Stunden bewerten und als JSON ablegen.
+
+    Horizont: 3 Naechte (20.08. bestätigt). Wolken: Nacht 1 aus ClearOutside
+    (feiner), Naechte 2+3 aus Open-Meteo (immer abgefragt); Boden aus dem
+    56-h-BrightSky-Nachtfenster; Seeing/Jet aus Meteoblue, stundengenau null
+    ab seeing_horizon (Meteoblue liefert ohne Abo heute + 2 Folgetage).
+    golden_windows: Liste je Nacht; 'golden' (kompatibel) = bestes Fenster.
+    Zusätzlich forecast_log-Insert (nur lead <= 48 h) für die spaetere
+    Prognosegüte-Analyse."""
     try:
         # Reihen-Keys sind naive lokale Stunden (Europe/Berlin) - 'now' ebenso
         now = datetime.now().replace(minute=0, second=0, microsecond=0)
-        clouds = {e["ts"][:13]: e for e in (rep.fc_clouds or [])}
+        co = {e["ts"][:13]: e for e in (rep.fc_clouds or [])}
+        om = {e["ts"][:13]: e for e in (rep.fc_clouds_om or [])}
         seeing = {e["ts"][:13]: e for e in (rep.fc_seeing or [])}
         ground = {}
         for e in (rep.fc_ground or []):
@@ -1560,78 +1604,105 @@ def build_forecast(rep: SiteReport, profile: str = "dso"):
                 ground[local.strftime("%Y-%m-%dT%H")] = e
             except Exception:
                 continue
+        dark_windows = rep.dark_windows or []
+        moon_win = rep.moon_window if rep.moon_window and "nie" not in str(
+            rep.moon_window) else None
+
+        # Seeing-Horizont: letzter Meteoblue-Stundenwert + 1 h
+        seeing_horizon = None
+        if seeing:
+            last_key = sorted(seeing)[-1]
+            seeing_horizon = (datetime.strptime(last_key, "%Y-%m-%dT%H")
+                              + timedelta(hours=1)).isoformat(timespec="minutes")
 
         series = []
-        # Nacht-Begrenzung (Fix: Tabelle nur bis Sonnenaufgang, keine
-        # Tagesstunden) - stundengranular: die laufende Stunde zaehlt mit,
-        # auch wenn der Sonnenuntergang mitten in ihr lag.
-        m = moon_cached(rep.lat, rep.lon) or {}
-        night_win = m.get("night") or ""   # z.B. "23:03-06:20"
-        n_start = int(night_win.split("-")[0].split(":")[0]) if "-" in night_win else 0
-        n_end_h, n_end_m = (night_win.split("-")[1].split(":") + ["0"])[:2] if "-" in night_win else (24, 0)
-        n_end = int(n_end_h) + (1 if int(n_end_m) > 0 else 0)  # aufrunden
-        for k in sorted(set(clouds) | set(seeing) | set(ground)):
+        for k in sorted(set(co) | set(om) | set(seeing) | set(ground)):
             dt_h = datetime.strptime(k, "%Y-%m-%dT%H")
             if dt_h < now:
                 continue
             hh = dt_h.hour
-            in_night = (n_start <= hh <= n_end) if n_start <= n_end \
-                else (hh >= n_start or hh <= n_end)
-            if not in_night:
-                continue  # Tagesstunde - gehoert nicht in die Vorausschau
+            # Raster: Nachtstunden 20:00-06:59 (7 mit Puffer fuer Sommer-Aufgang)
+            if not (hh >= 20 or hh < 7):
+                continue
             hhmm = dt_h.strftime("%H:%M")
-            cl, se, gr = clouds.get(k), seeing.get(k), ground.get(k)
+            cl, omc = co.get(k), om.get(k)
+            se, gr = seeing.get(k), ground.get(k)
+            if cl and cl.get("total") is not None:
+                clouds_v, src = cl["total"], "clearoutside"
+                rain_v = cl.get("rain")
+            elif omc and omc.get("total") is not None:
+                clouds_v, src = omc["total"], "open_meteo"
+                rain_v = omc.get("rain")
+            elif gr and gr.get("cloud") is not None:
+                clouds_v, src = gr["cloud"], "brightsky"
+                rain_v = gr.get("prob")
+            else:
+                clouds_v, rain_v, src = None, None, "n/a"
+            # Nacht 1: CO-Regen fiel evtl. weg - OM/BrightSky nachreichen
+            if rain_v is None:
+                rain_v = (omc or {}).get("rain") if omc else None
+            if rain_v is None and gr:
+                rain_v = gr.get("prob")
+            beyond = bool(seeing_horizon and k + ":00" >= seeing_horizon)
             hour = {
                 "ts": k + ":00",
                 "hhmm": hhmm,
-                "clouds": (cl or {}).get("total") if cl else gr.get("cloud") if gr else None,
-                "lmh": [((cl or {}).get(x) if cl else None)
+                # Nacht-Datum: Stunden >= 20 gehoeren zum Abend-Datum,
+                # Stunden < 7 zum Vortag
+                "night": (dt_h if hh >= 20 else dt_h - timedelta(days=1)
+                          ).strftime("%Y-%m-%d"),
+                "clouds": clouds_v, "src": src,
+                "lmh": [((cl or omc) or {}).get(x)
                         for x in ("low", "mid", "high")],
-                "seeing": (se or {}).get("seeing") if se else None,
-                "jet": (se or {}).get("jet") if se else None,
+                "seeing": (se or {}).get("seeing") if se and not beyond else None,
+                "jet": (se or {}).get("jet") if se and not beyond else None,
                 "tau": gr.get("tau") if gr else None,
                 "wind": gr.get("wind") if gr else None,
-                "rain": ((cl or {}).get("rain") if cl and (cl or {}).get("rain") is not None
-                         else gr.get("prob") if gr else None),
+                "rain": rain_v,
                 "precip": gr.get("precip") if gr else None,
-                "dark": _hh_in_window(hhmm, rep.dark_window),
-                "moon_up": _hh_in_window(hhmm, rep.moon_window)
-                           if rep.moon_window and "nie" not in str(rep.moon_window) else False,
+                "dark": any(_hh_in_window(hhmm, w) for w in dark_windows),
+                "moon_up": _hh_in_window(hhmm, moon_win) if moon_win else False,
                 "moon_illum": rep.moon_illum,
+                "beyond_seeing": beyond,
             }
             hour["ok"], hour["reasons"] = _hour_score(hour, profile)
             series.append(hour)
         if not series:
             return
 
-        # Golden Window: laengste 'ok'-Sequenz (min. 1 h Raster)
-        best = (0, None, None)  # (laenge, start, end)
-        i = 0
-        while i < len(series):
-            if series[i]["ok"]:
-                j = i
-                while j < len(series) and series[j]["ok"]:
-                    j += 1
-                if j - i > best[0]:
-                    best = (j - i, series[i]["ts"], series[j - 1]["ts"])
-                i = j
-            else:
-                i += 1
-        golden = None
-        if best[1]:
-            win = [h for h in series if best[1] <= h["ts"] <= best[2]]
-            counts = {}
-            for h in win:
-                for r in h["reasons"]:
-                    counts[r] = counts.get(r, 0) + 1
-            top = sorted(counts.items(), key=lambda kv: -kv[1])[:3]
-            golden = {
-                "start": datetime.fromisoformat(best[1]).strftime("%H:%M"),
-                "end": (datetime.fromisoformat(best[2])
-                        + timedelta(hours=1)).strftime("%H:%M"),
-                "hours": best[0],
-                "reasons": [f"{r} ({n}h)" for r, n in top],
-            }
+        # Golden Windows: je Nacht das laengste 'ok'-Segment (min. 1 h Raster)
+        golden_windows = []
+        for night in sorted({h["night"] for h in series}):
+            hseries = [h for h in series if h["night"] == night]
+            best = (0, None, None)
+            i = 0
+            while i < len(hseries):
+                if hseries[i]["ok"]:
+                    j = i
+                    while j < len(hseries) and hseries[j]["ok"]:
+                        j += 1
+                    if j - i > best[0]:
+                        best = (j - i, hseries[i]["ts"], hseries[j - 1]["ts"])
+                    i = j
+                else:
+                    i += 1
+            if best[1]:
+                win = [h for h in hseries if best[1] <= h["ts"] <= best[2]]
+                counts = {}
+                for h in win:
+                    for r in h["reasons"]:
+                        counts[r] = counts.get(r, 0) + 1
+                top = sorted(counts.items(), key=lambda kv: -kv[1])[:3]
+                golden_windows.append({
+                    "night": night,
+                    "start": datetime.fromisoformat(best[1]).strftime("%H:%M"),
+                    "end": (datetime.fromisoformat(best[2])
+                            + timedelta(hours=1)).strftime("%H:%M"),
+                    "hours": best[0],
+                    "reasons": [f"{r} ({n}h)" for r, n in top],
+                })
+        golden = max(golden_windows, key=lambda g: g["hours"]) \
+            if golden_windows else None
 
         data = {}
         try:
@@ -1643,27 +1714,33 @@ def build_forecast(rep: SiteReport, profile: str = "dso"):
             "ts": datetime.now().isoformat(timespec="minutes"),
             "profile": profile,
             "dark_window": rep.dark_window,
+            "dark_windows": dark_windows,
             "moon_window": rep.moon_window,
             "moon_illum": rep.moon_illum,
+            "seeing_horizon": seeing_horizon,
             "sources": {"clouds": rep.clouds_source,
                         "seeing": rep.seeing_source,
                         "ground": "brightsky"},
             "series": series,
             "golden": golden,
+            "golden_windows": golden_windows,
         }
         tmp = FORECAST_PATH + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=1)
         os.replace(tmp, FORECAST_PATH)  # atomar: API liest nie halbfertig
-        log.info("[Forecast] %s: %d Stunden, Golden Window: %s",
-                 rep.name, len(series),
-                 f"{golden['start']}-{golden['end']}" if golden else "keines")
+
+        # Prognosegüte-Log: nur lead <= 48 h (Vorschlag 18.08., bestaetigt)
+        db_insert_forecast_log(rep, series)
+
+        gtxt = ", ".join(f"{g['night'][5:]}: {g['start']}-{g['end']}"
+                         for g in golden_windows) or "keines"
+        log.info("[Forecast] %s: %d h / %d Naechte, Windows: %s",
+                 rep.name, len(series), len(golden_windows), gtxt)
     except Exception as e:
         log.warning("[Forecast] Aufbau fehlgeschlagen fuer %s: %s",
                     rep.name, type(e).__name__)
         log.debug("[Forecast] Traceback:\n%s", traceback.format_exc())
-
-
 # ---------------------------------------------------------------------------
 # SQLite-Historisierung (Rohwerte + Quellen + Mond + Session-Feedback)
 # ---------------------------------------------------------------------------
@@ -1722,6 +1799,33 @@ def db_init():
             source TEXT,                 -- optional (z.B. 'sharpcape', 'asisair')
             created_at TEXT NOT NULL     -- Zeitpunkt des Sync-Eintrags
         )""")
+    # Prognosegüte (18.08.): forecast_log ist strikt append-only (eine Zeile
+    # je Standort/Ziel-Stunde je Heavy-Lauf, nur lead <= 48 h). Die spaetere
+    # Verifikation schreibt ERGEBNISSE separat (forecast_verification), nie
+    # Updates auf forecast_log - 'erledigt' = Verification-Zeile existiert.
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS forecast_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            created_at TEXT NOT NULL,
+            target_ts TEXT NOT NULL,
+            location_name TEXT NOT NULL,
+            lead_hours REAL NOT NULL,
+            clouds_total INTEGER, seeing REAL, jetstream REAL,
+            dewpoint_spread REAL, wind_speed REAL, rain_prob INTEGER,
+            source_clouds TEXT
+        )""")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS forecast_verification (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            forecast_log_id INTEGER NOT NULL,
+            verified_at TEXT NOT NULL,
+            matched INTEGER NOT NULL,    -- 1 = Ist-Werte gefunden, 0 = nicht verifizierbar (final)
+            actual_clouds INTEGER, actual_seeing REAL,
+            actual_wind REAL, actual_tau REAL,
+            err_clouds REAL, err_seeing REAL, err_wind REAL, err_tau REAL
+        )""")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_flog_target "
+                 "ON forecast_log(location_name, target_ts)")
     # Idempotente Migration bestaehender DBs: neue Spalten nachziehen
     have = {r[1] for r in conn.execute("PRAGMA table_info(crawls)")}
     migrations = {
@@ -1801,6 +1905,42 @@ def db_end_session() -> Optional[tuple]:
         conn.commit()
     conn.close()
     return row
+
+
+def db_insert_forecast_log(rep: SiteReport, series: list):
+    """Vorhersage-Zeilen fuer die spaetere Prognosegüte-Analyse loggen.
+    Nur lead <= 48 h (bestaetigt 18.08.) - die Fernstunden sparen ein Drittel
+    Volumen ohne den Anwendungsfall (1h/24h/Vorlauf-Vergleich) zu schmälern.
+    Reines Zusatz-Logging: kein Einfluss auf Rating/Forecast."""
+    try:
+        now = datetime.now()
+        created = now.isoformat(timespec="seconds")
+        rows = []
+        for h in series:
+            try:
+                target = datetime.fromisoformat(h["ts"])
+            except Exception:
+                continue
+            lead = (target - now).total_seconds() / 3600
+            if lead < 0 or lead > 48:
+                continue
+            rows.append((created, h["ts"], rep.name, round(lead, 2),
+                         h.get("clouds"), h.get("seeing"), h.get("jet"),
+                         h.get("tau"), h.get("wind"), h.get("rain"),
+                         h.get("src")))
+        if not rows:
+            return
+        conn = sqlite3.connect(DB_PATH)
+        conn.executemany(
+            "INSERT INTO forecast_log (created_at, target_ts, location_name, "
+            "lead_hours, clouds_total, seeing, jetstream, dewpoint_spread, "
+            "wind_speed, rain_prob, source_clouds) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?)", rows)
+        conn.commit()
+        conn.close()
+        log.info("[ForecastLog] %s: %d Zeilen (lead<=48h)", rep.name, len(rows))
+    except Exception as e:
+        log.warning("[ForecastLog] Insert fehlgeschlagen: %s", e)
 
 
 def db_insert_crawl(rep: SiteReport, mode: str, profile: str = "dso"):
