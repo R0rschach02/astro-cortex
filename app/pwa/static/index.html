@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0a0e1a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Astro Cortex</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #0a0e1a;
+            color: #e8eaf0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        header {
+            padding: 1rem;
+            background: linear-gradient(135deg, #1a1f2e, #0a0e1a);
+            border-bottom: 1px solid #2a3142;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        header h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #4a9eff;
+        }
+        .status-pill {
+            margin-left: auto;
+            padding: 0.25rem 0.75rem;
+            background: #1a2332;
+            border-radius: 999px;
+            font-size: 0.75rem;
+            color: #4a9eff;
+            border: 1px solid #2a3142;
+        }
+        #map {
+            flex: 1;
+            min-height: 300px;
+            background: #0a0e1a;
+        }
+        .panel {
+            padding: 1rem;
+            border-top: 1px solid #2a3142;
+            max-height: 40vh;
+            overflow-y: auto;
+        }
+        .rating-card {
+            background: #1a1f2e;
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            border-left: 4px solid #444;
+        }
+        .rating-card.go { border-left-color: #4ade80; }
+        .rating-card.marginal { border-left-color: #fbbf24; }
+        .rating-card.no_go { border-left-color: #f87171; }
+        .rating-card .name {
+            font-weight: 600;
+            font-size: 1rem;
+            margin-bottom: 0.25rem;
+        }
+        .rating-card .score {
+            font-size: 0.875rem;
+            color: #94a3b8;
+        }
+        .badge {
+            display: inline-block;
+            padding: 0.125rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .badge.go { background: #14532d; color: #4ade80; }
+        .badge.marginal { background: #78350f; color: #fbbf24; }
+        .badge.no_go { background: #7f1d1d; color: #f87171; }
+        /* PWA install hint */
+        .install-hint {
+            display: none;
+            position: fixed;
+            bottom: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1a1f2e;
+            padding: 0.75rem 1.25rem;
+            border-radius: 999px;
+            border: 1px solid #2a3142;
+            font-size: 0.875rem;
+            color: #4a9eff;
+        }
+        @media (display-mode: standalone) {
+            .install-hint { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Astro Cortex</h1>
+        <span class="status-pill" id="status">Loading…</span>
+    </header>
+    <div id="map"></div>
+    <div class="panel" id="ratings">
+        <!-- Rating cards inserted here by JS -->
+    </div>
+    <div class="install-hint" id="installHint">Add to Home Screen for full-screen mode</div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Service Worker registration (PWA offline support)
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/sw.js').catch(console.error);
+        }
+
+        // Initialize Leaflet map
+        const map = L.map('map').setView([48.5, 11.5], 6);  // Default: Bavaria
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap',
+            maxZoom: 18,
+        }).addTo(map);
+
+        // Fetch locations and ratings
+        async function refresh() {
+            try {
+                const [locRes, rateRes] = await Promise.all([
+                    fetch('/api/locations').then(r => r.json()),
+                    // In production: fetch all ratings in one call
+                ]);
+                document.getElementById('status').textContent = 'Online';
+                // TODO: render rating cards
+            } catch (e) {
+                document.getElementById('status').textContent = 'Offline';
+                console.error(e);
+            }
+        }
+        refresh();
+        setInterval(refresh, 60000);  // Refresh every 60s
+    </script>
+</body>
+</html>

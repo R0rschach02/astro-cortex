@@ -1,0 +1,44 @@
+# Astro Cortex - Python dependencies
+# Pinned to known-good versions; update deliberately.
+
+# --- Web framework ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# --- HTTP & crawling ---
+httpx==0.28.1
+playwright==1.49.1
+beautifulsoup4==4.12.3
+lxml==5.3.0
+
+# --- Astronomy ---
+skyfield==1.52
+# Skyfield pulls in numpy, jplephem, sgp4 automatically
+astroplan==0.10.1
+
+# --- Database ---
+# stdlib sqlite3 is sufficient; no ORM to keep dependencies minimal.
+# sqlalchemy is intentionally NOT included — direct SQL keeps the
+# codebase auditable and the DB layer trivially debuggable.
+
+# --- Telegram ---
+python-telegram-bot==21.10
+
+# --- Configuration ---
+pydantic==2.10.4
+pydantic-settings==2.7.1
+python-dotenv==1.0.1
+
+# --- Maps (PWA static files only; no Python dep needed) ---
+# Leaflet is shipped as static JS, not a Python package.
+
+# --- Utilities ---
+tenacity==9.0.0           # retry logic for source fetches
+structlog==24.4.0         # structured logging
+click==8.1.8              # CLI for scripts (init_db, setup, etc.)
+
+# --- Testing ---
+pytest==8.3.4
+pytest-asyncio==0.25.2
+respx==0.22.0             # mock httpx responses in tests

@@ -1,0 +1,23 @@
+[Unit]
+Description=Astro Cortex - Heavy crawl (30min full aggregation + rating)
+After=network-online.target astro-app.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=astro
+Group=astro
+WorkingDirectory=/opt/astro-cortex
+EnvironmentFile=/opt/astro-cortex/.env
+ExecStart=/opt/astro-cortex/.venv/bin/python -m app.crawl.heavy
+TimeoutStartSec=900
+# Hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/astro-cortex
+PrivateTmp=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

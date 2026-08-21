@@ -1,0 +1,13 @@
+[Unit]
+Description=Astro Cortex - Radar timer (5min interval)
+Requires=astro-radar.service
+
+[Timer]
+# Run every 5 minutes, persistent across reboots
+OnBootSec=1min
+OnUnitActiveSec=5min
+AccuracySec=10s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

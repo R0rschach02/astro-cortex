@@ -1,0 +1,140 @@
+# =====================================================================
+# Astro Cortex - .gitignore
+# CRITICAL: This file protects secrets from being pushed to GitHub.
+# Never commit anything in the sections marked [SECRET] or [RUNTIME].
+# =====================================================================
+
+# --- [SECRET] Environment & credentials ---
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials/
+telegram_token.txt
+*.token
+
+# --- [SECRET] SSH & Tailscale ---
+.ssh/
+tailscale.state
+*.tailscale
+
+# --- [RUNTIME] Database & state ---
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+data/
+state/
+*.state.json
+runtime/
+
+# --- [RUNTIME] Logs ---
+logs/
+*.log
+*.log.*
+
+# --- [RUNTIME] Ephemeris & large data files ---
+*.bsp
+*.bpc
+de421.bsp
+de440.bsp
+ephemeris/
+skyfield-data/
+
+# --- [RUNTIME] Playwright browser binaries ---
+.playwright/
+ms-playwright/
+
+# --- [RUNTIME] Crawl caches & screenshots ---
+cache/
+.cache/
+screenshots/
+*.png.bak
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# --- Virtual environments ---
+.venv
+venv/
+env/
+ENV/
+.python-version
+
+# --- Testing & coverage ---
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# --- Type checkers ---
+.mypy_cache/
+.pyre/
+.pytype/
+.ruff_cache/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-*
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# --- PWA build artifacts (keep sources, ignore builds) ---
+app/pwa/static/bundle.js
+app/pwa/static/bundle.js.map
+node_modules/
+
+# --- OS-specific ---
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# --- Project-local scratch ---
+scratch/
+tmp/
+*.tmp
+*.bak
+*.orig

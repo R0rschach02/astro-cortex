@@ -1,0 +1,24 @@
+[Unit]
+Description=Astro Cortex - FastAPI app (PWA + REST API)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=astro
+Group=astro
+WorkingDirectory=/opt/astro-cortex
+EnvironmentFile=/opt/astro-cortex/.env
+ExecStart=/opt/astro-cortex/.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
+Restart=on-failure
+RestartSec=5
+# Hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/astro-cortex
+PrivateTmp=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

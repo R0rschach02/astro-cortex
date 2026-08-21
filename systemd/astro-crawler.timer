@@ -1,0 +1,12 @@
+[Unit]
+Description=Astro Cortex - Heavy crawl timer (30min interval)
+Requires=astro-crawler.service
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=30min
+AccuracySec=30s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
