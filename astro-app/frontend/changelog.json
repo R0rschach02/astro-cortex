@@ -111,6 +111,13 @@
    "tag": "neu",
    "desc": "/dew protokolliert den Beschlag-Eintritt der laufenden Session (einmal pro Session): Dauer seit Session-Start, Tau-Spread Start→Onset (Start aus dem Session-Snapshot), Temp/Feuchte zum Zeitpunkt. Reine Datensammlung für die spätere Beschlags-Kalibrierung — kein automatischer Trigger, keine Rating-Änderung; Session bleibt offen.",
    "usage": "Bot: /dew (während der Session, wenn der Fangspiegel beschlägt)"
+  },
+  {
+   "date": "2026-08-23",
+   "title": "Externes Uptime-Monitoring",
+   "tag": "neu",
+   "desc": "Dead-Man's-Switch über healthchecks.io: Der Radar-Tick pingt nach jedem erfolgreichen Durchlauf HEALTHCHECK_PING_URL an; der uvicorn-Prozess pingt alle 15 min HEALTHCHECK_PING_URL_APP (in-process — Prozess tot = Pings stoppen = Alarm). Down-Erkennung und Telegram-Alarmierung übernimmt healthchecks.io autonom; Ping-Fehler hier bleiben folgenlos für den Tick.",
+   "usage": "Aktivierung: URLs in ~/.env eintragen (leer = inaktiv)"
   }
  ]
 }
