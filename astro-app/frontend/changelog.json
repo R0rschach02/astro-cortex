@@ -97,6 +97,13 @@
    "tag": "neu",
    "desc": "TELEGRAM_TOKEN/CHAT_ID liegen in ~/.env (Mini-Loader, keine Extra-Abhängigkeit), .env.example im Repo, Git-Historie sauber neu initialisiert. Token-Revocation beim BotFather empfohlen.",
    "usage": "~/.env pflegen; python astro_crawler.py --setup-telegram schreibt dort hinein"
+  },
+  {
+   "date": "2026-08-23",
+   "title": "Session-Call-Sheet",
+   "tag": "neu",
+   "desc": "Vollständiges Beobachtungsblatt bei /session start und on-demand: Rating, Golden Window (bzw. beste Dunkelstunde als Fallback), Ziel-Vorschlag (bestplatzierter Messier im Fenster, Mondabstand illumination-gewichtet statt hart gefiltert), Mond, Wind mit Eskalationsgrenzen, Beschlags-Risiko und feste DSO-Gear-Checkliste.",
+   "usage": "Bot: /callsheet [Standort]  — oder automatisch bei /session start"
   }
  ]
 }
