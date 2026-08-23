@@ -165,7 +165,10 @@ class SiteReport:
     planets: Optional[dict] = None       # {"jupiter": {max_alt, culm, window}, ...}
     # Vorausschau-Reihen (transient, NICHT in der DB - latest-wins als JSON):
     # gefuellt von den Quellen-Scrapern, kombiniert von build_forecast()
-    fc_clouds: Optional[list] = None     # [{ts, total, low, mid, high, rain}] (Nacht-1-Quelle: CO)
+    fc_clouds: Optional[list] = None     # [{ts, total, low, mid, high, rain}]
+    fc_clouds_src: Optional[str] = None  # wer fc_clouds fuelte: 'clearoutside' | 'open_meteo'
+                                         # (Misslabel-Fix 23.08.: OM-Fallback füllt fc_clouds
+                                         # ebenfalls - build_forecast darf das nicht als CO labeln)
     fc_clouds_om: Optional[list] = None  # gleiche Form, IMMER aus Open-Meteo (72 h;
                                          # deckt Nacht 2+3, ClearOutside liefert nur ~24 h)
     fc_seeing: Optional[list] = None     # [{ts, seeing, idx, jet}] alle Meteoblue-Tage
@@ -408,6 +411,7 @@ async def scrape_clearoutside(context, lat: float, lon: float, rep: SiteReport):
             fh = row_values_from_text("High Clouds", body_text, 24)
             fr = row_values_from_text("Precipitation Probability", body_text, 24)
             today = datetime.now()
+            rep.fc_clouds_src = "clearoutside"
             rep.fc_clouds = [
                 {"ts": (today + timedelta(hours=i)).isoformat(timespec="minutes"),
                  "total": ft[i] if i < len(ft) else None,
@@ -782,6 +786,7 @@ def check_open_meteo_clouds(lat: float, lon: float, rep: SiteReport):
             # Wenn ClearOutside nichts lieferte, ist OM auch die Nacht-1-Serie
             if not rep.fc_clouds:
                 rep.fc_clouds = om_series
+                rep.fc_clouds_src = "open_meteo"
         # Jetstream-Fallback (nur falls Meteoblue nichts lieferte): Wind in
         # 300 hPa als Proxy - liegt etwas tiefer als Meteoblues 200-hPa-Jet,
         # liefert aber die Groessenordnung. OM gibt km/h -> m/s.
@@ -1634,7 +1639,7 @@ def build_forecast(rep: SiteReport, profile: str = "dso"):
             cl, omc = co.get(k), om.get(k)
             se, gr = seeing.get(k), ground.get(k)
             if cl and cl.get("total") is not None:
-                clouds_v, src = cl["total"], "clearoutside"
+                clouds_v, src = cl["total"], rep.fc_clouds_src or "clearoutside"
                 rain_v = cl.get("rain")
             elif omc and omc.get("total") is not None:
                 clouds_v, src = omc["total"], "open_meteo"
