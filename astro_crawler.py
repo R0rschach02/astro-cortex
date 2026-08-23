@@ -2640,7 +2640,7 @@ def pick_target(lat: float, lon: float, win_start: datetime, win_end: datetime,
         penalty = 0.0
         if moon_illum and moon_illum > 15:
             star_mid = obs.at(t_mid).observe(star).apparent()
-            dist = float((star_mid - moon_app).separation().degrees)
+            dist = float(star_mid.separation_from(moon_app).degrees)
             w = min(1.0, (moon_illum - 15) / 85.0)
             penalty = w * max(0.0, 60.0 - dist) * 0.5
         score = avg_alt - penalty
