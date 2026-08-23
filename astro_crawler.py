@@ -1618,6 +1618,10 @@ def build_forecast(rep: SiteReport, profile: str = "dso"):
                               + timedelta(hours=1)).isoformat(timespec="minutes")
 
         series = []
+        log.info("[Forecast-Diag] %s: co=%d (%s..%s) om=%d (%s..%s) seeing=%d ground=%d",
+                 rep.name, len(co), min(co) if co else '-', max(co) if co else '-',
+                 len(om), min(om) if om else '-', max(om) if om else '-',
+                 len(seeing), len(ground))
         for k in sorted(set(co) | set(om) | set(seeing) | set(ground)):
             dt_h = datetime.strptime(k, "%Y-%m-%dT%H")
             if dt_h < now:
