@@ -1940,6 +1940,18 @@ def db_init():
         )""")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_flog_target "
                  "ON forecast_log(location_name, target_ts)")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS dew_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL,
+            location_name TEXT NOT NULL,
+            ts_onset TEXT NOT NULL,
+            tau_spread_start REAL,     -- aus der Start-Snapshot-Heavy-Zeile
+            tau_spread_onset REAL,     -- frischer Wert zum Trigger
+            minutes_to_dew REAL,       -- session start -> onset
+            temp_onset REAL,
+            humidity_onset INTEGER
+        )""")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_crawls_loc_ts "
                  "ON crawls(location_name, ts)")
     # Idempotente Migration bestaehender DBs: neue Spalten nachziehen
@@ -2364,6 +2376,8 @@ HELP_TEXT = (
     "   Kulmination (alle M1-M110, Standort = zuletzt aktiv)\n"
     "/callsheet [Spot|lat lon] - Beobachtungs-Blatt on demand: Rating,\n"
     "   Zeitfenster, Ziel-Vorschlag, Mond, Wind, Gear-Checkliste\n"
+    "/dew - Beschlag-Eintritt der laufenden Session protokollieren\n"
+    "   (einmal pro Session, Session bleibt offen)\n"
     "/help - Diese Hilfe\n"
     "\n"
     "Alarme kommen automatisch: Gewitter, Regen, Entwarnung, Rating-Wechsel."
@@ -2835,6 +2849,76 @@ def check_track_alert():
         log.info("[Track] Watch verpasst (%s) - aufgeraeumt", tw["obj"])
 
 
+def _ground_snapshot(lat: float, lon: float) -> dict:
+    """Frischer 1-h-BrightSky-Call: Temp/Taupunkt -> Spread + rel. Feuchte
+    (Magnus) fuer den /dew-Onset-Moment."""
+    now = datetime.now(timezone.utc)
+    params = urllib.parse.urlencode({
+        "lat": lat, "lon": lon,
+        "date": now.strftime("%Y-%m-%dT%H:%M"),
+        "last_date": (now + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M"),
+    })
+    rows = http_get_json(
+        f"https://api.brightsky.dev/weather?{params}", timeout=10
+    ).get("weather", [])
+    if not rows:
+        return {}
+    t = rows[-1].get("temperature")
+    td = rows[-1].get("dew_point")
+    return {"temp": t,
+            "spread": round(t - td, 1) if t is not None and td is not None else None,
+            "rh": _rh_from_dew(t, td)}
+
+
+async def cmd_dew(state) -> str:
+    """/dew - Beschlag-Eintritt fuer die laufende Session protokollieren
+    (einmal pro Session). Bodenwerte frisch per On-Demand-Call."""
+    sess = db_open_session()
+    if not sess:
+        return "Keine offene Session - /session start zuerst."
+    sid, ts_start, loc_name = sess[0], sess[1], sess[2]
+    conn = sqlite3.connect(DB_PATH)
+    existing = conn.execute(
+        "SELECT ts_onset, minutes_to_dew, tau_spread_start, tau_spread_onset "
+        "FROM dew_events WHERE session_id = ?", (sid,)).fetchone()
+    if existing:
+        conn.close()
+        return (f"Fuer Session #{sid} wurde Beschlag bereits protokolliert "
+                f"({existing[0][11:16]}, nach {existing[1]:.0f} Min, "
+                f"Spread {existing[2]} -> {existing[3]} K).")
+    start_spread = conn.execute(
+        "SELECT c.dewpoint_spread FROM sessions s "
+        "JOIN crawls c ON c.id = s.crawl_id_start WHERE s.id = ?",
+        (sid,)).fetchone()
+    conn.close()
+    loc = next((c for c in ac_all_locations() if c["name"] == loc_name), None)
+    if not loc:
+        return (f"Standort '{loc_name}' nicht mehr in der Liste - Bodenwerte "
+                f"nicht abrufbar.")
+    snap = await asyncio.to_thread(_ground_snapshot, loc["lat"], loc["lon"])
+    if not snap:
+        return "Bodenwerte nicht abrufbar (BrightSky) - bitte gleich erneut."
+    now = datetime.now()
+    minutes = (now - datetime.fromisoformat(ts_start)).total_seconds() / 60
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute(
+        "INSERT INTO dew_events (session_id, location_name, ts_onset, "
+        "tau_spread_start, tau_spread_onset, minutes_to_dew, temp_onset, "
+        "humidity_onset) VALUES (?,?,?,?,?,?,?,?)",
+        (sid, loc_name, now.isoformat(timespec="minutes"),
+         start_spread[0] if start_spread else None,
+         snap.get("spread"), round(minutes, 1),
+         snap.get("temp"), snap.get("rh")))
+    conn.commit()
+    conn.close()
+    return (f"Beschlag nach {minutes:.0f} Min protokolliert. "
+            f"Tau-Spread Start: "
+            f"{start_spread[0] if start_spread and start_spread[0] else 'n/a'} K "
+            f"-> jetzt: {snap.get('spread')} K "
+            f"(Temp {snap.get('temp')}°C, Feuchte {snap.get('rh')}%).\n"
+            f"Session bleibt offen - /session end wenn Schluss.")
+
+
 def cmd_session(args, state) -> str:
     """/session start|end|status - Startbedingungen-Snapshot fuer /rate."""
     sub = args[0].lower() if args else "status"
@@ -2927,6 +3011,8 @@ async def handle_command(text: str, state) -> Optional[str]:
         return cmd_track(args, state)
     if cmd == "/callsheet":
         return await cmd_callsheet(args, state)
+    if cmd == "/dew":
+        return await cmd_dew(state)
     return f"Unbekannter Befehl: {cmd}\n\n{HELP_TEXT}"
 
 
