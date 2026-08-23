@@ -398,8 +398,10 @@ async def scrape_clearoutside(context, lat: float, lon: float, rep: SiteReport):
             rain   = row_values_from_text("Precipitation Probability", body_text)
             log.info("[%s] Text-Parse: total=%s low=%s mid=%s high=%s rain=%s",
                      source, total, low, mid, high, rain)
-            # Vorausschau-Reihe: volle 24 h ab aktueller Stunde, ts lokal
-            n_fc = 24 - datetime.now().hour
+            # Vorausschau-Reihe: volle 24 h ab aktueller Stunde, ts lokal.
+            # n_fc: die Rohwerte der Seite BEGINNEN zur aktuellen Stunde -
+            # 24 - now.hour haette abends fast die ganze CO-Reihe gekappt.
+            n_fc = min(24, len(ft))
             ft = row_values_from_text("Total Clouds", body_text, 24)
             fl = row_values_from_text("Low Clouds", body_text, 24)
             fm = row_values_from_text("Medium Clouds", body_text, 24)
