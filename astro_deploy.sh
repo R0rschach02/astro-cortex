@@ -48,4 +48,34 @@ if git -C /home/enigma rev-parse --is-inside-work-tree >/dev/null 2>&1; then
 else
   echo "WARNUNG: kein Git-Repo in /home/enigma - Deploy nicht versioniert!"
 fi
+echo "== 7/7 GitHub-Push (mit Divergenz-Warnung, nie auto-merge/force) =="
+export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15"
+if git -C /home/enigma fetch origin 2>/dev/null; then
+  BEHIND=$(git -C /home/enigma rev-list --count HEAD..origin/main 2>/dev/null || echo 1)
+  if [ "$BEHIND" -gt 0 ]; then
+    echo "ABBRUCH: origin/main hat $BEHIND Commits, die lokal fehlen - KEIN Push, KEIN Merge:"
+    git -C /home/enigma log --oneline HEAD..origin/main | head -5
+    git -C /home/enigma diff --stat HEAD origin/main | tail -3
+    python3 - << 'PYTELE' 2>/dev/null || true
+import sys; sys.path.insert(0, "/home/enigma")
+import astro_crawler as ac, datetime
+state = ac.load_state()
+today = f"{datetime.datetime.now():%Y-%m-%d}"
+if state.get("push_alert_date") != today:  # max. 1 Hinweis/Tag
+    state["push_alert_date"] = today
+    ac.save_state(state)
+    ac.send_telegram("Deploy pausiert - GitHub hat unbekannte Commits, bitte manuell pruefen (astro_deploy.sh Schritt 7).")
+PYTELE
+    exit 1
+  fi
+  if git -C /home/enigma push origin main 2>&1 | tail -2; then
+    echo "Push OK: $(git -C /home/enigma rev-parse --short HEAD) -> origin/main"
+  else
+    echo "FEHLER: Push gescheitert (Netzwerk/Auth) - kein stiller Retry."
+    exit 1
+  fi
+else
+  echo "FEHLER: git fetch origin gescheitert (Netzwerk/Auth) - kein stiller Retry."
+  exit 1
+fi
 echo "DEPLOY KOMPLETT."

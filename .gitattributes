@@ -1,0 +1,5 @@
+# changelog.json ist append-only, Eintraege sind unabhaengig:
+# Bei Konflikten automatisch BEIDE Seiten behalten (union) - fuer diesen
+# einen Dateityp gefahrlos. Alle anderen Dateien: niemals auto-mergen,
+# Divergenz stoppt den Deploy (siehe astro_deploy.sh Schritt 7).
+changelog.json merge=union
