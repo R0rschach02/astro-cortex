@@ -103,6 +103,25 @@ _load_env()
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 TELEMETRY_DISABLED = False                 # --no-telegram setzt das auf True
+# Uptime-Monitoring (healthchecks.io Dead-Man's-Switch): der Radar-Tick
+# pingt nach erfolgreichem Durchlauf diese URL. Leer = inaktiv. Der
+# App-Check (HEALTHCHECK_PING_URL_APP) pingt aus dem uvicorn-Prozess.
+HEALTHCHECK_PING_URL = os.environ.get("HEALTHCHECK_PING_URL", "")
+
+
+def ping_healthchecks(url: str, label: str = "radar"):
+    """Ein einzelner GET an die healthchecks-URL. Absichtlich nebenwirkungs-
+    frei: Fehler (kein Netz etc.) werden geloggt und verschluckt - ein
+    gescheiterter Ping darf den Tick niemals rot machen."""
+    if not url:
+        return
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        urllib.request.urlopen(req, timeout=10).read()
+        log.info("[Healthcheck] %s-Ping OK", label)
+    except Exception as e:
+        log.warning("[Healthcheck] %s-Ping fehlgeschlagen: %s",
+                    label, type(e).__name__)
 
 # Optionaler Schutz schreibender API-Endpunkte (Backend liest dieselbe .env,
 # da main.py astro_crawler importiert - _load_env laeuft dabei mit):
@@ -3184,6 +3203,12 @@ async def run_cycle(locations: list, headless: bool, send_dashboard: bool,
             check_forecast_verification()
         except Exception as e:
             log.warning("[Verify] Aufruf fehlgeschlagen: %s", e)
+
+        # Uptime-Ping: Radar-Kern komplett durchgelaufen (Checks inklusive).
+        # Bewusst VOR dem Auto-Heavy-Nachzug: Der dauert bis ~7 min und zieht
+        # beim naechsten Tick seinen eigenen Ping nach - so bleibt die
+        # Period-5-Meldung auch bei knapp bemessener Grace Time stabil.
+        ping_healthchecks(HEALTHCHECK_PING_URL, "radar")
 
         # 1x taeglich: Meilenstein-Check fuer /rate-Feedback (20/50 Sessions)
         try:

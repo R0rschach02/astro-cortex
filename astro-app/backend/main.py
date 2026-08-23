@@ -384,6 +384,43 @@ def api_changelog():
         raise HTTPException(503, "changelog.json nicht lesbar")
 
 
+# --- Uptime-Monitoring (healthchecks.io): in-process Dead-Man's-Switch ---
+# Bewusst IM uvicorn-Prozess: Prozess tot => Pings stoppen => healthchecks
+# alarmiert nach der Grace Time. Ein externer Ping-Prozess wuerde dagegen
+# weiterpingen und den Ausfall nie melden. Leer = inaktiv.
+import urllib.request as _urlreq  # noqa: E402
+
+PING_URL_APP = os.environ.get("HEALTHCHECK_PING_URL_APP", "")
+
+
+@app.on_event("startup")
+async def _healthcheck_loop():
+    if not PING_URL_APP:
+        log.info("[Healthcheck] App-Ping deaktiviert (keine URL gesetzt)")
+        return
+
+    async def _loop():
+        import asyncio as _aio
+
+        def _ping():
+            _urlreq.urlopen(
+                _urlreq.Request(PING_URL_APP,
+                                headers={"User-Agent": "astro-cortex"}),
+                timeout=10).read()
+
+        while True:
+            try:
+                await _aio.to_thread(_ping)
+                log.info("[Healthcheck] app-Ping OK")
+            except Exception as e:
+                log.warning("[Healthcheck] app-Ping fehlgeschlagen: %s",
+                            type(e).__name__)
+            await _aio.sleep(900)
+
+    import asyncio as _aio2
+    _aio2.get_running_loop().create_task(_loop())
+
+
 # --- Cache-Header: Shell-Dateien immer revalidieren (Fix 15.08.) ---
 # Der Service Worker selbst (sw.js) und die Shell-Dateien duerfen niemals aus
 # Browser-/Proxy-Caches kommen, sonst erreicht ein Deploy die installierte PWA
