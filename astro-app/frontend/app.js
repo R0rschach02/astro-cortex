@@ -287,6 +287,7 @@ async function rvStart(kind) {
 }
 
 function rvShow(i) {
+  rvState.idx = i;                      // Loop-Position mitfuehren
   rvState.layers.forEach((l, j) => l.setOpacity(j === i ? rvOpacity() : 0));
   const f = rvState.frames[i];
   const t = new Date(f.time * 1000);
@@ -305,17 +306,22 @@ function rvTogglePlay(force) {
   const want = force === true ? true : !rvState.playing;
   rvState.playing = want;
   document.getElementById("rv-play").innerHTML = want ? "&#10074;&#10074;" : "&#9654;";
+  clearTimeout(rvState.timer);
   clearInterval(rvState.timer);
   if (want) {
-    rvState.timer = setInterval(() => {
+    // Self-rescheduling Timeout statt setInterval: robust gegen
+    // Timer-Throttling (Frame-Wechsel erst nach Rendering des vorigen)
+    const step = () => {
       rvShow((rvState.idx + 1) % rvState.frames.length);
-    }, 700);
+      rvState.timer = setTimeout(step, 700);
+    };
+    rvState.timer = setTimeout(step, 700);
   }
 }
 
 function rvStop(hideTs = true) {
   rvState.active = false; rvState.playing = false;
-  clearInterval(rvState.timer); clearInterval(rvState.refetch);
+  clearTimeout(rvState.timer); clearInterval(rvState.timer); clearInterval(rvState.refetch);
   rvState.layers.forEach(l => map.removeLayer(l));
   rvState.layers = []; rvState.frames = [];
   if (hideTs) rvTimestampEl().style.display = "none";
