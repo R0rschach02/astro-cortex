@@ -2853,18 +2853,21 @@ def _ground_snapshot(lat: float, lon: float) -> dict:
     """Frischer 1-h-BrightSky-Call: Temp/Taupunkt -> Spread + rel. Feuchte
     (Magnus) fuer den /dew-Onset-Moment."""
     now = datetime.now(timezone.utc)
+    # 2-h-Fenster (identisch zum ground-Call): BrightSky akzeptiert das
+    # degenerierte 30-min-Zukunfts-Fenster nicht (0 Zeilen/IndexError).
+    # rows[0] = aktuelle Stunde (Stations-Interpolation), nicht die Prognose.
     params = urllib.parse.urlencode({
         "lat": lat, "lon": lon,
         "date": now.strftime("%Y-%m-%dT%H:%M"),
-        "last_date": (now + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M"),
+        "last_date": (now + timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M"),
     })
     rows = http_get_json(
         f"https://api.brightsky.dev/weather?{params}", timeout=10
     ).get("weather", [])
     if not rows:
         return {}
-    t = rows[-1].get("temperature")
-    td = rows[-1].get("dew_point")
+    t = rows[0].get("temperature")
+    td = rows[0].get("dew_point")
     return {"temp": t,
             "spread": round(t - td, 1) if t is not None and td is not None else None,
             "rh": _rh_from_dew(t, td)}
