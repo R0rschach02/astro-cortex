@@ -2362,6 +2362,8 @@ HELP_TEXT = (
     "   Bedingungen gekoppelt (nicht an die Lage beim Eintippen)\n"
     "/track M81 - Meridian-Flip-Reminder: pusht 15-20 Min vor der\n"
     "   Kulmination (alle M1-M110, Standort = zuletzt aktiv)\n"
+    "/callsheet [Spot|lat lon] - Beobachtungs-Blatt on demand: Rating,\n"
+    "   Zeitfenster, Ziel-Vorschlag, Mond, Wind, Gear-Checkliste\n"
     "/help - Diese Hilfe\n"
     "\n"
     "Alarme kommen automatisch: Gewitter, Regen, Entwarnung, Rating-Wechsel."
@@ -2575,6 +2577,179 @@ def compute_transit(ra_hours: float, dec_degrees: float, lat: float, lon: float)
     return transit_dt, float(alt[upper]), in_night
 
 
+# ---------------------------------------------------------------------------
+# Session-Call-Sheet: Ziel-Auswahl (Messier + skyfield) und Blatt-Text
+# ---------------------------------------------------------------------------
+# Ziel-Score = Durchschnittshoehe uebers Fenster (Hauptkriterium, min. 25 Grad)
+# minus Mondabstands-Strafe: gewichtet nach Illumination (unter 15% egal,
+# oberhalb linear bis Faktor 1) und nur bei Abstand < 60 Grad wirksam.
+# Kein Ausschlussfilter - ein exzellent stehendes Objekt neben der Sichel
+# gewinnt weiterhin.
+GEAR_CHECKLIST_DSO = [
+    "Quattro 150P + Komakorrektor", "EQ5 Pro SynScan", "ASIAIR Mini",
+    "EOS 600D + T2-Adapter", "Antlia Triband 2\"", "Gegengewichte",
+    "Netzteile + Kabel", "Rote Taschenlampe",
+]
+
+
+def _moon_illum_now() -> Optional[float]:
+    """Aktuelle Mond-Illumination aus dem Tages-Cache (skyfield)."""
+    m = moon_cached(DEFAULT_LOCATIONS[0]["lat"], DEFAULT_LOCATIONS[0]["lon"])
+    return (m or {}).get("illum")
+
+
+def pick_target(lat: float, lon: float, win_start: datetime, win_end: datetime,
+                 moon_illum: Optional[float] = None) -> Optional[dict]:
+    """Bestplatziertes Messier-Objekt fuer ein Zeitfenster.
+
+    Score = avg_alt - mond_penalty mit
+      mond_penalty = w * max(0, 60 - dist_mond) * 0.5,
+      w = max(0, (illum - 15) / 85)   # 0 bei <=15% Sichel, 1 bei Vollmond
+    Begrundung: bei duenner Sichel ist Mondnahe praktisch folgenlos (w=0);
+    bei Vollmond kostet der Minimalabstand (0 Grad) bis zu 30 Hoehengrade
+    an Score - spuerbar, aber nie kategorisch ausschliessend.
+    """
+    import numpy as np
+    from skyfield.api import Loader, Star, wgs84
+
+    cat = load_messier()
+    if not cat:
+        return None
+    load = Loader(SKYFIELD_DIR)
+    eph = load("de421.bsp")
+    ts = load.timescale()
+    topo = wgs84.latlon(lat, lon)
+    obs = eph["earth"] + topo
+
+    hours = int((win_end - win_start).total_seconds() // 3600) + 1
+    grid = ts.tt_jd(np.linspace(
+        ts.from_datetime(win_start.replace(tzinfo=_berlin())).tt,
+        ts.from_datetime(win_end.replace(tzinfo=_berlin())).tt,
+        max(2, hours)))
+    t_mid = grid[len(grid) // 2]
+    moon_app = obs.at(t_mid).observe(eph["moon"]).apparent()
+
+    best = None
+    for key, (name, ra, dec, typ) in cat.items():
+        star = Star(ra_hours=ra, dec_degrees=dec)
+        app = obs.at(grid).observe(star).apparent()
+        alt = app.altaz()[0].degrees
+        avg_alt = float(np.mean(alt))
+        if avg_alt < 25.0:      # Basis-Anforderung: brauchbar im Fenster
+            continue
+        penalty = 0.0
+        if moon_illum and moon_illum > 15:
+            star_mid = obs.at(t_mid).observe(star).apparent()
+            dist = float((star_mid - moon_app).separation().degrees)
+            w = min(1.0, (moon_illum - 15) / 85.0)
+            penalty = w * max(0.0, 60.0 - dist) * 0.5
+        score = avg_alt - penalty
+        if best is None or score > best["score"]:
+            best = {"obj": key.upper(), "name": name, "type": typ,
+                    "avg_alt": round(avg_alt, 1), "score": round(score, 1),
+                    "min_alt": round(float(np.min(alt)), 1)}
+    return best
+
+
+def _forecast_window(name: str) -> tuple[Optional[datetime], Optional[datetime], str]:
+    """(start, ende, label) des Golden Windows der naechsten Nacht; Fallback:
+    beste ok-Stunde bzw. erstes Dunkelheitsfenster (klar gekennzeichnet)."""
+    try:
+        with open(FORECAST_PATH, "r", encoding="utf-8") as f:
+            fc = json.load(f).get(name)
+    except Exception:
+        fc = None
+    if fc and fc.get("golden_windows"):
+        g = fc["golden_windows"][0]
+        base = datetime.fromisoformat(g["night"])
+        try:
+            start = datetime.fromisoformat(g["night"]).replace(
+                hour=int(g["start"][:2]), minute=int(g["start"][3:5]))
+            end = datetime.fromisoformat(g["night"]).replace(
+                hour=int(g["end"][:2]), minute=int(g["end"][3:5]))
+            if end <= start:
+                end += timedelta(days=1)
+            return start, end, f"Golden Window {g['night'][8:10]}.{g['night'][5:7]}. {g['start']}-{g['end']}"
+        except Exception:
+            pass
+    if fc and fc.get("series"):
+        oks = [h for h in fc["series"] if h["ok"]]
+        pool = oks or [h for h in fc["series"] if h["dark"]]
+        if pool:
+            h = pool[0]
+            t = datetime.fromisoformat(h["ts"])
+            return t, t + timedelta(hours=1), \
+                ("beste Stunde " + h["hhmm"] if oks
+                 else "Dunkelheitsfenster (kein Golden Window) " + h["hhmm"])
+    return None, None, ""
+
+
+def build_callsheet(loc: dict, profile: str) -> str:
+    """Call-Sheet-Text: alles was schon berechnet wird, in einer Nachricht."""
+    conn = sqlite3.connect(DB_PATH)
+    row = conn.execute(
+        "SELECT ts, clouds_total, seeing, jetstream, radar_status, wind_speed, "
+        "dewpoint_spread, dew_risk, moon_illum FROM crawls "
+        "WHERE location_name = ? ORDER BY id DESC LIMIT 1",
+        (loc["name"],)).fetchone()
+    conn.close()
+    m = moon_cached(loc["lat"], loc["lon"]) or {}
+    rep = SiteReport(name=loc["name"], lat=loc["lat"], lon=loc["lon"])
+    if row:
+        rep.clouds_total, rep.seeing, rep.radar_status = row[1], row[2], row[4]
+        rep.moon_illum = row[8] if row[8] is not None else m.get("illum")
+    rating, icon = rep.rate(profile)
+
+    w_start, w_end, w_label = _forecast_window(loc["name"])
+    target = None
+    if w_start:
+        target = pick_target(loc["lat"], loc["lon"], w_start, w_end,
+                             moon_illum=m.get("illum"))
+
+    lines = [f"=== SESSION CALL-SHEET: {loc['name']} [{profile.upper()}] ===",
+             f"Rating aktuell: {rating} {icon}"
+             + (f" (Wolken {row[1]}%, Seeing {row[2]}{ARCSEC})" if row else ""),
+             f"Zeitfenster: {w_label}" if w_label else "Zeitfenster: keine Daten"]
+    if target:
+        lines.append(f"Ziel-Vorschlag: {target['obj']} {target['name']} "
+                     f"({target['type']}) - avg {target['avg_alt']}° im Fenster, "
+                     f"min {target['min_alt']}°")
+    if m.get("illum") is not None:
+        lines.append(f"Mond: {m['illum']:.0f}% | Kulm. {m.get('culm') or 'unter Horizont'} "
+                     f"({m.get('max_alt', '?')}°) | >30°: {m.get('window') or 'nie'}")
+    if row:
+        wind = f"{row[5]:.0f} km/h" if row[5] is not None else "n/a"
+        lines.append(f"Wind: {wind} (Warnung >{WIND_WARN_KMH:.0f}, Abbruch >{WIND_ABORT_KMH:.0f} km/h)")
+        if row[7]:
+            lines.append(f"Beschlag-Risiko: {row[7]} (Fangspiegel ohne Heizung - "
+                         f"Spread {row[6]} K)")
+    lines.append("Ausruestung (DSO):")
+    lines += [f"  [ ] {g}" for g in GEAR_CHECKLIST_DSO]
+    lines.append("Gute Jagd! /clear setzen, /track wenn's um den Meridian geht.")
+    return "\n".join(lines)
+
+
+async def cmd_callsheet(args, state) -> str:
+    """/callsheet [Standort|lat lon] - Call-Sheet on demand (ohne Session)."""
+    loc = None
+    if len(args) >= 2:
+        try:
+            lat, lon = float(args[0]), float(args[1])
+            loc = {"name": f"Live {lat:.4f}/{lon:.4f}", "lat": lat, "lon": lon}
+        except ValueError:
+            return "Koordinaten nicht lesbar. Beispiel: /callsheet 50.0000009 8.0000009"
+    elif args:
+        needle = " ".join(args).lower()
+        loc = next((c for c in ac_all_locations() if needle in c["name"].lower()), None)
+        if not loc:
+            return f"Kein Standort passt zu '{args[0]}'."
+    else:
+        name = state.get("last_location") or DEFAULT_LOCATIONS[0]["name"]
+        loc = next((c for c in ac_all_locations() if c["name"] == name),
+                   DEFAULT_LOCATIONS[0])
+    return build_callsheet(loc, get_profile(state))
+
+
 def cmd_track(args, state) -> str:
     """/track [Objekt] - Meridian-Flip-Reminder 15-20 Min vor der Kulmination."""
     if not args:
@@ -2670,10 +2845,11 @@ def cmd_session(args, state) -> str:
                     f"Beschlag {crawl[3] or 'n/a'}, Mond {crawl[4] or 'n/a'}%")
         else:
             info = "Achtung: kein Heavy-Crawl fuer diese Location vorhanden."
+        sheet = build_callsheet(loc, profile)
         return (f"Session #{sid} gestartet: {loc} [{profile}]\n{info}\n"
                 f"Dein /rate wird jetzt an DIESE Startbedingungen gekoppelt.\n"
                 f"/session end beendet sie (optional - naechstes start "
-                f"ersetzt automatisch, Auto-Ablauf nach 14 h).")
+                f"ersetzt automatisch, Auto-Ablauf nach 14 h).\n\n{sheet}")
 
     if sub == "end":
         row = db_end_session()
@@ -2741,6 +2917,8 @@ async def handle_command(text: str, state) -> Optional[str]:
         return cmd_session(args, state)
     if cmd == "/track":
         return cmd_track(args, state)
+    if cmd == "/callsheet":
+        return await cmd_callsheet(args, state)
     return f"Unbekannter Befehl: {cmd}\n\n{HELP_TEXT}"
 
 
