@@ -1276,6 +1276,109 @@ def check_wind_alert(reports: list):
 
 
 # ---------------------------------------------------------------------------
+# Prognoseguete-Verifikation (1x taeglich): Vorhersage vs. Ist je Standort
+# ---------------------------------------------------------------------------
+FORECAST_VERIFY_TOL_MIN = 20   # Matching-Toleranz um target_ts
+FORECAST_VERIFY_TIMEOUT_H = 24  # aelter ohne Match -> final matched=0
+FORECAST_VERIFY_BATCH = 2000   # Zeilen pro Tageslauf (Rest kommt morgen)
+
+
+def _nearest_crawl(conn, loc, target, modes):
+    """Zeitlich naechste crawls-Zeile (innerhalb Toleranz) fuer einen Standort.
+    modes: ('heavy',) fuer Wolken/Seeing (nur Heavy liefert sie) bzw. None
+    fuer Wind/Tau (jede Zeile, Radar alle 5 min)."""
+    t_lo = (target - timedelta(minutes=FORECAST_VERIFY_TOL_MIN)
+            ).isoformat(timespec="minutes")
+    t_hi = (target + timedelta(minutes=FORECAST_VERIFY_TOL_MIN)
+            ).isoformat(timespec="minutes")
+    q = ("SELECT ts, clouds_total, seeing, jetstream, wind_speed, "
+         "dewpoint_spread FROM crawls WHERE location_name = ? AND ts BETWEEN ? AND ?")
+    args = [loc, t_lo, t_hi]
+    if modes:
+        q += " AND mode IN (%s)" % ",".join("?" * len(modes))
+        args += list(modes)
+    best, best_dt = None, None
+    for r in conn.execute(q, args):
+        try:
+            dt = abs((datetime.fromisoformat(r[0]) - target
+                      ).total_seconds())
+        except Exception:
+            continue
+        if best_dt is None or dt < best_dt:
+            best, best_dt = r, dt
+    return best
+
+
+def check_forecast_verification():
+    """1x taeglich im Radar-Takt: unverifizierte forecast_log-Zeilen mit
+    target_ts >= 45 min zurueck gegen echte crawls-Zeilen matchen und die
+    Abweichung (vorhergesagt - tatsaechlich) in forecast_verification
+    schreiben. Beide Tabellen bleiben append-only; 'erledigt' = es existiert
+    eine Verification-Zeile (LEFT JOIN). Nach 24 h ohne Match: final
+    matched=0 (z.B. Standort aus Watchlist gefallen)."""
+    state = load_state()
+    today = f"{datetime.now():%Y-%m-%d}"
+    if state.get("forecast_verify_date") == today:
+        return
+    state["forecast_verify_date"] = today
+    save_state(state)
+
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        now = datetime.now()
+        cutoff = (now - timedelta(minutes=45)).isoformat(timespec="minutes")
+        rows = conn.execute(
+            "SELECT fl.id, fl.target_ts, fl.location_name, fl.clouds_total, "
+            "fl.seeing, fl.jetstream, fl.dewpoint_spread, fl.wind_speed "
+            "FROM forecast_log fl "
+            "LEFT JOIN forecast_verification v ON v.forecast_log_id = fl.id "
+            "WHERE v.id IS NULL AND fl.target_ts < ? "
+            "ORDER BY fl.target_ts LIMIT ?",
+            (cutoff, FORECAST_VERIFY_BATCH)).fetchall()
+        verified_at = now.isoformat(timespec="seconds")
+        inserts, matched_n, unmatched_n = [], 0, 0
+        for (fid, target_s, loc, p_clouds, p_seeing, p_jet, p_tau, p_wind) in rows:
+            try:
+                target = datetime.fromisoformat(target_s)
+            except Exception:
+                continue
+            h_row = _nearest_crawl(conn, loc, target, modes=("heavy",))
+            a_row = _nearest_crawl(conn, loc, target, modes=None)
+            if h_row is None and a_row is None:
+                if (now - target).total_seconds() > FORECAST_VERIFY_TIMEOUT_H * 3600:
+                    inserts.append((fid, verified_at, 0, None, None, None, None,
+                                    None, None, None, None))
+                    unmatched_n += 1
+                continue  # juenger als 24 h: morgen erneut versuchen
+            # Ist-Werte + Fehler nur fuer Parameter mit beiden Seiten
+            a_clouds = h_row[1] if h_row else None
+            a_seeing = h_row[2] if h_row else None
+            a_wind = a_row[4] if a_row else None
+            a_tau = a_row[5] if a_row else None
+            inserts.append((
+                fid, verified_at, 1,
+                a_clouds, a_seeing, a_wind, a_tau,
+                round(p_clouds - a_clouds, 1) if (p_clouds is not None and a_clouds is not None) else None,
+                round(p_seeing - a_seeing, 2) if (p_seeing is not None and a_seeing is not None) else None,
+                round(p_wind - a_wind, 1) if (p_wind is not None and a_wind is not None) else None,
+                round(p_tau - a_tau, 1) if (p_tau is not None and a_tau is not None) else None))
+            matched_n += 1
+        if inserts:
+            conn.executemany(
+                "INSERT INTO forecast_verification (forecast_log_id, verified_at, "
+                "matched, actual_clouds, actual_seeing, actual_wind, actual_tau, "
+                "err_clouds, err_seeing, err_wind, err_tau) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?)", inserts)
+            conn.commit()
+        conn.close()
+        log.info("[Verify] %d Zeilen geprueft: %d verifiziert, %d final "
+                 "unverifizierbar", len(inserts), matched_n, unmatched_n)
+    except Exception as e:
+        log.warning("[Verify] Lauf fehlgeschlagen: %s", type(e).__name__)
+        log.debug("[Verify] Traceback:\n%s", traceback.format_exc())
+
+
+# ---------------------------------------------------------------------------
 # Mond-Ephemeriden (skyfield, komplett lokal - kein API, kein Rate-Limit)
 # ---------------------------------------------------------------------------
 # de421.bsp (17 MB) liegt in ~/.skyfield und wird NIE neu geladen. Pro Standort
@@ -1837,6 +1940,8 @@ def db_init():
         )""")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_flog_target "
                  "ON forecast_log(location_name, target_ts)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_crawls_loc_ts "
+                 "ON crawls(location_name, ts)")
     # Idempotente Migration bestaehender DBs: neue Spalten nachziehen
     have = {r[1] for r in conn.execute("PRAGMA table_info(crawls)")}
     migrations = {
@@ -2798,6 +2903,12 @@ async def run_cycle(locations: list, headless: bool, send_dashboard: bool,
             check_wind_alert(reports)
         except Exception as e:
             log.warning("[Wind] Prüfung fehlgeschlagen: %s", e)
+
+        # Prognoseguete: 1x taeglich Vorhersagen gegen Ist-Daten matchen
+        try:
+            check_forecast_verification()
+        except Exception as e:
+            log.warning("[Verify] Aufruf fehlgeschlagen: %s", e)
 
         # 1x taeglich: Meilenstein-Check fuer /rate-Feedback (20/50 Sessions)
         try:
