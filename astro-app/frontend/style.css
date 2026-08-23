@@ -220,3 +220,17 @@ body.night .leaflet-container { background: #000; }
   padding-top: 10px; background: transparent;
   border-bottom: 2px solid var(--border);
 }
+
+/* ---- RainViewer: Zeitstempel + Play-Button ---- */
+#rv-ts {
+  position: absolute; bottom: 18px; left: 12px; z-index: 900;
+  display: none; align-items: center; gap: 8px;
+  background: var(--panel-bg); border: 1px solid var(--border);
+  border-radius: 10px; padding: 4px 10px;
+}
+#rv-ts .rv-btn { min-width: 40px; height: 40px; font-size: 15px; }
+#rv-time { font-size: 15px; font-weight: 700; }
+
+/* Rotlicht: Radar-Farben bleiben informativ, aber abgedunkelt + entschaerft
+   (Opacity steuert JS zusaetzlich auf 0.45) */
+body.night .leaflet-pane .rv-tile { filter: brightness(0.7); }

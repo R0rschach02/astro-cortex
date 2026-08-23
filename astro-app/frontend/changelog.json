@@ -118,6 +118,13 @@
    "tag": "neu",
    "desc": "Dead-Man's-Switch über healthchecks.io: Der Radar-Tick pingt nach jedem erfolgreichen Durchlauf HEALTHCHECK_PING_URL an; der uvicorn-Prozess pingt alle 15 min HEALTHCHECK_PING_URL_APP (in-process — Prozess tot = Pings stoppen = Alarm). Down-Erkennung und Telegram-Alarmierung übernimmt healthchecks.io autonom; Ping-Fehler hier bleiben folgenlos für den Tick.",
    "usage": "Aktivierung: URLs in ~/.env eintragen (leer = inaktiv)"
+  },
+  {
+   "date": "2026-08-23",
+   "title": "Regenradar-Animation + Abendplan",
+   "tag": "neu",
+   "desc": "Regenradar-Layer (RainViewer) mit Play/Pause-Loop durch die letzten ~2 h + Nowcast und Zeitstempel-Anzeige; Satellit-Toggle mit Empty-Handling. Dazu zwei proactive Pushes: taeglicher Abendplan ab 18 Uhr (Golden Windows mit Ziel-Vorschlag, Sammelzeile fuer Rest) und Live-Abweichungswarnung waehrend der Nacht (Wolken +30pp oder Seeing +1.0\" gegen die Planungs-Vorhersage, nur Verschlechterung, 90-min-Cooldown).",
+   "usage": "PWA: Layer-Control → 'Regenradar' — Pushes kommen automatisch"
   }
  ]
 }

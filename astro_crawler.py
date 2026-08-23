@@ -1328,6 +1328,84 @@ def _nearest_crawl(conn, loc, target, modes):
     return best
 
 
+# ---------------------------------------------------------------------------
+# Teil A: Golden-Window-Abendpush (1x taeglich ab 18 Uhr, eine Sammel-Nachricht)
+# ---------------------------------------------------------------------------
+EVENING_PUSH_HOUR = 18
+
+
+def _night_ko_reason(fc: dict) -> str:
+    """Haeufigster K.o.-Grund der ersten Nacht (fuer die nichts-Bruchteile)."""
+    try:
+        night = fc["series"][0]["night"]
+        counts = {}
+        for h in fc["series"]:
+            if h["night"] == night and not h["ok"]:
+                for r in h["reasons"]:
+                    counts[r] = counts.get(r, 0) + 1
+        return max(counts, key=counts.get) if counts else "keine Daten"
+    except Exception:
+        return "keine Daten"
+
+
+def check_evening_push():
+    """Abends (>= 18 Uhr) 1x taeglich: eine Sammel-Nachricht. GO-Standorte
+    mit Fenster/Ziel kompakt, Rest als Einzeiler mit K.o.-Grund - keine
+    Funkstille, kein 6-facher Einzelspam, keine Wiederholung bei spaeteren
+    Heavy-Crawls desselben Abends."""
+    state = load_state()
+    today = f"{datetime.now():%Y-%m-%d}"
+    if state.get("evening_push_date") == today:
+        return
+    if datetime.now().hour < EVENING_PUSH_HOUR:
+        return
+    state["evening_push_date"] = today
+    save_state(state)
+
+    try:
+        with open(FORECAST_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        log.warning("[Abendpush] keine Forecast-Daten - ueberspringe")
+        return
+
+    go_parts, no_parts = [], []
+    for loc in active_locations(DEFAULT_LOCATIONS):
+        fc = data.get(loc["name"])
+        if not fc:
+            continue
+        gws = fc.get("golden_windows") or []
+        if gws:
+            g = gws[0]
+            try:
+                ws = datetime.fromisoformat(g["night"]).replace(
+                    hour=int(g["start"][:2]))
+                we = ws + timedelta(hours=max(1, g["hours"]))
+                target = pick_target(loc["lat"], loc["lon"], ws, we,
+                                     moon_illum=fc.get("moon_illum"))
+            except Exception:
+                target = None
+            tz = (f"Ziel: {target['obj']} {target['name']} "
+                  f"({target['avg_alt']}\u00b0)" if target else "kein Ziel-Vorschlag")
+            go_parts.append(
+                f"{loc['name']}: {g['start']}-{g['end']} Uhr\n"
+                f"  {', '.join(g['reasons'][:2])}\n  {tz}")
+        else:
+            no_parts.append(f"{loc['name']} ({_night_ko_reason(fc)})")
+
+    lines = [f"ASTRO ABENDPLAN {datetime.now():%d.%m.}"]
+    if go_parts:
+        lines.append("\U0001f31f Fenster:")
+        lines += [f"\u2022 {p}" for p in go_parts]
+    if no_parts:
+        lines.append("\u274c Heute Nacht nichts: " + ", ".join(no_parts) + ".")
+    if not go_parts and not no_parts:
+        return
+    send_telegram("\n".join(lines))
+    log.info("[Abendpush] gesendet: %d Fenster, %d ohne",
+             len(go_parts), len(no_parts))
+
+
 def check_forecast_verification():
     """1x taeglich im Radar-Takt: unverifizierte forecast_log-Zeilen mit
     target_ts >= 45 min zurueck gegen echte crawls-Zeilen matchen und die
@@ -1395,6 +1473,64 @@ def check_forecast_verification():
     except Exception as e:
         log.warning("[Verify] Lauf fehlgeschlagen: %s", type(e).__name__)
         log.debug("[Verify] Traceback:\n%s", traceback.format_exc())
+
+
+# ---------------------------------------------------------------------------
+# Teil B: Live-Abweichungswarnung (Heavy-Takt, nur in astronomischer Nacht)
+# Vergleicht frisch gemessene Ist-Werte mit der PLANUNGS-Vorhersage (max.
+# Vorlauf) fuer genau diese Stunde. Nur Verschlechterung, 90-min-Cooldown.
+# ---------------------------------------------------------------------------
+DEVIATION_CLOUD_PP = 30     # Prozentpunkte Ist schlechter als Vorhersage
+DEVIATION_SEEING_ARCSEC = 1.0
+
+
+def check_forecast_deviation(reports: list):
+    now = datetime.now()
+    state = load_state()
+    state.setdefault("last_alert", {})
+    for rep in reports:
+        if not (rep.dark_window and _in_time_window(now, rep.dark_window)):
+            continue
+        t_lo = (now - timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M")
+        t_hi = (now + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M")
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            row = conn.execute(
+                "SELECT clouds_total, seeing, lead_hours, target_ts FROM "
+                "forecast_log WHERE location_name = ? AND target_ts BETWEEN ? "
+                "AND ? AND lead_hours >= 2 "
+                "ORDER BY lead_hours DESC LIMIT 1",
+                (rep.name, t_lo, t_hi)).fetchone()
+            conn.close()
+        except Exception:
+            continue
+        if not row:
+            continue
+        p_clouds, p_seeing, lead, target = row
+        msg = None
+        if p_clouds is not None and rep.clouds_total is not None and \
+                rep.clouds_total - p_clouds >= DEVIATION_CLOUD_PP:
+            msg = (f"Wolken: fuer {target[11:16]} waren {p_clouds:.0f}% "
+                   f"vorhergesagt ({lead:.0f}h Vorlauf), real "
+                   f"{rep.clouds_total:.0f}%.")
+        elif p_seeing is not None and rep.seeing is not None and \
+                rep.seeing - p_seeing >= DEVIATION_SEEING_ARCSEC:
+            msg = (f"Seeing: fuer {target[11:16]} waren {p_seeing:.1f}\" "
+                   f"vorhergesagt ({lead:.0f}h Vorlauf), real "
+                   f"{rep.seeing:.1f}\".")
+        if not msg:
+            continue
+        key = f"deviation|{rep.name}"
+        la = state["last_alert"].get(key)
+        if la and (now - datetime.fromisoformat(la)).total_seconds() / 60 \
+                < ALERT_COOLDOWN_MIN:
+            log.info("[Abweichung] %s: Cooldown aktiv", rep.name)
+            continue
+        state["last_alert"][key] = now.isoformat(timespec="seconds")
+        log.warning("[Abweichung] %s: %s", rep.name, msg)
+        send_telegram(f"\u26a0\ufe0f Vorhersage lag daneben [{rep.name}]\n"
+                      f"{msg}\nGolden Window moeglicherweise hinfaellig.")
+    save_state(state)
 
 
 # ---------------------------------------------------------------------------
@@ -3162,6 +3298,13 @@ async def run_cycle(locations: list, headless: bool, send_dashboard: bool,
         # Vorausschau: Reihen kombinieren + Golden Window (latest-wins JSON)
         for rep in reports:
             build_forecast(rep, profile)
+        # Live-Abweichung: Ist vs. Planungs-Vorhersage (nur Dunkelheit,
+        # nur Verschlechterung, Cooldown) - NACH build_forecast, damit die
+        # lead>=2-Filterung die frischen Zeilen dieses Laufs sicher meidet
+        try:
+            check_forecast_deviation(reports)
+        except Exception as e:
+            log.warning("[Abweichung] Pruefung fehlgeschlagen: %s", e)
         dashboard = build_dashboard(reports, profile)
         print(dashboard)
 
@@ -3203,6 +3346,12 @@ async def run_cycle(locations: list, headless: bool, send_dashboard: bool,
             check_forecast_verification()
         except Exception as e:
             log.warning("[Verify] Aufruf fehlgeschlagen: %s", e)
+
+        # Golden-Window-Abendpush (1x/Tag ab 18 Uhr, eine Sammel-Nachricht)
+        try:
+            check_evening_push()
+        except Exception as e:
+            log.warning("[Abendpush] fehlgeschlagen: %s", e)
 
         # Uptime-Ping: Radar-Kern komplett durchgelaufen (Checks inklusive).
         # Bewusst VOR dem Auto-Heavy-Nachzug: Der dauert bis ~7 min und zieht

@@ -65,10 +65,22 @@ function initMap() {
 
   markersLayer = L.layerGroup().addTo(map);
 
+  // RainViewer: Dummy-Overlays nur fuer die Control, Logik via Events
+  const rvRadarDummy = L.layerGroup();
+  const rvSatDummy = L.layerGroup();
   L.control.layers(null, {
     "Lichtverschmutzung": lpLayer,
     "Unwetterwarnungen (DWD)": warnLayer,
+    "Regenradar (RainViewer)": rvRadarDummy,
+    "Wolken (Satellit)": rvSatDummy,
   }, { position: "bottomright", collapsed: true }).addTo(map);
+  map.on("overlayadd", (e) => {
+    if (e.name.includes("Regenradar")) rvStart("radar");
+    if (e.name.includes("Satellit")) rvStart("satellite");
+  });
+  map.on("overlayremove", (e) => {
+    if (e.name.includes("Regenradar") || e.name.includes("Satellit")) rvStop();
+  });
 }
 
 /* ---------- Ampel-Schwellen (bestätigt 2026-08-15) ----------
@@ -213,6 +225,109 @@ function fetchBortle(s) {
       localStorage.setItem(key, JSON.stringify(b));
       if (currentSpot === s && currentTab === "now") showTab("now");
     }).catch(() => {});
+}
+
+/* ---------- RainViewer: Regenradar + Satellit (animiert, direkt, kein Proxy) */
+const RV_API = "https://api.rainviewer.com/public/weather-maps.json";
+let rvState = { frames: [], layers: [], idx: 0, playing: false,
+                timer: null, refetch: null, kind: null, active: false };
+
+async function rvFetchFrames(kind) {  // kind: 'radar' | 'satellite'
+  const d = await (await fetch(RV_API)).json();
+  if (kind === "radar") {
+    return { host: d.host, frames: [...(d.radar.past || []),
+                                     ...(d.radar.nowcast || [])] };
+  }
+  return { host: d.host, frames: d.satellite?.infrared || [] };
+}
+
+function rvTimestampEl() {
+  let el = document.getElementById("rv-ts");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "rv-ts";
+    el.innerHTML = '<button id="rv-play" class="hbtn rv-btn">&#9654;</button>' +
+                   '<span id="rv-time" class="mono"></span>';
+    document.getElementById("map").appendChild(el);
+    document.getElementById("rv-play").onclick = rvTogglePlay;
+  }
+  return el;
+}
+
+async function rvStart(kind) {
+  rvState.kind = kind; rvState.active = true;
+  let data;
+  try { data = await rvFetchFrames(kind); }
+  catch (e) { rvBail("Radar-API nicht erreichbar"); return; }
+  if (!data.frames.length) {
+    rvBail(kind === "satellite" ? "Satellit: keine Bilder verfuegbar"
+                                : "Radar: keine Frames");
+    return;
+  }
+  const opts = kind === "radar" ? "/2/1_1" : "/0/0_0";  // color/smooth bzw. 0/0
+  rvState.frames = data.frames;
+  rvState.layers = data.frames.map(f => L.tileLayer(
+    `${data.host}${f.path}/256/{z}/{x}/{y}${opts}.png`,
+    { opacity: 0, className: "rv-tile", zIndex: 350, maxNativeZoom: 12 }
+  ).addTo(map));
+  rvState.idx = rvState.frames.length - 1;
+  rvShow(rvState.idx);
+  rvTimestampEl().style.display = "flex";
+  rvTogglePlay(true);
+  // Frames alle 5 min auffrischen, solange aktiv
+  rvState.refetch = setInterval(async () => {
+    if (!rvState.active) return;
+    try {
+      const nd = await rvFetchFrames(kind);
+      if (nd.frames.length && nd.frames.length !== rvState.frames.length) {
+        rvStop(false); rvStart(kind);
+      }
+    } catch (e) { /* naechster Versuch kommt */ }
+  }, 300000);
+}
+
+function rvShow(i) {
+  rvState.layers.forEach((l, j) => l.setOpacity(j === i ? rvOpacity() : 0));
+  const f = rvState.frames[i];
+  const t = new Date(f.time * 1000);
+  document.getElementById("rv-time").textContent =
+    (f.time * 1000 > Date.now() ? "Nowcast " : "") +
+    t.toLocaleTimeString("de-DE", {hour: "2-digit", minute: "2-digit"});
+}
+
+function rvOpacity() {
+  return document.body.classList.contains("night") ? 0.45 : 0.75;
+}
+
+function rvTogglePlay(force) {
+  const want = force === true ? true : !rvState.playing;
+  rvState.playing = want;
+  document.getElementById("rv-play").innerHTML = want ? "&#10074;&#10074;" : "&#9654;";
+  clearInterval(rvState.timer);
+  if (want) {
+    rvState.timer = setInterval(() => {
+      rvShow((rvState.idx + 1) % rvState.frames.length);
+    }, 700);
+  }
+}
+
+function rvStop(hideTs = true) {
+  rvState.active = false; rvState.playing = false;
+  clearInterval(rvState.timer); clearInterval(rvState.refetch);
+  rvState.layers.forEach(l => map.removeLayer(l));
+  rvState.layers = []; rvState.frames = [];
+  if (hideTs) rvTimestampEl().style.display = "none";
+}
+
+function rvBail(text) {
+  rvStop();
+  alert(text);
+  // Control-Checkbox zuruecksetzen
+  document.querySelectorAll(".leaflet-control-layers-selector").forEach(cb => {
+    if (cb.checked && (cb.closest("label").textContent.includes("Radar") ||
+                       cb.closest("label").textContent.includes("Satellit")))
+      cb.checked = false;
+  });
 }
 
 /* ---------- Marker + Detail-Panel ---------- */

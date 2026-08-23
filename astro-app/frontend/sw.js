@@ -1,8 +1,8 @@
-/* Service Worker v7 - 3-Nächte-Vorausschau, Segmente, Seeing-Horizont. */
+/* Service Worker v8 - RainViewer Radar/Satellit-Layer mit Animation. */
 "use strict";
 
-const SHELL_CACHE = "astro-shell-v7";
-const API_CACHE = "astro-api-v7";
+const SHELL_CACHE = "astro-shell-v8";
+const API_CACHE = "astro-api-v8";
 const SHELL = [
   ".", "index.html", "app.js", "style.css", "manifest.webmanifest",
   "vendor/leaflet.js", "vendor/leaflet.css",
