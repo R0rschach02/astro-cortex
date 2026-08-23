@@ -265,11 +265,15 @@ async function rvStart(kind) {
     return;
   }
   const opts = kind === "radar" ? "/2/1_1" : "/0/0_0";  // color/smooth bzw. 0/0
+  rvState.host = data.host;
+  rvState.opts = opts;
   rvState.frames = data.frames;
-  rvState.layers = data.frames.map(f => L.tileLayer(
-    `${data.host}${f.path}/256/{z}/{x}/{y}${opts}.png`,
-    { opacity: 0, className: "rv-tile", zIndex: 350, maxNativeZoom: 12 }
-  ).addTo(map));
+  // LAZY: nur den NEUESTEN Frame sofort laden. Alle 13 Frames vorzuladen
+  // feuert ~300 Kachel-Requests als Burst - RainViewer antwortet mit 429
+  // (Too Many Requests) und gerade der sichtbare Frame bleibt leer.
+  // Aeltere Frames entstehen erst bei ihrem ersten Loop-Auftritt und liegen
+  // danach im Browser-Cache.
+  rvState.layers = data.frames.map(() => null);
   rvState.idx = rvState.frames.length - 1;
   rvShow(rvState.idx);
   rvTimestampEl().style.display = "flex";
@@ -286,9 +290,23 @@ async function rvStart(kind) {
   }, 300000);
 }
 
+function rvLayerFor(i) {
+  if (!rvState.layers[i]) {
+    const f = rvState.frames[i];
+    rvState.layers[i] = L.tileLayer(
+      `${rvState.host}${f.path}/256/{z}/{x}/{y}${rvState.opts}.png`,
+      { opacity: 0, className: "rv-tile", zIndex: 350, maxNativeZoom: 12 }
+    ).addTo(map);
+  }
+  return rvState.layers[i];
+}
+
 function rvShow(i) {
   rvState.idx = i;                      // Loop-Position mitfuehren
-  rvState.layers.forEach((l, j) => l.setOpacity(j === i ? rvOpacity() : 0));
+  rvState.layers.forEach((l, j) => {
+    if (l) l.setOpacity(j === i ? rvOpacity() : 0);
+  });
+  rvLayerFor(i).setOpacity(rvOpacity());   // lazy: Layer ggf. erst jetzt erzeugen
   const f = rvState.frames[i];
   const t = new Date(f.time * 1000);
   rvTimestampEl().style.display = "flex";   // Existenz sicherstellen
