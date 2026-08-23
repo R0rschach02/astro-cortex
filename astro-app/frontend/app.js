@@ -290,7 +290,9 @@ function rvShow(i) {
   rvState.layers.forEach((l, j) => l.setOpacity(j === i ? rvOpacity() : 0));
   const f = rvState.frames[i];
   const t = new Date(f.time * 1000);
-  document.getElementById("rv-time").textContent =
+  rvTimestampEl().style.display = "flex";   // Existenz sicherstellen
+  const span = document.getElementById("rv-time");
+  span.textContent =
     (f.time * 1000 > Date.now() ? "Nowcast " : "") +
     t.toLocaleTimeString("de-DE", {hour: "2-digit", minute: "2-digit"});
 }
