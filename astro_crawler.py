@@ -2687,12 +2687,20 @@ def _forecast_window(name: str) -> tuple[Optional[datetime], Optional[datetime],
 def build_callsheet(loc: dict, profile: str) -> str:
     """Call-Sheet-Text: alles was schon berechnet wird, in einer Nachricht."""
     conn = sqlite3.connect(DB_PATH)
+    # Heavy-Zeile fuer Wolken/Seeing (Radar-Zeilen tragen sie nicht),
+    # juengste Zeile fuer Wind/Tau/Beschlag - gleiche Taktungslogik wie API
     row = conn.execute(
         "SELECT ts, clouds_total, seeing, jetstream, radar_status, wind_speed, "
         "dewpoint_spread, dew_risk, moon_illum FROM crawls "
         "WHERE location_name = ? ORDER BY id DESC LIMIT 1",
         (loc["name"],)).fetchone()
+    heavy = conn.execute(
+        "SELECT clouds_total, seeing FROM crawls "
+        "WHERE location_name = ? AND mode='heavy' ORDER BY id DESC LIMIT 1",
+        (loc["name"],)).fetchone()
     conn.close()
+    if row and heavy:
+        row = (row[0], heavy[0] or row[1], heavy[1] or row[2]) + row[3:]
     m = moon_cached(loc["lat"], loc["lon"]) or {}
     rep = SiteReport(name=loc["name"], lat=loc["lat"], lon=loc["lon"])
     if row:
@@ -2708,7 +2716,7 @@ def build_callsheet(loc: dict, profile: str) -> str:
 
     lines = [f"=== SESSION CALL-SHEET: {loc['name']} [{profile.upper()}] ===",
              f"Rating aktuell: {rating} {icon}"
-             + (f" (Wolken {row[1]}%, Seeing {row[2]}{ARCSEC})" if row else ""),
+             + (f" (Wolken {row[1]}%, Seeing {row[2]}{ARCSEC})" if row and row[1] is not None else ""),
              f"Zeitfenster: {w_label}" if w_label else "Zeitfenster: keine Daten"]
     if target:
         lines.append(f"Ziel-Vorschlag: {target['obj']} {target['name']} "
