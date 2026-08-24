@@ -84,6 +84,20 @@ body.night .leaflet-container { background: #000; }
   white-space: nowrap; font-size: 11px; font-weight: 600;
   color: var(--text); text-shadow: 0 1px 3px #000, 0 0 6px #000;
 }
+/* Regen-Tropfen-Badge am Marker (BrightSky precip_2h; oben links, da "!"-Alert oben rechts sitzt) */
+.rain-badge {
+  position: absolute; top: -3px; left: -3px;
+  width: 11px; height: 11px; background: #7cc4ff;
+  border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+  box-shadow: 0 0 2px rgba(0,0,0,.4);
+}
+.rain-badge.rain-2 { width: 14px; height: 14px; background: #3b9dff; }
+.rain-badge.rain-3 { width: 17px; height: 17px; background: #1173e0; }
+.rain-badge.rain-4 { width: 20px; height: 20px; background: #0a4aa8; }
+.rain-badge.rain-forecast { width: 12px; height: 12px; background: transparent; border: 2px solid #3b9dff; }
+.rain-badge.rain-new { animation: rain-pulse .7s ease-out 3; }
+@keyframes rain-pulse { 50% { transform: rotate(-45deg) scale(1.7); } }
+body.night .rain-badge { filter: brightness(.65); }
 
 /* ---- Detail-Panel ---- */
 #panel {

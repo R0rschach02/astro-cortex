@@ -42,7 +42,8 @@ if git -C /home/enigma rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   if git -C /home/enigma diff --cached --quiet; then
     echo "Keine Quellcode-Änderungen - kein Commit."
   else
-    git -C /home/enigma commit -q -m "deploy: $(date '+%Y-%m-%d %H:%M')" \
+    # Konventionelle Message als $1 uebergeben (feat:/fix:/...), sonst Fallback Datum
+    git -C /home/enigma commit -q -m "${1:-deploy: $(date '+%Y-%m-%d %H:%M')}" \
       && echo "Commit: $(git -C /home/enigma log -1 --oneline)"
   fi
 else

@@ -359,13 +359,34 @@ function rvBail(text) {
 }
 
 /* ---------- Marker + Detail-Panel ---------- */
-function markerIcon(spot) {
+// Tropfen-Stufen ankoppelt an die TH.precip-Ampelgrenzen (0.1 / 1.0 mm) + Starkstufe
+const RAIN_STEPS = [
+  { max: 0.1, cls: "rain-1", label: "Nieselregen" },
+  { max: 1.0, cls: "rain-2", label: "leichter Regen" },
+  { max: 2.5, cls: "rain-3", label: "kräftiger Regen" },
+  { max: Infinity, cls: "rain-4", label: "Starkregen" },
+];
+let lastRainMm = {};   // name -> precip_2h des vorherigen Refresh (fuer Regen-Puls)
+
+function rainBadgeHtml(spot, isNew) {
+  const mm = spot.precip_2h, prob = spot.rain_prob || 0;
+  if (mm == null || mm <= 0) {
+    if (prob >= 50)
+      return `<div class="rain-badge rain-forecast" title="Regen absehbar (${prob}% innerhalb 4 h)"></div>`;
+    return "";
+  }
+  const st = RAIN_STEPS.find(x => mm <= x.max);
+  return `<div class="rain-badge ${st.cls}${isNew ? " rain-new" : ""}" title="${st.label}: ${mm.toFixed(1)} mm/2 h"></div>`;
+}
+
+function markerIcon(spot, rainNew) {
   const rating = spot.rating || "NA";
   const alertCls = (spot.radar_status || "").includes("Alert") ? " alert" : "";
   return L.divIcon({
     className: "",
     html: `<div class="spot-marker">
              <div class="spot-dot rating-${esc(rating)}${alertCls}"></div>
+             ${rainBadgeHtml(spot, rainNew)}
              <div class="spot-label">${esc(spot.name)}</div>
            </div>`,
     iconSize: [46, 46], iconAnchor: [23, 23],
@@ -440,7 +461,9 @@ function panelHtml(s) {
 function renderSpots(data) {
   markersLayer.clearLayers();
   for (const s of data.spots) {
-    const mk = L.marker([s.lat, s.lon], { icon: markerIcon(s) });
+    const mm = s.precip_2h || 0;
+    const rainNew = mm > 0 && (lastRainMm[s.name] ?? 0) <= 0;   // trocken -> nass
+    const mk = L.marker([s.lat, s.lon], { icon: markerIcon(s, rainNew) });
     mk.on("click", () => {
       currentSpot = s;
       $("panel").classList.remove("hidden");
@@ -448,6 +471,7 @@ function renderSpots(data) {
       fetchBortle(s);
     });
     markersLayer.addLayer(mk);
+    lastRainMm[s.name] = mm;
   }
 }
 
