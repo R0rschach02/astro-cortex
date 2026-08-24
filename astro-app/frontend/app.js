@@ -295,7 +295,9 @@ function rvLayerFor(i) {
     const f = rvState.frames[i];
     rvState.layers[i] = L.tileLayer(
       `${rvState.host}${f.path}/256/{z}/{x}/{y}${rvState.opts}.png`,
-      { opacity: 0, className: "rv-tile", zIndex: 350, maxNativeZoom: 12 }
+      // RainViewer Free liefert ab z8 nur "Zoom Level Not Supported"-Kacheln;
+      // z7 ist die hoechste Stufe mit echten Daten, darueber skaliert Leaflet hoch.
+      { opacity: 0, className: "rv-tile", zIndex: 350, maxNativeZoom: 7, maxZoom: 18 }
     ).addTo(map);
   }
   return rvState.layers[i];
