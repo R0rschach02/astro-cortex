@@ -994,6 +994,9 @@ WATCHLIST_PATH = os.path.expanduser("~/.astro_crawler_watchlist.json")
 DB_PATH = os.path.expanduser("~/.astro_crawler.db")
 MOON_CACHE_PATH = os.path.expanduser("~/.astro_crawler_moon.json")
 FORECAST_PATH = os.path.expanduser("~/.astro_crawler_forecast.json")
+# Taeglich ueberschriebener Export signifikanter Prognose-Abweichungen
+# (Quelle bleibt forecast_verification; die CSV ist nur ein Lese-Angebot)
+DEVIATION_CSV_PATH = os.path.expanduser("~/astro-app/deviations.csv")
 SKYFIELD_DIR = os.path.expanduser("~/.skyfield")
 MOON_MIN_ALT = 30.0  # Grad: darunter gilt der Mond als 'zu niedrig' (Extinktion)
 ALERT_COOLDOWN_MIN = 90  # gleicher Alarm am gleichen Ort nicht vor Ablauf erneut
@@ -1399,6 +1402,17 @@ def check_evening_push():
         lines += [f"\u2022 {p}" for p in go_parts]
     if no_parts:
         lines.append("\u274c Heute Nacht nichts: " + ", ".join(no_parts) + ".")
+    # Konsolidierte Abweichungen (statt Einzelnachrichten ausserhalb von
+    # Sessions): eine Zeile, Standorte nur als Kurzzaehlung.
+    dev = state.get("deviation_counter", {}).get(today)
+    if dev and dev.get("count"):
+        names = {}
+        for n in dev.get("spots", []):
+            names[n] = names.get(n, 0) + 1
+        summ = ", ".join(f"{n} {c}x" for n, c in
+                         sorted(names.items(), key=lambda x: -x[1]))
+        lines.append(f"\u26a0 Heute {dev['count']} Vorhersage-Abweichung(en) "
+                     f"ausserhalb aktiver Sessions erkannt ({summ}).")
     if not go_parts and not no_parts:
         return
     send_telegram("\n".join(lines))
@@ -1468,11 +1482,107 @@ def check_forecast_verification():
                 "VALUES (?,?,?,?,?,?,?,?,?,?,?)", inserts)
             conn.commit()
         conn.close()
+        export_deviation_csv()
         log.info("[Verify] %d Zeilen geprueft: %d verifiziert, %d final "
                  "unverifizierbar", len(inserts), matched_n, unmatched_n)
     except Exception as e:
         log.warning("[Verify] Lauf fehlgeschlagen: %s", type(e).__name__)
         log.debug("[Verify] Traceback:\n%s", traceback.format_exc())
+
+
+def export_deviation_csv():
+    """Taeglich im Verify-Zyklus: Zeilen mit signifikanter Abweichung als
+    einfache CSV exportieren. Schwellen wie Teil B (30 pp Wolken, 1.0\"
+    Seeing), aber in BEIDE Richtungen (err = vorhergesagt - Ist): Eine
+    spaetere Bias-Korrektur braucht auch die 'besser als vorhergesagt'-
+    Faelle. Datei wird fortlaufend ueberschrieben, Daten bleiben in der DB."""
+    import csv as _csv
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        rows = conn.execute(
+            "SELECT fl.location_name, fl.target_ts, fl.lead_hours, "
+            "fl.clouds_total, v.actual_clouds, v.err_clouds, "
+            "fl.seeing, v.actual_seeing, v.err_seeing, v.verified_at "
+            "FROM forecast_verification v "
+            "JOIN forecast_log fl ON fl.id = v.forecast_log_id "
+            "WHERE v.matched = 1 AND ("
+            "  ABS(v.err_clouds) >= ? OR ABS(v.err_seeing) >= ?) "
+            "ORDER BY fl.target_ts DESC",
+            (DEVIATION_CLOUD_PP, DEVIATION_SEEING_ARCSEC)).fetchall()
+        conn.close()
+        header = ["location", "target_ts", "lead_hours",
+                  "pred_clouds", "actual_clouds", "err_clouds",
+                  "pred_seeing", "actual_seeing", "err_seeing", "verified_at"]
+        with open(DEVIATION_CSV_PATH, "w", newline="", encoding="utf-8") as f:
+            w = _csv.writer(f)
+            w.writerow(header)
+            w.writerows(rows)
+        log.info("[CSV] %d signifikante Abweichungen -> %s",
+                 len(rows), DEVIATION_CSV_PATH)
+    except Exception as e:
+        log.warning("[CSV] Export fehlgeschlagen: %s", type(e).__name__)
+        log.debug("[CSV] Traceback:\n%s", traceback.format_exc())
+
+
+# Erste stabile Bias-Schaetzung pro Parameter/Vorlauf-Bucket: Standardfehler
+# des Mittelwerts SE = sigma/sqrt(n); mit n=50 bleibt SE bei typischen
+# Fehlerstreuungen (Wolken sigma~25-30 pp, Seeing sigma~0.5-0.8\") klein
+# genug, dass systematische Bias ab ~10 pp Wolken bzw. ~0.25\" Seeing
+# signifikant werden - und 50 passt zum FINAL-Wert des Session-Meilensteins.
+ML_MILESTONE_ROWS = 50
+
+
+def check_ml_milestone():
+    """1x taeglich im Radar-Zyklus: verifizierte forecast_verification-Zeilen
+    je Parameter (Wolken/Seeing) und Vorlauf-Bucket (<=24 h / >24 h) zaehlen.
+    Erreicht eine Gruppe ML_MILESTONE_ROWS, einmalige Telegram-Meldung
+    (gleicher Flag-in-State-Mechanismus wie der 20/50-Session-Meilenstein)."""
+    state = load_state()
+    today = f"{datetime.now():%Y-%m-%d}"
+    if state.get("ml_milestone_date") == today:
+        return
+    state["ml_milestone_date"] = today
+
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        groups = conn.execute(
+            # GROUP BY 1 (Ordinalzahl): Aliase sind in compound SELECTs
+            # (UNION ALL) fuer GROUP BY nicht aufloesbar
+            "SELECT CASE WHEN fl.lead_hours <= 24 THEN 'Wolken<=24h' "
+            "             ELSE 'Wolken>24h' END AS grp, COUNT(*), "
+            "       ROUND(AVG(v.err_clouds), 1) "
+            "FROM forecast_verification v "
+            "JOIN forecast_log fl ON fl.id = v.forecast_log_id "
+            "WHERE v.matched = 1 AND v.err_clouds IS NOT NULL GROUP BY 1 "
+            "UNION ALL "
+            "SELECT CASE WHEN fl.lead_hours <= 24 THEN 'Seeing<=24h' "
+            "             ELSE 'Seeing>24h' END, COUNT(*), "
+            "       ROUND(AVG(v.err_seeing), 2) "
+            "FROM forecast_verification v "
+            "JOIN forecast_log fl ON fl.id = v.forecast_log_id "
+            "WHERE v.matched = 1 AND v.err_seeing IS NOT NULL GROUP BY 1"
+        ).fetchall()
+        conn.close()
+    except Exception as e:
+        log.warning("[ML-Milestone] DB-Check fehlgeschlagen: %s", e)
+        save_state(state)
+        return
+
+    if not groups or max(g[1] for g in groups) < ML_MILESTONE_ROWS \
+            or state.get("ml_milestone_sent"):
+        save_state(state)
+        return
+
+    state["ml_milestone_sent"] = True
+    save_state(state)
+    top = max(groups, key=lambda g: g[1])
+    detail = " | ".join(f"{g[0]}: {g[1]}" for g in groups)
+    send_telegram(
+        f"\U0001f4ca Genug Vorhersage-Historie fuer eine erste "
+        f"Bias-Korrektur gesammelt ({top[1]} Zeilen in {top[0]}).\n"
+        f"Alle Gruppen: {detail}\n"
+        f"Zeit fuer den naechsten Kalibrierungsschritt.")
+    log.info("[ML-Milestone] Trigger erreicht: %s", detail)
 
 
 # ---------------------------------------------------------------------------
@@ -1527,6 +1637,23 @@ def check_forecast_deviation(reports: list):
             log.info("[Abweichung] %s: Cooldown aktiv", rep.name)
             continue
         state["last_alert"][key] = now.isoformat(timespec="seconds")
+
+        # Session laeuft -> sofortige Push (Sicherheits-/Planungsrelevanz
+        # waehrend der Beobachtung). Ohne Session -> nur Zaehler fuer die
+        # Abendplan-Zeile; der Cooldown oben verhindert, dass dieselbe
+        # anhaltende Abweichung jeden Heavy-Tick erneut zaehlt.
+        if db_open_session() is None:
+            today = f"{now:%Y-%m-%d}"
+            day = state.setdefault("deviation_counter", {}).get(today)
+            if day is None:
+                state["deviation_counter"] = {today: {"count": 0, "spots": []}}
+                day = state["deviation_counter"][today]
+            day["count"] += 1
+            day["spots"].append(rep.name)
+            log.warning("[Abweichung] %s: %s (keine Session aktiv -> nur "
+                        "gezaehlt, Zusammenfassung im Abendplan)",
+                        rep.name, msg)
+            continue
         log.warning("[Abweichung] %s: %s", rep.name, msg)
         send_telegram(f"\u26a0\ufe0f Vorhersage lag daneben [{rep.name}]\n"
                       f"{msg}\nGolden Window moeglicherweise hinfaellig.")
@@ -3346,6 +3473,13 @@ async def run_cycle(locations: list, headless: bool, send_dashboard: bool,
             check_forecast_verification()
         except Exception as e:
             log.warning("[Verify] Aufruf fehlgeschlagen: %s", e)
+
+        # ML-Bereitschaft: 1x taeglich Zeilenzahl je Parameter/Lead-Bucket
+        # pruefen, einmalige Meldung ab Schwelle (Flag in State-Datei)
+        try:
+            check_ml_milestone()
+        except Exception as e:
+            log.warning("[ML-Milestone] Aufruf fehlgeschlagen: %s", e)
 
         # Golden-Window-Abendpush (1x/Tag ab 18 Uhr, eine Sammel-Nachricht)
         try:
