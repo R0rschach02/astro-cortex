@@ -15,4 +15,5 @@
 !/astro-app/
 /astro-app/tilecache/
 /astro-app/verification-screenshots/
+/astro-app/deviations.csv
 /astro-app/backend/__pycache__/
