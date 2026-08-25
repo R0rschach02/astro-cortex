@@ -4,7 +4,9 @@
 
 # --- Projekt: Crawler + Deploy ---
 !/astro_crawler.py
+!/data_sanity.py
 !/astro_deploy.sh
+!/locations.json.example
 !/messier.csv
 !/.gitignore
 !/.gitattributes
