@@ -3443,6 +3443,14 @@ async def run_cycle(locations: list, headless: bool, send_dashboard: bool,
             check_forecast_deviation(reports)
         except Exception as e:
             log.warning("[Abweichung] Pruefung fehlgeschlagen: %s", e)
+
+        # Plausibilitaetsschicht: Wertebereiche, Totlauf-Erkennung,
+        # Zwei-Quellen-Abgleich (data_sanity.py, Log-only, kein Telegram)
+        try:
+            import data_sanity
+            data_sanity.run_sanity(reports, DB_PATH)
+        except Exception as e:
+            log.warning("[sanity] Aufruf fehlgeschlagen: %s", e)
         dashboard = build_dashboard(reports, profile)
         print(dashboard)
 

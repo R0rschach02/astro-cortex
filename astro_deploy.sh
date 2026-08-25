@@ -11,15 +11,19 @@ LIVE="/home/enigma/astro_crawler.py"
 APP_DIR="/home/enigma/astro-app"
 
 echo "== 1/5 Syntax-Check (Workspace-Kopie) =="
-python3 -m py_compile "$WS/astro_crawler.py"
+python3 -m py_compile "$WS/astro_crawler.py" "$WS/data_sanity.py"
 
-echo "== 2/5 Deploy nach $LIVE =="
+echo "== 2/5 Deploy nach $LIVE (+ data_sanity.py) =="
 cp "$WS/astro_crawler.py" "$LIVE"
+cp "$WS/data_sanity.py" "/home/enigma/data_sanity.py"
 
 echo "== 3/5 Integrität (md5 Workspace == Live) =="
 a=$(md5sum "$WS/astro_crawler.py" | cut -d' ' -f1)
 b=$(md5sum "$LIVE" | cut -d' ' -f1)
 [ "$a" = "$b" ] && echo "OK: $a" || { echo "MD5-MISMATCH!"; exit 1; }
+c=$(md5sum "$WS/data_sanity.py" | cut -d' ' -f1)
+d=$(md5sum "/home/enigma/data_sanity.py" | cut -d' ' -f1)
+[ "$c" = "$d" ] && echo "OK: $c" || { echo "MD5-MISMATCH data_sanity!"; exit 1; }
 
 echo "== 4/5 Dienste: Timer sind oneshot (laden Datei je Tick frisch),"
 echo "         aber astro-app importiert beim Start -> IMMER neu starten =="
@@ -38,7 +42,7 @@ done
 
 echo "== 6/6 Git: Deploy-Commit (nur wenn Quellcode-Änderungen) =="
 if git -C /home/enigma rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /home/enigma add astro_crawler.py astro_deploy.sh messier.csv astro-app 2>/dev/null || true
+  git -C /home/enigma add astro_crawler.py data_sanity.py astro_deploy.sh messier.csv astro-app 2>/dev/null || true
   if git -C /home/enigma diff --cached --quiet; then
     echo "Keine Quellcode-Änderungen - kein Commit."
   else
