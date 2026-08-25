@@ -12,7 +12,8 @@ const BASE = (localStorage.getItem("astro_base") || "").replace(/\/$/, "");
 const $ = (id) => document.getElementById(id);
 const REFRESH_MS = 60_000;
 
-let map, markersLayer, warnLayer, lpLayer;
+let map, markersLayer, warnLayer, lpLayer, rainGridLayer;
+let rgActive = false, rgDebounce = null, stormRings = [];
 let lastSpots = null;
 let CURRENT_PROFILE = "dso";
 let currentSpot = null;   // fuer Tab-Wechsel im Detail-Panel
@@ -65,21 +66,36 @@ function initMap() {
 
   markersLayer = L.layerGroup().addTo(map);
 
-  // RainViewer: Dummy-Overlays nur fuer die Control, Logik via Events
-  const rvRadarDummy = L.layerGroup();
+  // Regionales Regen-Icon-Raster (Open-Meteo via /api/rain-grid): die neue
+  // Standard-Regenansicht - klare Wolke/Tropfen-Icons statt Farbflaechen.
+  rainGridLayer = L.layerGroup().addTo(map);
+  rgActive = true;
+
+  // RainViewer: Dummy-Overlays nur fuer die Control, Logik via Events.
+  // Kachel-Heatmap ist seit dem Icon-Raster nur noch optionale Rohansicht.
+  const rvRawDummy = L.layerGroup();
   const rvSatDummy = L.layerGroup();
   L.control.layers(null, {
     "Lichtverschmutzung": lpLayer,
     "Unwetterwarnungen (DWD)": warnLayer,
-    "Regenradar (RainViewer)": rvRadarDummy,
+    "Regen-Icons (Region)": rainGridLayer,
+    "Radar-Rohansicht (Kachel)": rvRawDummy,
     "Wolken (Satellit)": rvSatDummy,
   }, { position: "bottomright", collapsed: true }).addTo(map);
   map.on("overlayadd", (e) => {
-    if (e.name.includes("Regenradar")) rvStart("radar");
+    if (e.name.includes("Regen-Icons")) { rgActive = true; fetchRainGrid(); }
+    if (e.name.includes("Radar-Rohansicht")) rvStart("radar");
     if (e.name.includes("Satellit")) rvStart("satellite");
   });
   map.on("overlayremove", (e) => {
-    if (e.name.includes("Regenradar") || e.name.includes("Satellit")) rvStop();
+    if (e.name.includes("Regen-Icons")) rgActive = false;
+    if (e.name.includes("Radar-Rohansicht") || e.name.includes("Satellit")) rvStop();
+  });
+  // Raster folgt dem Ausschnitt (debounced); Cache im Backend faengt Pan an
+  map.on("moveend zoomend", () => {
+    if (!rgActive) return;
+    clearTimeout(rgDebounce);
+    rgDebounce = setTimeout(fetchRainGrid, 600);
   });
 }
 
@@ -358,6 +374,63 @@ function rvBail(text) {
   });
 }
 
+/* ---------- Regen-Icon-Raster (Open-Meteo, Overworld-Bildsprache) ----------
+   Keine Farbflaechen: pro Gitterpunkt eine klare Wolke mit 0-3 Tropfen,
+   Groesse/Fuellung nach mm; hohle Wolke = Regen absehbar; Blitz-Symbol,
+   wo der Punkt in einer aktiven DWD-Gewitterwarnung liegt. */
+function rgIconHtml(p, storm) {
+  const mm = p.mm ?? 0;
+  let cls = "", drops = 0;
+  if (mm > 5)        { cls = "rg-4"; drops = 3; }
+  else if (mm > 2)   { cls = "rg-3"; drops = 3; }
+  else if (mm > 0.5) { cls = "rg-2"; drops = 2; }
+  else if (mm > 0)   { cls = "rg-1"; drops = 1; }
+  else if ((p.prob ?? 0) >= 30) cls = "rg-forecast";
+  if (!cls) return null;
+  let html = `<div class="rg-icon ${cls}" title="${mm.toFixed(1)} mm/h \u00b7 `
+    + `${p.prob ?? "?"}% Regenwahrscheinlichkeit">`;
+  html += `<span class="rg-cloud"></span>`;
+  for (let i = 1; i <= drops; i++) html += `<span class="rg-drop rg-d${i}"></span>`;
+  if (storm) html += `<span class="rg-bolt">\u26a1</span>`;
+  return html + "</div>";
+}
+
+function pointInRing(lat, lon, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+    if ((yi > lat) !== (yj > lat) &&
+        lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+function renderRainGrid(data) {
+  rainGridLayer.clearLayers();
+  let shown = 0;
+  for (const p of data.points) {
+    const storm = stormRings.some(r => pointInRing(p.lat, p.lon, r));
+    const html = rgIconHtml(p, storm);
+    if (!html) continue;
+    shown++;
+    L.marker([p.lat, p.lon], {
+      icon: L.divIcon({ className: "", html, iconSize: [30, 28], iconAnchor: [15, 24] }),
+      keyboard: false, zIndexOffset: -500,
+    }).addTo(rainGridLayer);
+  }
+  console.debug(`[RegenIcons] ${shown}/${data.points.length} Gitterpunkte mit Icon`);
+}
+
+async function fetchRainGrid() {
+  try {
+    const b = map.getBounds();
+    const bbox = [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()]
+      .map(v => v.toFixed(4)).join(",");
+    const data = await api(`/api/rain-grid?bbox=${encodeURIComponent(bbox)}&zoom=${map.getZoom()}`);
+    renderRainGrid(data);
+  } catch (e) { console.warn("rain-grid offline:", e); }
+}
+
 /* ---------- Marker + Detail-Panel ---------- */
 // Tropfen-Stufen ankoppelt an die TH.precip-Ampelgrenzen (0.1 / 1.0 mm) + Starkstufe
 const RAIN_STEPS = [
@@ -486,12 +559,21 @@ async function refresh() {
       updateModeButton();
     }
     renderSpots(data);
-    // Warnungen nachladen (Layer nur, wenn aktiviert)
+    // Warnungen nachladen (Layer nur, wenn aktiviert); Gewitter-Ringe
+    // speichern wir zusaetzlich fuer die Blitz-Icons im Regen-Raster
     try {
       const warns = await api("/api/warnings");
       warnLayer.addData({ type: "FeatureCollection",
                           features: warns.features.filter(f => f.properties.kind !== "other") });
+      stormRings = [];
+      for (const f of warns.features) {
+        if (f.properties.kind !== "storm" || !f.geometry) continue;
+        if (f.geometry.type === "Polygon") stormRings.push(f.geometry.coordinates[0]);
+        else if (f.geometry.type === "MultiPolygon")
+          f.geometry.coordinates.forEach(p => stormRings.push(p[0]));
+      }
     } catch (e) { console.warn("warnings offline:", e); }
+    if (rgActive) fetchRainGrid();
     setFreshness(data.ts, false);
   } catch (e) {
     console.warn("refresh fehlgeschlagen:", e);

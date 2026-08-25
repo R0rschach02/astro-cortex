@@ -15,6 +15,7 @@ from __future__ import annotations
 import datetime as dt
 import json
 import logging
+import math
 import os
 import sqlite3
 import sys
@@ -291,6 +292,81 @@ from lpcache import get_lp_tile  # noqa: E402
 @app.get("/api/lp-tiles/{z}/{x}/{y}")
 def api_lp_tile(z: int, x: int, y: int):
     return get_lp_tile(z, x, y)
+
+
+# --- Regen-Raster: Open-Meteo multi-coordinate, zoomgekoppelt, RAM-Cache ---
+# Basis fuer die Icon-Darstellung im Frontend (Wolke/Tropfen statt Heatmap).
+_RAINGRID_CACHE: dict = {}          # "lat,lon" -> (mono_ts, punkt-dict)
+_RAINGRID_TTL = 900                 # OM current aktualisiert ~15 min
+_RAINGRID_MAX_PTS = 120
+# Zoom -> Grad-Abstand (~10 km bei 0.10 auf 49.5 N); groessere Zooms nutzen
+# das feinste Raster, kleinere verdichten den Schritt
+_RAINGRID_STEP = {8: 0.25, 9: 0.15, 10: 0.10, 11: 0.07}
+
+
+@app.get("/api/rain-grid")
+def api_rain_grid(bbox: str, zoom: int = 9):
+    """Niederschlag fuer ein Gitter ueber den sichtbaren Kartenausschnitt.
+    EIN OM-Request bedient alle fehlenden Gitterpunkte (comma-separated
+    coordinates); Punkte liegen auf einem globalen Raster, damit Pan/Zoom
+    den Zell-Cache trifft statt neue Koordinaten zu erzeugen."""
+    try:
+        p = [float(x) for x in bbox.split(",")]
+        assert len(p) == 4
+    except Exception:
+        raise HTTPException(400, "bbox=lat1,lon1,lat2,lon2 noetig")
+    s, w = min(p[0], p[2]), min(p[1], p[3])
+    n, e = max(p[0], p[2]), max(p[1], p[3])
+
+    step = _RAINGRID_STEP.get(min(max(zoom, 8), 11), 0.15)
+    while True:
+        i_s, i_n = int(math.ceil(s / step)), int(n // step)
+        j_w, j_e = int(math.ceil(w / step)), int(e // step)
+        if (i_n - i_s + 1) * (j_e - j_w + 1) <= _RAINGRID_MAX_PTS:
+            break
+        step = round(step * 2, 4)   # zu viele Punkte: Raster groeber
+
+    now = time.time()
+    pts, missing = [], []
+    for i in range(i_s, i_n + 1):
+        for j in range(j_w, j_e + 1):
+            lat, lon = round(i * step, 4), round(j * step, 4)
+            key = f"{lat:.4f},{lon:.4f}"
+            cached = _RAINGRID_CACHE.get(key)
+            if cached and now - cached[0] < _RAINGRID_TTL:
+                pts.append(cached[1])
+            else:
+                missing.append((lat, lon, key))
+    if missing:
+        url = ("https://api.open-meteo.com/v1/forecast?latitude="
+               + ",".join(f"{m[0]:.4f}" for m in missing)
+               + "&longitude=" + ",".join(f"{m[1]:.4f}" for m in missing)
+               + "&current=precipitation,precipitation_probability,weathercode"
+                 "&timezone=Europe%2FBerlin")
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": ac.USER_AGENT})
+            data = json.loads(urllib.request.urlopen(req, timeout=12).read())
+            items = data if isinstance(data, list) else [data]
+            if len(items) != len(missing):
+                raise ValueError("Anzahl-Antwort != Anfrage")
+            for (lat, lon, key), it in zip(missing, items):
+                cur = it.get("current") or {}
+                d = {"lat": lat, "lon": lon,
+                     "mm": cur.get("precipitation"),
+                     "prob": cur.get("precipitation_probability"),
+                     "code": cur.get("weathercode")}
+                _RAINGRID_CACHE[key] = (now, d)
+                pts.append(d)
+        except Exception as ex:
+            log.warning("[API] Regen-Raster OM-Abfrage fehlgeschlagen: %s (%d Punkte)",
+                        type(ex).__name__, len(missing))
+            # Cache-Treffer zurueckgeben, was da ist; Frontend zeigt Rest naechsten Takt
+    # Cache-Begrenzung: grob aufräumen (>4x Maximalbedarf)
+    if len(_RAINGRID_CACHE) > 4 * _RAINGRID_MAX_PTS * 2:
+        for k in sorted(_RAINGRID_CACHE, key=lambda k: _RAINGRID_CACHE[k][0])[:len(_RAINGRID_CACHE) // 2]:
+            _RAINGRID_CACHE.pop(k, None)
+    return {"step": step, "ts": now,
+            "points": sorted(pts, key=lambda d: (d["lat"], d["lon"]))}
 
 
 # --- Vorausschau: stündliche Reihe + Golden Window (latest-wins JSON) ---
