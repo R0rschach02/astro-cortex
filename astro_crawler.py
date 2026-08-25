@@ -1425,6 +1425,30 @@ def check_evening_push():
              len(go_parts), len(no_parts))
 
 
+def _brightsky_hour_clouds(lat: float, lon: float, target) -> Optional[int]:
+    """Einzelstunden-Bewoelkung (cloud_cover %) per BrightSky NACHMESSEN -
+    Stationsmessung fuer genau die Zielstunde. Ersetzt in der Verifikation
+    den 5h-Worst-Case aus crawls (Befund B: Worst-Case-Ist vs. Einzelstunden-
+    Vorhersage erzeugte strukturelle +-100pp-Differenzen)."""
+    try:
+        date = target.strftime("%Y-%m-%dT%H:00")
+        params = urllib.parse.urlencode(
+            {"lat": round(lat, 6), "lon": round(lon, 6),
+             "date": date, "last_date": date})
+        data = http_get_json(f"https://api.brightsky.dev/weather?{params}",
+                             timeout=10)
+        rows = [w for w in (data.get("weather") or [])
+                if w.get("cloud_cover") is not None]
+        if not rows:
+            return None
+        best = min(rows, key=lambda w: abs(
+            (datetime.fromisoformat(w["timestamp"]) - target
+             ).total_seconds()))
+        return best["cloud_cover"]
+    except Exception:
+        return None
+
+
 def check_forecast_verification():
     """1x taeglich im Radar-Takt: unverifizierte forecast_log-Zeilen mit
     target_ts >= 45 min zurueck gegen echte crawls-Zeilen matchen und die
@@ -1452,6 +1476,15 @@ def check_forecast_verification():
             "ORDER BY fl.target_ts LIMIT ?",
             (cutoff, FORECAST_VERIFY_BATCH)).fetchall()
         verified_at = now.isoformat(timespec="seconds")
+        # Koordinaten-Lookup fuer die BrightSky-Nachmessung (Standorte +
+        # Watchlist); einmal pro Lauf.
+        loc_coord = {}
+        try:
+            for l in active_locations(DEFAULT_LOCATIONS) + load_watchlist():
+                loc_coord[l["name"]] = (l["lat"], l["lon"])
+        except Exception:
+            pass
+        bs_cache = {}   # (name, stunde) -> cloud_cover|None
         inserts, matched_n, unmatched_n = [], 0, 0
         for (fid, target_s, loc, p_clouds, p_seeing, p_jet, p_tau, p_wind) in rows:
             try:
@@ -1466,7 +1499,18 @@ def check_forecast_verification():
             # nicht in die Fehlerberechnung.
             h_bad = bool(h_row and (h_row[6] or "").strip())
             a_bad = bool(a_row and (a_row[6] or "").strip())
-            a_clouds = h_row[1] if (h_row and not h_bad) else None
+            # Wolken: Einzelstunden-Ist per BrightSky-Nachmessung (Befund B)
+            # statt des 5h-Worst-Case aus der crawl-Zeile. Kein Messwert
+            # verfuegbar -> NULL -> fliesst nicht in die Fehlerrechnung.
+            a_clouds = None
+            hour_key = (loc, target.strftime("%Y-%m-%dT%H"))
+            if hour_key in bs_cache:
+                a_clouds = bs_cache[hour_key]
+            elif loc in loc_coord:
+                time.sleep(0.2)   # hoeflich gegenueber der freien API
+                a_clouds = _brightsky_hour_clouds(
+                    *loc_coord[loc], target)
+                bs_cache[hour_key] = a_clouds
             a_seeing = h_row[2] if (h_row and not h_bad) else None
             a_wind = a_row[4] if (a_row and not a_bad) else None
             a_tau = a_row[5] if (a_row and not a_bad) else None
