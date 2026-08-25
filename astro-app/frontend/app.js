@@ -414,7 +414,7 @@ function renderRainGrid(data) {
     if (!html) continue;
     shown++;
     L.marker([p.lat, p.lon], {
-      icon: L.divIcon({ className: "", html, iconSize: [30, 28], iconAnchor: [15, 24] }),
+      icon: L.divIcon({ className: "", html, iconSize: [38, 34], iconAnchor: [19, 30] }),
       keyboard: false, zIndexOffset: -500,
     }).addTo(rainGridLayer);
   }
