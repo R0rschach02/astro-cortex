@@ -13,6 +13,14 @@ APP_DIR="/home/enigma/astro-app"
 echo "== 1/5 Syntax-Check (Workspace-Kopie) =="
 python3 -m py_compile "$WS/astro_crawler.py" "$WS/data_sanity.py"
 
+# ruff-Gate: nur Korrektheits-Fehler (F821 undefined name, F823/F811
+# unbenutzte/doppelte Definition - die Bug-Klasse des ClearOutside-Regressions-
+# Feblers). Reine Stil-Warnungen (E/W) blockieren bewusst NICHT.
+echo "== 1b/5 Statische Korrektheit (ruff F8xx) =="
+ruff check --select F821,F823,F811 \
+  "$WS/astro_crawler.py" "$WS/data_sanity.py" "$APP_DIR/backend/main.py" \
+  || { echo "RUFF-FEHLER: Deploy abgebrochen"; exit 1; }
+
 echo "== 2/5 Deploy nach $LIVE (+ data_sanity.py) =="
 cp "$WS/astro_crawler.py" "$LIVE"
 cp "$WS/data_sanity.py" "/home/enigma/data_sanity.py"
@@ -42,7 +50,8 @@ done
 
 echo "== 6/6 Git: Deploy-Commit (nur wenn Quellcode-Änderungen) =="
 if git -C /home/enigma rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -C /home/enigma add astro_crawler.py data_sanity.py astro_deploy.sh messier.csv astro-app 2>/dev/null || true
+  git -C /home/enigma add astro_crawler.py data_sanity.py astro_deploy.sh \
+    locations.json.example messier.csv astro-app 2>/dev/null || true
   if git -C /home/enigma diff --cached --quiet; then
     echo "Keine Quellcode-Änderungen - kein Commit."
   else

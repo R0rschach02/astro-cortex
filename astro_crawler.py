@@ -71,17 +71,31 @@ from typing import Optional
 # Konfiguration
 # ---------------------------------------------------------------------------
 
-DEFAULT_LOCATIONS = [
-    {"name": "Mannheim Neckarplatten", "lat": 50.0000001, "lon": 8.0000001},
-    # Koordinaten-Update 2026-08-16 (Marcel, vor Ort): alter Wert 50.0000006/8.0000006
-    {"name": "Hemsbach (Sulzbach)",   "lat": 50.0000002, "lon": 8.0000002},
-    # Koordinaten-Update 2026-08-16 (Marcel, vor Ort): alter Wert 50.0000007/8.0000007
-    # Name bewusst UNveraendert, damit die DB-Historie laeuft.
-    {"name": "Weinheim",              "lat": 50.0000003,  "lon": 8.0000003},
-    {"name": "Spinelli Park",         "lat": 50.0000004, "lon": 8.0000004},
-    # Neu 2026-08-16: Feld an der L631
-    {"name": "Viernheim (Heddesheimer Str.)", "lat": 50.0000005, "lon": 8.0000005},
-]
+# Standorte liegen in ~/locations.json (echte Koordinaten, NICHT im Git-Repo;
+# Vorlage: locations.json.example im Repo - gleiches Muster wie ~/.env).
+LOCATIONS_PATH = os.path.expanduser("~/locations.json")
+
+
+def _load_locations() -> list:
+    try:
+        with open(LOCATIONS_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        raise SystemExit(
+            f"[Config] {LOCATIONS_PATH} fehlt - aus locations.json.example "
+            f"anlegen (echte Koordinaten, Format name/lat/lon).")
+    except Exception as e:
+        raise SystemExit(f"[Config] {LOCATIONS_PATH} unlesbar: {e}")
+    if not data or not all(
+            isinstance(l, dict) and l.get("name")
+            and isinstance(l.get("lat"), (int, float))
+            and isinstance(l.get("lon"), (int, float)) for l in data):
+        raise SystemExit(
+            f"[Config] {LOCATIONS_PATH}: jeder Eintrag braucht name/lat/lon")
+    return data
+
+
+DEFAULT_LOCATIONS = _load_locations()
 
 # Bot: @AstroCrawler007bot - Zugangsdaten liegen in ~/.env (NICHT im Repo,
 # siehe .env.example). _load_env() ist eine Mini-.env-Loader ohne Fremd-
