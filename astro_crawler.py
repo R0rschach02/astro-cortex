@@ -155,6 +155,49 @@ USER_AGENT = (
 log = logging.getLogger("astro")
 
 
+# Profilregeln: alle Schwellen an EINEM Ort (rate + _hour_score + Forecast).
+# None = Kriterium entfaellt fuer dieses Profil. Strukturelle Unterschiede
+# (DSO braucht Dunkelheit + Beschlag-Ampel; Planeten reichen Daemmerung und
+# muessen >30 Grad haben) bleiben bewusst im Code - ein Dict verschleiert
+# semantische Pfade nur, statt sie lesbar zu machen.
+PROFILE_RULES = {
+    "dso": {
+        "clouds_nogo": 40,      # >  -> NO-GO / Stunden-K.o.
+        "clouds_maybe": 20,     # >  -> MAYBE
+        "clouds_good": 20,      # <= -> Stundengrund "Wolken x%"
+        "seeing_nogo": 3.0,
+        "seeing_good": 1.0,
+        "moon_maybe": 60,       # %, None = Mond fuer Rating irrelevant
+        "jet_nogo": None,       # DSO-Rating prueft Jetstream nicht
+        "tau_nogo": 3.0,        # <  -> Beschlagrisiko (Stunden-K.o.)
+        "tau_good": 6.0,        # >= -> Stundengrund
+        "wind_nogo": 30.0,
+        "rain_nogo": 30,
+        "precip_nogo": 0.1,
+        "need_dark": True,
+        "dew_relevant": True,   # Beschlag 'hoch' = hartes K.o. (keine Tauheizung)
+        "need_planet": False,
+    },
+    "planet": {
+        "clouds_nogo": 50,
+        "clouds_maybe": None,
+        "clouds_good": 30,
+        "seeing_nogo": 2.0,     # hart: 150mm ~1" Beugungsgrenze
+        "seeing_good": 1.5,
+        "moon_maybe": None,
+        "jet_nogo": 30.0,
+        "tau_nogo": 3.0,
+        "tau_good": None,
+        "wind_nogo": 30.0,
+        "rain_nogo": 30,
+        "precip_nogo": 0.1,
+        "need_dark": False,     # Planeten gehen auch in der Daemmerung
+        "dew_relevant": False,
+        "need_planet": True,    # mind. ein Planet >30 Grad in der Nacht
+    },
+}
+
+
 @dataclass
 class SiteReport:
     """Ergebnis-Container einer Location."""
@@ -239,48 +282,38 @@ class SiteReport:
         return self.dew_risk
 
     def rate(self, profile: str = "dso") -> tuple[str, str]:
-        """Go/No-Go nach Beobachtungsprofil.
-
-        DSO (Triband, Default):
-          Radar-Alarm > Wolken >40% > Seeing >3.0" (lockert von 2.0" -
-          Flaeche/DSO ist seeing-toleranter) > Beschlag 'hoch' (Fangspiegel
-          ohne Heizung!) > Mond >60% => MAYBE.
-        PLANETARISCH (ASI662MC + SharpCap):
-          Radar-Alarm > Seeing >2.0" hart (150mm ~1" Beugungsgrenze) >
-          Jetstream >30 m/s > Wolken >50% > kein Planet >30 Grad in der Nacht.
-        Gemeinsam: NO DATA, wenn weder Wolken noch Radar vorliegen.
-        """
+        """Go/No-Go nach Beobachtungsprofil. Alle Schwellen kommen aus
+        PROFILE_RULES; hier steht nur die Struktur der Kaskade:
+        Radar-Alarm > harte K.o.s > NO DATA > MAYBE-Stufen > GO."""
+        R = PROFILE_RULES.get(profile, PROFILE_RULES["dso"])
         rs = self.radar_status or "Unknown"
         if "Storm" in rs or "Rain" in rs:
             return "NO-GO", "🔴"
 
-        if profile == "planet":
-            if self.seeing is not None and self.seeing > 2.0:
-                return "NO-GO", "🔴"
-            if self.jetstream is not None and self.jetstream > 30:
-                return "NO-GO", "🔴"
-            if self.clouds_total is not None and self.clouds_total > 50:
-                return "NO-GO", "🔴"
-            # Bedingung: mindestens ein Planet (Jupiter/Saturn/Mars) > 30 Grad
-            if self.planets and not any(
-                    (p or {}).get("window") for p in self.planets.values()):
-                return "NO-GO", "🔴"
-            if rs == "Unknown" and self.clouds_total is None:
-                return "NO DATA", "⚪"
-            return "GO", "🟢"
+        if self.seeing is not None and R["seeing_nogo"] is not None \
+                and self.seeing > R["seeing_nogo"]:
+            return "NO-GO", "🔴"
+        if self.jetstream is not None and R["jet_nogo"] is not None \
+                and self.jetstream > R["jet_nogo"]:
+            return "NO-GO", "🔴"
+        if self.clouds_total is not None and R["clouds_nogo"] is not None \
+                and self.clouds_total > R["clouds_nogo"]:
+            return "NO-GO", "🔴"
+        # Bedingung Planet: mindestens einer (Jupiter/Saturn/Mars) > 30 Grad
+        if R["need_planet"] and self.planets and not any(
+                (p or {}).get("window") for p in self.planets.values()):
+            return "NO-GO", "🔴"
+        # Beschlag 'hoch': Fangspiegel ohne Tauheizung - nur DSO hart
+        if R["dew_relevant"] and self.dew_risk == "hoch":
+            return "NO-GO", "🔴"
 
-        # --- DSO ---
-        if self.clouds_total is not None and self.clouds_total > 40:
-            return "NO-GO", "🔴"
-        if self.seeing is not None and self.seeing > 3.0:
-            return "NO-GO", "🔴"
-        if self.dew_risk == "hoch":
-            return "NO-GO", "🔴"
         if rs == "Unknown" and self.clouds_total is None:
             return "NO DATA", "⚪"
-        if self.clouds_total is not None and self.clouds_total > 20:
+        if R["clouds_maybe"] is not None and self.clouds_total is not None \
+                and self.clouds_total > R["clouds_maybe"]:
             return "MAYBE", "🟡"
-        if self.moon_illum is not None and self.moon_illum > 60:
+        if R["moon_maybe"] is not None and self.moon_illum is not None \
+                and self.moon_illum > R["moon_maybe"]:
             return "MAYBE", "🟡"
         return "GO", "🟢"
 
@@ -1993,49 +2026,40 @@ def _hh_in_window(hhmm: str, window: Optional[str]) -> bool:
 
 
 def _hour_score(hour: dict, profile: str) -> tuple[bool, list]:
-    """Bewertet eine Stunde nach den Ampel-/Rating-Schwellen (profilabhaengig).
+    """Bewertet eine Stunde nach den Profilregeln (PROFILE_RULES).
     Liefert (ok, reasons) - reasons beschreiben, WARUM die Stunde gut ist."""
+    R = PROFILE_RULES.get(profile, PROFILE_RULES["dso"])
     reasons = []
     c, s = hour.get("clouds"), hour.get("seeing")
     jet, tau, wind = hour.get("jet"), hour.get("tau"), hour.get("wind")
     prob, mm = hour.get("rain"), hour.get("precip")
 
-    if profile == "planet":
-        if not hour.get("dark"):
-            pass  # Planeten gehen auch in der Daemmerung - kein K.o.
-        if s is not None and s > 2.0:
-            return False, ["Seeing >2\""]
-        if s is not None and s <= 1.5:
-            reasons.append(f"Seeing {s:.1f}\"")
-        if c is not None and c > 50:
-            return False, [f"Wolken {c:.0f}%"]
-        if c is not None and c <= 30:
-            reasons.append(f"Wolken {c:.0f}%")
-    else:  # DSO
-        if not hour.get("dark"):
-            return False, ["hell"]  # Rahmenbedingung: astron. Dunkelheit
-        if c is not None and c <= 20:
-            reasons.append(f"Wolken {c:.0f}%")
-        if s is not None and s <= 1.0:
-            reasons.append(f"Seeing {s:.1f}\"")
-        if hour.get("moon_up") and (hour.get("moon_illum") or 0) > 60:
-            return False, ["heller Mond hoch"]
-        if tau is not None and tau >= 6:
-            reasons.append(f"Tau {tau:.0f}K")
-    # gemeinsame K.o.-Kriterien
-    if profile == "dso" and c is not None and c > 40:
+    # Dunkelheit: DSO zwingend; Planeten geht auch Daemmerung
+    if R["need_dark"] and not hour.get("dark"):
+        return False, ["hell"]
+    if s is not None and s > R["seeing_nogo"]:
+        return False, [f"Seeing >{R['seeing_nogo']:.0f}\""]
+    if s is not None and s <= R["seeing_good"]:
+        reasons.append(f"Seeing {s:.1f}\"")
+    if c is not None and c > R["clouds_nogo"]:
         return False, [f"Wolken {c:.0f}%"]
-    if profile == "dso" and s is not None and s > 3.0:
-        return False, ["Seeing >3\""]
-    if jet is not None and jet > 30:
+    if c is not None and c <= R["clouds_good"]:
+        reasons.append(f"Wolken {c:.0f}%")
+    if R["moon_maybe"] is not None and hour.get("moon_up") \
+            and (hour.get("moon_illum") or 0) > R["moon_maybe"]:
+        return False, ["heller Mond hoch"]
+    if tau is not None and R["tau_good"] is not None and tau >= R["tau_good"]:
+        reasons.append(f"Tau {tau:.0f}K")
+    # gemeinsame K.o.-Kriterien
+    if jet is not None and jet > R["jet_nogo"]:
         return False, [f"Jetstream {jet:.0f}"]
-    if tau is not None and tau < 3:
+    if tau is not None and tau < R["tau_nogo"]:
         return False, ["Beschlagrisiko"]
-    if wind is not None and wind > 30:
+    if wind is not None and wind > R["wind_nogo"]:
         return False, [f"Wind {wind:.0f}"]
-    if prob is not None and prob > 30:
+    if prob is not None and prob > R["rain_nogo"]:
         return False, [f"Regen {prob:.0f}%"]
-    if mm is not None and mm > 0.1:
+    if mm is not None and mm > R["precip_nogo"]:
         return False, ["Niederschlag"]
     if not reasons:
         reasons.append("dunkel")
