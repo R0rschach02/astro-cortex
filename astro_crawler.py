@@ -423,12 +423,12 @@ async def scrape_clearoutside(context, lat: float, lon: float, rep: SiteReport):
             # Vorausschau-Reihe: volle 24 h ab aktueller Stunde, ts lokal.
             # n_fc: die Rohwerte der Seite BEGINNEN zur aktuellen Stunde -
             # 24 - now.hour haette abends fast die ganze CO-Reihe gekappt.
-            n_fc = min(24, len(ft))
             ft = row_values_from_text("Total Clouds", body_text, 24)
             fl = row_values_from_text("Low Clouds", body_text, 24)
             fm = row_values_from_text("Medium Clouds", body_text, 24)
             fh = row_values_from_text("High Clouds", body_text, 24)
             fr = row_values_from_text("Precipitation Probability", body_text, 24)
+            n_fc = min(24, len(ft))
             today = datetime.now()
             rep.fc_clouds_src = "clearoutside"
             rep.fc_clouds = [
@@ -1308,13 +1308,18 @@ FORECAST_VERIFY_BATCH = 2000   # Zeilen pro Tageslauf (Rest kommt morgen)
 def _nearest_crawl(conn, loc, target, modes):
     """Zeitlich naechste crawls-Zeile (innerhalb Toleranz) fuer einen Standort.
     modes: ('heavy',) fuer Wolken/Seeing (nur Heavy liefert sie) bzw. None
-    fuer Wind/Tau (jede Zeile, Radar alle 5 min)."""
+    fuer Wind/Tau (jede Zeile, Radar alle 5 min).
+    Achtung Methodik: clouds_total/seeing sind Worst-Case-Maxima ueber
+    aktuelle+4 h, keine Einzelstunden-Istwerte - die Verification vergleicht
+    sie dennoch mit Einzelstunden-Vorhersagen (bekannte Grenze, siehe
+    check_forecast_deviation-Kontext)."""
     t_lo = (target - timedelta(minutes=FORECAST_VERIFY_TOL_MIN)
             ).isoformat(timespec="minutes")
     t_hi = (target + timedelta(minutes=FORECAST_VERIFY_TOL_MIN)
             ).isoformat(timespec="minutes")
     q = ("SELECT ts, clouds_total, seeing, jetstream, wind_speed, "
-         "dewpoint_spread FROM crawls WHERE location_name = ? AND ts BETWEEN ? AND ?")
+         "dewpoint_spread, errors FROM crawls "
+         "WHERE location_name = ? AND ts BETWEEN ? AND ?")
     args = [loc, t_lo, t_hi]
     if modes:
         q += " AND mode IN (%s)" % ",".join("?" * len(modes))
@@ -1455,17 +1460,23 @@ def check_forecast_verification():
                 continue
             h_row = _nearest_crawl(conn, loc, target, modes=("heavy",))
             a_row = _nearest_crawl(conn, loc, target, modes=None)
-            if h_row is None and a_row is None:
+            # Quellen-Fehler-Guard: Crawls mit errors-Eintrag (z. B.
+            # ClearOutside-Crash -> OM-Notfallwert) sind keine belastbare
+            # Ist-Basis. Betroffene Parameter bleiben NULL und fliessen
+            # nicht in die Fehlerberechnung.
+            h_bad = bool(h_row and (h_row[6] or "").strip())
+            a_bad = bool(a_row and (a_row[6] or "").strip())
+            a_clouds = h_row[1] if (h_row and not h_bad) else None
+            a_seeing = h_row[2] if (h_row and not h_bad) else None
+            a_wind = a_row[4] if (a_row and not a_bad) else None
+            a_tau = a_row[5] if (a_row and not a_bad) else None
+            if a_clouds is None and a_seeing is None and a_wind is None \
+                    and a_tau is None:
                 if (now - target).total_seconds() > FORECAST_VERIFY_TIMEOUT_H * 3600:
                     inserts.append((fid, verified_at, 0, None, None, None, None,
                                     None, None, None, None))
                     unmatched_n += 1
                 continue  # juenger als 24 h: morgen erneut versuchen
-            # Ist-Werte + Fehler nur fuer Parameter mit beiden Seiten
-            a_clouds = h_row[1] if h_row else None
-            a_seeing = h_row[2] if h_row else None
-            a_wind = a_row[4] if a_row else None
-            a_tau = a_row[5] if a_row else None
             inserts.append((
                 fid, verified_at, 1,
                 a_clouds, a_seeing, a_wind, a_tau,
