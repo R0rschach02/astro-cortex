@@ -1,4 +1,4 @@
-/* Service Worker v13 - RainViewer Radar/Satellit-Layer mit Animation. */
+/* Service Worker v13b - RainViewer Radar/Satellit-Layer mit Animation. */
 "use strict";
 
 const SHELL_CACHE = "astro-shell-v13";

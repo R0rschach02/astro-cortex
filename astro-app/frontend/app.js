@@ -400,13 +400,13 @@ function rvBail(text) {
    Groesse/Fuellung nach mm; hohle Wolke = Regen absehbar; Blitz-Symbol,
    wo der Punkt in einer aktiven DWD-Gewitterwarnung liegt. */
 function rgIconHtml(p, storm) {
-  const mm = p.mm ?? 0;
+  const mm = p.mm ?? 0, prob = p.prob ?? 0;
   let cls = "", drops = 0;
   if (mm > 5)        { cls = "rg-4"; drops = 3; }
   else if (mm > 2)   { cls = "rg-3"; drops = 3; }
   else if (mm > 0.5) { cls = "rg-2"; drops = 2; }
   else if (mm > 0)   { cls = "rg-1"; drops = 1; }
-  else if ((p.prob ?? 0) >= 30) cls = "rg-forecast";
+  else if (prob >= 30) cls = "rg-forecast";
   if (!cls) return null;
   const when = rgHour === 0 ? "jetzt" : `in +${rgHour} h`;
   let html = `<div class="rg-icon ${cls}" title="${when}: ${mm.toFixed(1)} mm \u00b7 `
