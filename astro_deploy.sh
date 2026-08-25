@@ -21,6 +21,12 @@ ruff check --select F821,F823,F811 \
   "$WS/astro_crawler.py" "$WS/data_sanity.py" "$APP_DIR/backend/main.py" \
   || { echo "RUFF-FEHLER: Deploy abgebrochen"; exit 1; }
 
+# pytest-Gate: Logik-Tests gegen die WORKSPACE-Version (genau das, was
+# deployed wird). -p no:anyio: Plugin-Konflikt mit System-pytest umgehen.
+echo "== 1c/5 Logik-Tests (pytest, ~/tests) =="
+python3 -m pytest "$HOME/tests" -q -p no:anyio \
+  || { echo "PYTEST-FEHLER: Deploy abgebrochen"; exit 1; }
+
 echo "== 2/5 Deploy nach $LIVE (+ data_sanity.py) =="
 cp "$WS/astro_crawler.py" "$LIVE"
 cp "$WS/data_sanity.py" "/home/enigma/data_sanity.py"
