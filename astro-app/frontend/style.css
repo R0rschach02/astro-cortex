@@ -134,6 +134,18 @@ body.night .rain-badge { filter: brightness(.65); }
 }
 body.night .rg-icon { filter: brightness(.65); }
 
+/* Zeitregler fuer die Regen-Icons (OM-Stundenprognose 0-6 h) */
+#rg-time {
+  position: absolute; left: 10px; bottom: 24px; z-index: 1100;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border-radius: 10px;
+  background: rgba(15, 20, 28, .82); border: 1px solid #2c3542;
+  color: var(--text); font-size: 13px; font-weight: 600;
+}
+#rg-slider { width: 130px; accent-color: #3b9dff; }
+#rg-time.hidden { display: none; }
+body.night #rg-time { background: rgba(20, 8, 8, .9); border-color: #3a2020; }
+
 /* ---- Detail-Panel ---- */
 #panel {
   position: absolute; left: 0; right: 0; bottom: 0; z-index: 1200;

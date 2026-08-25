@@ -14,6 +14,7 @@ const REFRESH_MS = 60_000;
 
 let map, markersLayer, warnLayer, lpLayer, rainGridLayer;
 let rgActive = false, rgDebounce = null, stormRings = [];
+let rgHour = 0, rgLastData = null;   // Zeitregler 0-6 h fuer die Regen-Icons
 let lastSpots = null;
 let CURRENT_PROFILE = "dso";
 let currentSpot = null;   // fuer Tab-Wechsel im Detail-Panel
@@ -71,6 +72,19 @@ function initMap() {
   rainGridLayer = L.layerGroup().addTo(map);
   rgActive = true;
 
+  // Zeitregler: spult die Icons durch die OM-Stundenprognose (0 = jetzt)
+  const rgPanel = document.createElement("div");
+  rgPanel.id = "rg-time";
+  rgPanel.innerHTML = `<input id="rg-slider" type="range" min="0" max="6"
+      step="1" value="0" aria-label="Regen-Prognose Stunden">
+    <span id="rg-label">Jetzt</span>`;
+  document.body.appendChild(rgPanel);
+  $("rg-slider").addEventListener("input", (e) => {
+    rgHour = Number(e.target.value);
+    $("rg-label").textContent = rgHour === 0 ? "Jetzt" : `+${rgHour} h`;
+    if (rgLastData) renderRainGrid(rgLastData);
+  });
+
   // RainViewer: Dummy-Overlays nur fuer die Control, Logik via Events.
   // Kachel-Heatmap ist seit dem Icon-Raster nur noch optionale Rohansicht.
   const rvRawDummy = L.layerGroup();
@@ -83,12 +97,19 @@ function initMap() {
     "Wolken (Satellit)": rvSatDummy,
   }, { position: "bottomright", collapsed: true }).addTo(map);
   map.on("overlayadd", (e) => {
-    if (e.name.includes("Regen-Icons")) { rgActive = true; fetchRainGrid(); }
+    if (e.name.includes("Regen-Icons")) {
+      rgActive = true;
+      $("rg-time")?.classList.remove("hidden");
+      fetchRainGrid();
+    }
     if (e.name.includes("Radar-Rohansicht")) rvStart("radar");
     if (e.name.includes("Satellit")) rvStart("satellite");
   });
   map.on("overlayremove", (e) => {
-    if (e.name.includes("Regen-Icons")) rgActive = false;
+    if (e.name.includes("Regen-Icons")) {
+      rgActive = false;
+      $("rg-time")?.classList.add("hidden");
+    }
     if (e.name.includes("Radar-Rohansicht") || e.name.includes("Satellit")) rvStop();
   });
   // Raster folgt dem Ausschnitt (debounced); Cache im Backend faengt Pan an
@@ -387,8 +408,9 @@ function rgIconHtml(p, storm) {
   else if (mm > 0)   { cls = "rg-1"; drops = 1; }
   else if ((p.prob ?? 0) >= 30) cls = "rg-forecast";
   if (!cls) return null;
-  let html = `<div class="rg-icon ${cls}" title="${mm.toFixed(1)} mm/h \u00b7 `
-    + `${p.prob ?? "?"}% Regenwahrscheinlichkeit">`;
+  const when = rgHour === 0 ? "jetzt" : `in +${rgHour} h`;
+  let html = `<div class="rg-icon ${cls}" title="${when}: ${mm.toFixed(1)} mm \u00b7 `
+    + `${prob ?? "?"}% Regenwahrscheinlichkeit">`;
   html += `<span class="rg-cloud"></span>`;
   for (let i = 1; i <= drops; i++) html += `<span class="rg-drop rg-d${i}"></span>`;
   if (storm) html += `<span class="rg-bolt">\u26a1</span>`;
@@ -409,8 +431,11 @@ function renderRainGrid(data) {
   rainGridLayer.clearLayers();
   let shown = 0;
   for (const p of data.points) {
+    // Zeitregler: Werte der gewaehlten Prognosestunde (Fallback: current)
+    const src = (p.hours && p.hours[rgHour]) || p;
+    const mm = src.mm ?? 0, prob = src.prob ?? 0;
     const storm = stormRings.some(r => pointInRing(p.lat, p.lon, r));
-    const html = rgIconHtml(p, storm);
+    const html = rgIconHtml({ ...p, mm, prob }, storm);
     if (!html) continue;
     shown++;
     L.marker([p.lat, p.lon], {
@@ -418,7 +443,7 @@ function renderRainGrid(data) {
       keyboard: false, zIndexOffset: -500,
     }).addTo(rainGridLayer);
   }
-  console.debug(`[RegenIcons] ${shown}/${data.points.length} Gitterpunkte mit Icon`);
+  console.debug(`[RegenIcons] ${shown}/${data.points.length} Gitterpunkte mit Icon (+${rgHour}h)`);
 }
 
 async function fetchRainGrid() {
@@ -427,6 +452,7 @@ async function fetchRainGrid() {
     const bbox = [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()]
       .map(v => v.toFixed(4)).join(",");
     const data = await api(`/api/rain-grid?bbox=${encodeURIComponent(bbox)}&zoom=${map.getZoom()}`);
+    rgLastData = data;
     renderRainGrid(data);
   } catch (e) { console.warn("rain-grid offline:", e); }
 }

@@ -342,7 +342,8 @@ def api_rain_grid(bbox: str, zoom: int = 9):
                + ",".join(f"{m[0]:.4f}" for m in missing)
                + "&longitude=" + ",".join(f"{m[1]:.4f}" for m in missing)
                + "&current=precipitation,precipitation_probability,weathercode"
-                 "&timezone=Europe%2FBerlin")
+                 "&hourly=precipitation,precipitation_probability"
+                 "&forecast_hours=7&timezone=Europe%2FBerlin")
         try:
             req = urllib.request.Request(url, headers={"User-Agent": ac.USER_AGENT})
             data = json.loads(urllib.request.urlopen(req, timeout=12).read())
@@ -351,10 +352,19 @@ def api_rain_grid(bbox: str, zoom: int = 9):
                 raise ValueError("Anzahl-Antwort != Anfrage")
             for (lat, lon, key), it in zip(missing, items):
                 cur = it.get("current") or {}
+                # 7-h-Serie (aktuelle Stunde + 6) fuer den Zeitregler im
+                # Frontend: Icons pro Reglerstellung aus derselben Antwort
+                h_times = (it.get("hourly") or {}).get("time") or []
+                h_mm = (it.get("hourly") or {}).get("precipitation") or []
+                h_pp = (it.get("hourly") or {}).get("precipitation_probability") or []
+                hours = [{"h": i, "mm": h_mm[i] if i < len(h_mm) else None,
+                          "prob": h_pp[i] if i < len(h_pp) else None}
+                         for i in range(min(7, len(h_times)))]
                 d = {"lat": lat, "lon": lon,
                      "mm": cur.get("precipitation"),
                      "prob": cur.get("precipitation_probability"),
-                     "code": cur.get("weathercode")}
+                     "code": cur.get("weathercode"),
+                     "hours": hours}
                 _RAINGRID_CACHE[key] = (now, d)
                 pts.append(d)
         except Exception as ex:
