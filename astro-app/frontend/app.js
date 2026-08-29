@@ -15,6 +15,7 @@ const REFRESH_MS = 60_000;
 let map, markersLayer, warnLayer, lpLayer, rainGridLayer;
 let rgActive = false, rgDebounce = null, stormRings = [];
 let rgHour = 0, rgLastData = null;   // Zeitregler 0-6 h fuer die Regen-Icons
+let rgPlaying = false, rgTimer = null;
 let lastSpots = null;
 let CURRENT_PROFILE = "dso";
 let currentSpot = null;   // fuer Tab-Wechsel im Detail-Panel
@@ -72,18 +73,20 @@ function initMap() {
   rainGridLayer = L.layerGroup().addTo(map);
   rgActive = true;
 
-  // Zeitregler: spult die Icons durch die OM-Stundenprognose (0 = jetzt)
+  // Zeitregler: spult die Icons durch die OM-Stundenprognose (0 = jetzt).
+  // Play/Pause laeuft automatisch durch - self-rescheduling setTimeout wie
+  // beim RainViewer-Loop (robuster als setInterval), kein neuer Request.
   const rgPanel = document.createElement("div");
   rgPanel.id = "rg-time";
-  rgPanel.innerHTML = `<input id="rg-slider" type="range" min="0" max="6"
+  rgPanel.innerHTML = `<button id="rg-play" title="Regen-Verlauf 0-6 h automatisch abspielen">\u25b6</button>
+    <input id="rg-slider" type="range" min="0" max="6"
       step="1" value="0" aria-label="Regen-Prognose Stunden">
     <span id="rg-label">Jetzt</span>`;
   document.body.appendChild(rgPanel);
   $("rg-slider").addEventListener("input", (e) => {
-    rgHour = Number(e.target.value);
-    $("rg-label").textContent = rgHour === 0 ? "Jetzt" : `+${rgHour} h`;
-    if (rgLastData) renderRainGrid(rgLastData);
+    setRgHour(Number(e.target.value));
   });
+  $("rg-play").addEventListener("click", rgTogglePlay);
 
   // RainViewer: Dummy-Overlays nur fuer die Control, Logik via Events.
   // Kachel-Heatmap ist seit dem Icon-Raster nur noch optionale Rohansicht.
@@ -399,6 +402,34 @@ function rvBail(text) {
    Keine Farbflaechen: pro Gitterpunkt eine klare Wolke mit 0-3 Tropfen,
    Groesse/Fuellung nach mm; hohle Wolke = Regen absehbar; Blitz-Symbol,
    wo der Punkt in einer aktiven DWD-Gewitterwarnung liegt. */
+
+ function rgTogglePlay() { 
+  rgPlaying = !rgPlaying; 
+  const btn = $("rg-play");
+   if (rgPlaying) { 
+    btn.textContent = "\u23f8";
+     btn.title = "Regen-Verlauf pausieren";
+      rgAdvance();
+     } else { 
+      btn.textContent = "\u25b6"; 
+      btn.title = "Regen-Verlauf 0-6 h automatisch abspielen"; 
+      clearTimeout(rgTimer);
+       rgTimer = null;
+       } 
+      } 
+      
+      
+      function rgAdvance() { 
+        if (!rgPlaying) 
+          return; 
+        const next = (rgHour + 1) % 7;
+         rgHour = next; 
+         setRgHour(next); 
+         $("rg-slider").value = next; 
+         rgTimer = setTimeout(rgAdvance, 1500); 
+        } 
+
+
 function rgIconHtml(p, storm) {
   const mm = p.mm ?? 0, prob = p.prob ?? 0;
   let cls = "", drops = 0;
