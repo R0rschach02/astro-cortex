@@ -1,0 +1,11 @@
+{
+  "observer": {"lat": 49.5, "lon": 8.6, "alt_m": 100},
+  "datetime_utc": "2026-08-30T21:00:00",
+  "source": "JPL Horizons API (ssd.jpl.nasa.gov/api/horizons.api), QUANTITIES=4, CENTER=coord@399",
+  "queried_at": "2026-08-30",
+  "positions": {
+    "venus": {"az_deg": 272.402945, "alt_deg": -17.483261},
+    "moon":  {"az_deg": 104.506768, "alt_deg": 20.437727},
+    "sun":   {"az_deg": 320.065156, "alt_deg": -23.584342}
+  }
+}
