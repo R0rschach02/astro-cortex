@@ -91,3 +91,12 @@ das Deploy-Gate gebrochen).
 -> Bei Whitelist-.gitignore: Whitelist-Zeile und die Dateien, die sie
    freigeben soll, im SELBEN Commit pruefen (git ls-files gegen
    Dateibauf abgleichen).
+
+## 11. Sekundaerbehauptung statt Primaerlizenz
+ Fuer die GEIPAN-Datenuebernahme stand "Licence Ouverte/Etalab" im Raum
+ (Spec-Revision + Drittseiten wie carteovni.fr behaupten das). Die
+ Primaerpruefung (cnes-geipan.fr selbst + offizieller Katalog
+ data.gouv.fr) ergab: keine Reuse-Freigabe auf der Site, kein GEIPAN-
+ Datensatz im Katalog - die Freigabe war nicht belegbar.
+ -> Lizenzen nur aus der Primaerquelle zitieren (docs/SOURCE_LEGAL_REVIEW.md);
+    fehlende Freigabe heisst "ungeklaert", nie "wahrscheinlich okay".

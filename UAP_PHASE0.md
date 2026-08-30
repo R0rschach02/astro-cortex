@@ -30,8 +30,12 @@ Offiziellen API-Zugang erfragen; bis dahin kein Abruf, kein Scraping.
 - KEINE formelle oeffentliche API; Zugang ueber Websuche/Downloads
   (cnes-geipan.fr, teils data.gouv.fr); Drittprojekte (CarteOvni u.a.)
   nutzen genau diesen Weg.
-Bewertung: NUTZBAR - rechtlich sauber (Etalab: Attribution
-"GEIPAN/CNES"), technisch Download/Export statt API.
+Bewertung (korrigiert 2026-08-30 nach Primaerpruefung, siehe
+docs/SOURCE_LEGAL_REVIEW.md): UNGEKLAEERT - die oben genannte Etalab-
+Freigabe ist aus Primaerquellen NICHT belegbar (keine Reuse-/Lizenz-
+Seite auf cnes-geipan.fr, kein GEIPAN-Datensatz im Katalog data.gouv.fr;
+nur Sekundaerbehauptung von Drittseiten). Kein Abruf vor schriftlicher
+Freigabe durch CNES/GEIPAN.
 
 ## ufo-hunters.com
 - Keine auffindbaren Nutzungsbedingungen (keine Terms-Seite indexiert);
