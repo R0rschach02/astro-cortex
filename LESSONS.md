@@ -100,3 +100,23 @@ das Deploy-Gate gebrochen).
  Datensatz im Katalog - die Freigabe war nicht belegbar.
  -> Lizenzen nur aus der Primaerquelle zitieren (docs/SOURCE_LEGAL_REVIEW.md);
     fehlende Freigabe heisst "ungeklaert", nie "wahrscheinlich okay".
+
+## 12. Wiederkehrendes 0-Byte-Artefakt = Symptom eines fremden Prozesses
+ Zweimal tauchte eine leere "astro-app/astro_crawler.py" auf (zweites Mal
+ in astro-app/astro-app/ verschachtelt). Forensik: Birth-Timestamp
+ 03:03:54 nachts korrelierte exakt mit dem Start eines aider-Prozesses
+ (--model ollama/qwen3-coder), der mit dem FALSCHEN Datei-Argument
+ "astro-app/astro_crawler.py" gestartet wurde (Datei liegt in ~, nicht in
+ ~/astro-app). aider legt fehlende Argument-Dateien als LEERE Dateien an
+ ("> Creating empty file ..." in ~/.aider.chat.history.md); nach "/cd
+ ~/astro-app" in der Session verschachtelte sich der Pfad nochmals.
+ -> Root Cause war ein Werkzeug-Aufruffehler, kein Deploy/Hotfix-Rest.
+    Fixes: Shell-Alias aider-astro (korrekte Pfade, Workspace-Kopie) in
+    ~/.bashrc; Deploy-Guard bricht bei fremden astro_crawler.py-Kopien
+    hart ab. Merksatz: wiederkehrende Artefakte erst der Birth-Time nach
+    correlationsprozessen zuordnen (journalctl, ps, Tool-Histories),
+    bevor Hotfixes/Deploy-Logik verdächtigt werden.
+    Meta-Lesson: selbst der Guard hatte einen Bug - find liefert bei
+    Permission-Denied Exit 1 und set -euo pipefail bricht die stille
+    Zuweisung ab; immer "|| true" bei diagnostischen find-Aufrufen in
+    strict-mode-Skripten.
