@@ -10,6 +10,21 @@ WS="/home/enigma/.zcode/workspace/default"
 LIVE="/home/enigma/astro_crawler.py"
 APP_DIR="/home/enigma/astro-app"
 
+# Wurzel-Fix 2026-08-30 (LESSONS Fall 12): aider-Starts mit falschem Pfad
+# 'astro-app/astro_crawler.py' legten wiederholt 0-Byte-Doppelgaenger an.
+# Guard: vor jedem Deploy nach fremden/leeren Kopien suchen und hart
+# abbrechen (sichtbar machen statt still weiterlaufen).
+STRAY=$(find /home/enigma -maxdepth 4 -name "astro_crawler.py" \
+  ! -path "$WS/*" ! -path "/home/enigma/.zcode/*" ! -path "*/ai_env/*" \
+  ! -path "/home/enigma/astro_crawler.py" 2>/dev/null) || true
+if [ -n "$STRAY" ]; then
+  echo "STRAY-DATEI(en) gefunden (vermutlich 0-Byte-Artefakte, siehe LESSONS.md Fall 12):"
+  echo "$STRAY"
+  ls -la $STRAY 2>/dev/null
+  echo "Deploy abgebrochen - erst klaeren/loeschen."
+  exit 1
+fi
+
 echo "== 1/5 Syntax-Check (Workspace-Kopie) =="
 # Bewusst /usr/bin/python3: ein aktiviertes VirtualEnv im PATH (z. B.
 # ~/ai_env) hat womoeglich weder pytest noch die Systempakete - der Deploy
