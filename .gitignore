@@ -23,3 +23,7 @@
 /astro-app/backend/__pycache__/
 !/docs/
 !/app/
+
+# Bytecode niemals versionieren (Whitelist gab Verzeichnisse inkl. __pycache__ frei)
+__pycache__/
+*.pyc
