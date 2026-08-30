@@ -5,6 +5,52 @@
 > eigentlich relevanten Ebene verwechselt. Bei jeder neuen Aenderung: Was
 > genau wird hier bewiesen, und ist das wirklich die Ebene, die zaehlt?
 
+## English Summary (details below are kept in German)
+
+Recurring bug patterns in this project — one common theme: proof on one
+level (file copy, DB, JS state, reference region, fallback success) was
+mistaken for proof on the level that actually matters.
+
+1. **Workspace vs. live services** — edits made/tested in the workspace
+   while live services ran a separately deployed copy; a deploy in the
+   wrong direction once overwrote live changes with the stale workspace.
+2. **Long-lived backend process** — DB rows updated, but the running
+   uvicorn service kept serving old in-memory values; deploy script
+   always restarts it now.
+3. **JS state is not rendered pixels** — RainViewer timer/opacity/
+   timestamps all "correct" while every tile was an identical error
+   graphic (zoom limit exceeded). Visual claims require screenshot
+   pixel diffs.
+4. **Reference region is not the target location** — pixel proof was
+   done on the Alps; Mannheim (the actual user location) was never
+   re-checked and still broken.
+5. **Injected test data can hide real bugs** — inject data for a pixel
+   proof, miss an independent JS runtime error at the same time.
+6. **Python gates cannot see JavaScript** — an undefined JS variable
+   killed all icon rendering; ruff/pytest (Python-only) passed the
+   deploy. Frontend changes always need real browser verification.
+7. **A working fallback masks the primary source's death** — the
+   ClearOutside→Open-Meteo fallback hid a 36-hour total outage of the
+   primary source; a sanity layer (error ratio, cross-source checks)
+   now runs in every heavy tick.
+8. **External dependencies change their terms** — CARTO tiles suddenly
+   required an API key with zero code changes on our side.
+9. **Half-finished change series reached production** — function calls
+   without definitions (rgTogglePlay/setRgHour) were deployed and
+   crashed initMap; the hotfix itself left setRgHour missing, moving
+   the crash from page load to first interaction.
+10. **Uncommitted whitelist line emptied a commit** — the pytest suite
+    commit contained only the script because `!/tests/` in .gitignore
+    was never committed.
+11. **Secondary claim instead of primary license** — the GEIPAN
+    "Etalab" reuse claim came from a spec revision/third-party sites;
+    primary-source checking found no license at all. Licenses are only
+    ever quoted from primary sources (docs/SOURCE_LEGAL_REVIEW.md).
+12. **Recurring 0-byte artifact = symptom of a foreign process** — two
+    empty `astro-app/.../astro_crawler.py` files were created by aider
+    being started with a wrong file path (aider creates missing
+    argument files empty); fixed via shell alias plus a deploy guard.
+
 Erweitert bei jedem neuen Vorfall dieser Art (analog changelog.json).
 
 ## 1. Workspace-Kopie vs. Live-Dienste

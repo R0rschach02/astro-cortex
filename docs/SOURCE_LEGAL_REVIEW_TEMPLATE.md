@@ -1,28 +1,30 @@
-# SOURCE_LEGAL_REVIEW - Template je Datenquelle
+# SOURCE_LEGAL_REVIEW — Template per Data Source
 
-Eine Kopie dieses Blocks je Quelle ausfuellen und in
-docs/SOURCE_LEGAL_REVIEW.md verlinken. Erst wenn Status
-"freigegeben" oder "geklaert_nach_rueckfrage" DOKUMENTIERT ist,
-darf ein Ingest-Modul (enabled=1 in anomaly_sources) aktiv werden.
+Fill in one copy of this block per source and link it from
+docs/SOURCE_LEGAL_REVIEW.md. Only once a status of "released" or
+"clarified_after_inquiry" is DOCUMENTED may an ingest module be
+activated (enabled=1 in anomaly_sources).
 
 ---
 
-## Quelle: <NAME>
+## Source: <NAME>
 
-- **Status:** ungeklaert | geklaert_nach_rueckfrage | freigegeben
-- **Geprueft am:** <YYYY-MM-DD>
-- **Pruefmethode:** <z.B. "direkter Abruf Roh-HTML per curl",
-  "Wayback-Volltext-Snapshot vom <Datum>", "E-Mail-Antwort vom <Datum>">
-- **Gepruefte URLs:** <alle besuchten Seiten auflisten, inkl. 404s>
-- **Exaktes Zitat (woertlich, mit URL):**
-  > "<Zitat aus der Primaerquelle>"
-- **Volltext-Suche nach:** <z.B. "scrap", "reuse", "API", "licence">
-  -> <Trefferzahlen>
-- **Fazit:** <ein Satz, keine Interpretation ueber das Zitat hinaus>
-- **Naechster Schritt:** <wer fragt wen worauf an>
+- **Status:** unclarified | clarified_after_inquiry | released
+- **Checked on:** <YYYY-MM-DD>
+- **Check method:** <e.g. "direct raw-HTML retrieval via curl",
+  "Wayback Machine full-text snapshot of <date>",
+  "email reply received <date>">
+- **URLs checked:** <list every page visited, including 404s>
+- **Verbatim quote (word-for-word, with URL):**
+  > "<quote from the primary source — never translate the quote itself>"
+- **Full-text searched for:** <e.g. "scrap", "reuse", "API", "licence">
+  → <hit counts>
+- **Conclusion:** <one sentence, no interpretation beyond the quote>
+- **Next step:** <who asks whom for what>
 
-Regeln (siehe LESSONS.md Fall 11):
-- Lizenzen nur aus der Primaerquelle zitieren; Sekundaerbehauptungen
-  (Drittseiten, Spec-Revisionen) sind KEIN Beleg.
-- Ohne explizite Freigabe: Status "ungeklaert" - nie "wahrscheinlich okay".
-- robots.txt dokumentieren, aber nie als Lizenz werten.
+Rules (see LESSONS.md case 11):
+- Quote licenses only from the primary source; secondary claims (third-
+  party sites, spec revisions) are NOT evidence.
+- Without an explicit release the status is "unclarified" — never
+  "probably fine".
+- Document robots.txt, but never treat it as a license.

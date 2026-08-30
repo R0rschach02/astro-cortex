@@ -1,57 +1,60 @@
-# SOURCE_LEGAL_REVIEW.md - UAP-Quellen, Primaerpruefung
+# SOURCE_LEGAL_REVIEW.md — UAP Sources, Primary-Source Legal Assessment
 
-Geprueft am: 2026-08-30. Methode: direkter Abruf der Seiten (curl,
-Roh-HTML) bzw. Wayback-Machine-Volltext; Zitate wortgetreu aus den
-abgerufenen Dokumenten, KEINE Uebernahme aus Sekundaerquellen oder
-Spec-Revisionen. Suchreihenfolge je Quelle: Reuse-/Lizenz-/Open-Data-
-Seite, dann erst Impressum/Disclaimer.
+Checked on: 2026-08-30. Method: direct retrieval of the pages themselves
+(curl, raw HTML) or Wayback Machine full text; all quotes are verbatim
+from the retrieved documents — nothing adopted from secondary sources or
+spec revisions. Per source, the search order was: reuse / license /
+open-data pages first, legal notices and disclaimers second.
 
-Bewertungsskala: NUR "freigegeben" (explizite Lizenz), "geklaert nach
-Rueckfrage" oder "ungeklaert". Keine Einstufung als "wahrscheinlich okay".
+Rating scale: only "released" (explicit license), "clarified after
+inquiry", or "unclarified". Nothing is ever rated "probably fine".
 
 ---
 
-## 1) GEIPAN (CNES) - cnes-geipan.fr - UNGEKLAERT
+## 1) GEIPAN (CNES) — cnes-geipan.fr — UNCLARIFIED
 
-Gepruefte Orte:
-- https://www.cnes-geipan.fr/fr (Startseite): einziger Rechts-Link im
-  Footer ist `/fr/mentions_legales`. Kein Open-Data-, Lizenz- oder
-  Reuse-Link vorhanden.
-- https://www.cnes-geipan.fr/fr/mentions_legales - exakter Wortlaut:
+Places checked:
+- https://www.cnes-geipan.fr/fr (home page): the only legal link in the
+  footer is `/fr/mentions_legales`. No open-data, license or reuse link
+  is present anywhere on the page.
+- https://www.cnes-geipan.fr/fr/mentions_legales — verbatim quote:
 
   > "Toutes les données, et plus généralement le contenu du site Internet
   > sont la propriété du CNES, ou d'un tiers et pour lesquels il a obtenu
   > le droit d'en disposer. Ils sont rendus accessibles tels quel, tels
   > que disponibles, et sans garantie d'aucune sorte"
 
-  (Eigentumsvorbehalt + Haftungsausschluss; KEINE Weiterverwendungs-
-  freigabe, kein Lizenzvermerk.)
-- https://www.cnes-geipan.fr/fr/web/deir (Fall-Datenbank): nur eine
-  ~4 kB SPA-Shell; 0 Treffer fuer "licen", "réutilis", "csv", "export",
-  "télécharg" im ausgelieferten HTML.
-- Offizieller franzoesischer Open-Data-Katalog data.gouv.fr (API v2,
-  Lizenzfeld je Datensatz): Suche "geipan" -> 8 Treffer, ALLE von
-  anderen Organisationen (GEOPAL, DDT Var, OpenHealth, ...), kein
-  GEIPAN-/CNES-Datensatz. Organisation "Centre National d'Etudes
-  Spatiales" existiert (ID 563a2cdf88ee385a94531575), hat dort aber
-  0 Datensaetze.
-- https://www.cnes-geipan.fr/sitemap.xml -> liefert HTML-Fallback,
-  keine Sitemap-Navigation auswertbar.
+  (Ownership reservation plus liability disclaimer; NO reuse permission,
+  no license notice. Convenience translation: "All data and, more
+  generally, the content of the website are the property of CNES, or of
+  a third party for which it has obtained disposal rights. They are made
+  available as is, as available, and without warranty of any kind.")
+- https://www.cnes-geipan.fr/fr/web/deir (case database): only a ~4 kB
+  SPA shell; zero hits for "licen", "réutilis", "csv", "export",
+  "télécharg" in the served HTML.
+- Official French open-data catalogue data.gouv.fr (API v2, per-dataset
+  license field): search "geipan" returns 8 datasets, ALL from other
+  organizations (GEOPAL, DDT Var, OpenHealth, ...), no GEIPAN/CNES
+  dataset. The organization "Centre National d'Etudes Spatiales" exists
+  there (ID 563a2cdf88ee385a94531575) but has 0 datasets.
+- https://www.cnes-geipan.fr/sitemap.xml → serves an HTML fallback; no
+  sitemap navigation was evaluable.
 
-Fazit: Die in einer Spec-Revision behauptete Freigabe "Licence Ouverte /
-Etalab" ist aus Primaerquellen NICHT belegbar - weder auf der Site noch
-im offiziellen Open-Data-Katalog. (Dass Drittprojekte wie carteovni.fr
-eine solche Lizenz BEHAUPTEN, ist Sekundaerquelle und zaehlt nicht.)
-Status: UNGEKLAERT. Vor jedem Abruf: CNES/GEIPAN direkt anfragen
-(Kontaktformular/Postmaster) und schriftliche Nutzungsfreigabe einholen.
+Conclusion: the "Licence Ouverte / Etalab" release asserted in a spec
+revision is NOT substantiable from primary sources — neither on the site
+itself nor in the official open-data catalogue. (Third-party projects
+such as carteovni.fr ASSERTING that license are secondary sources and do
+not count as evidence.)
+Status: UNCLARIFIED. Before any retrieval: contact CNES/GEIPAN directly
+(contact form / postmaster) and obtain written usage permission.
 
-## 2) Enigma Labs - enigmalabs.io - UNGEKLAERT
+## 2) Enigma Labs — enigmalabs.io — UNCLARIFIED
 
-Gepruefte Orte:
-- https://enigmalabs.io/terms (Live-Abruf: HTTP 403; Volltext via
-  Wayback-Machine-Snapshot vom 2026-06-12:
+Places checked:
+- https://enigmalabs.io/terms (live retrieval: HTTP 403; full text via
+  Wayback Machine snapshot of 2026-06-12:
   http://web.archive.org/web/20260612081939/https://enigmalabs.io/terms ,
-  "Last updated: July 12, 2023"). Exakte Wortlaute:
+  "Last updated: July 12, 2023"). Verbatim quotes:
 
   > "The Service and its original content (excluding Content provided by
   > You or other users), features and functionality are and will remain
@@ -64,52 +67,51 @@ Gepruefte Orte:
   > the right for Us to make Your Content available to other users of
   > the Service, who may also use Your Content subject to these Terms."
 
-- Volltext-Suche im ToS: "scrap" = 0 Treffer, "reuse" = 0 Treffer,
-  API-Klausel = nicht enthalten (einziger "API"-Treffer ist die
-  Definition von "Application"). Keine Rate-Limit-, keine Bulk-Daten-,
-  keine Attribution-Regel.
+- Full-text search across the ToS: "scrap" = 0 hits, "reuse" = 0 hits,
+  no API clause (the only "API"-adjacent hit is the definition of
+  "Application"). No rate-limit, no bulk-data, no attribution rules.
 
-Fazit: Keine explizite Freigabe fuer programmatischen Zugriff oder
-Dritt-Weiterverwendung; die "exclusive property"-Klausel plus
-Schweigen zu Automatisierung ergibt keine Nutzungsgrundlage.
-Status: UNGEKLAERT. Nur nach offizieller API-/Zugangs-Zusage nutzbar.
+Conclusion: no explicit permission for programmatic access or third-
+party reuse; the "exclusive property" clause plus complete silence on
+automation provides no usage basis.
+Status: UNCLARIFIED. Usable only after an official API/access grant.
 
-## 3) ufo-hunters.com - UNGEKLAERT
+## 3) ufo-hunters.com — UNCLARIFIED
 
-Gepruefte Orte:
-- https://www.ufo-hunters.com/terms -> HTTP 404; /terms-of-use -> 404;
-  /disclaimer -> 404; /privacy-policy -> 404; /about -> 404.
-  Es existiert KEINE aufrufbare Nutzungsbedingungen-Seite.
-- https://www.ufo-hunters.com/sightings/about - exakter Wortlaut des
-  einzigen Rechts-Hinweises (Disclaimer-Overlay):
+Places checked:
+- https://www.ufo-hunters.com/terms → HTTP 404; /terms-of-use → 404;
+  /disclaimer → 404; /privacy-policy → 404; /about → 404.
+  There is NO reachable terms-of-use page.
+- https://www.ufo-hunters.com/sightings/about — verbatim quote of the
+  only legal notice (disclaimer overlay):
 
   > "The information on this site that is not produced by
   > ufo-hunters.com is covered under the Copyright Disclaimer Under
   > Section 107 of the Copyright Act 1976"
 
-  Footer: "UFO HUNTERS (c) 2026 UFO HUNTERS - HIGH ALTITUDE
-  INTELLIGENCE DATASET". Volltext-Suche: "terms" = 0, "licen" = 0,
-  "permission" = 0 Treffer auf der About-Seite.
-- robots.txt: sperrt nur /sessions/*, /users/*, /password_resets/*,
-  Fehlerseiten und /articles/myspace - die Sichtungsseiten sind NICHT
-  gesperrt (robots.txt ist aber keine Lizenz, nur Zusatzinfo).
+  Footer: "UFO HUNTERS (c) 2026 UFO HUNTERS — HIGH ALTITUDE
+  INTELLIGENCE DATASET". Full-text search on that page: "terms" = 0,
+  "licen" = 0, "permission" = 0 hits.
+- robots.txt: disallows only /sessions/*, /users/*, /password_resets/*,
+  error pages and /articles/myspace — the sighting pages are NOT
+  disallowed (robots.txt is additional information, never a license).
 
-Fazit: Kein Lizenztext, keine Terms, kein Bulk-/API-Zugang dokumentiert;
-Fair-Use-Hinweis betrifft nur FREMDE Inhalte und ist keine Einraumung
-an Dritte. Betreiber sind auf der About-Seite namentlich genannt
-(Rueckfrage moeglich). Status: UNGEKLAERT.
+Conclusion: no license text, no terms, no documented bulk/API access;
+the fair-use notice covers THIRD-PARTY content only and grants nothing
+to third parties. Operators are named on the about page (inquiry
+possible). Status: UNCLARIFIED.
 
 ---
 
-## Gesamtstatus
+## Overall status
 
-| Quelle        | Status     | Naechster Schritt                          |
-|---------------|------------|--------------------------------------------|
-| GEIPAN        | ungeklaert | Schriftliche Freigabe CNES/GEIPAN anfragen |
-| Enigma Labs   | ungeklaert | Offiziellen API-Zugang erfragen            |
-| ufo-hunters   | ungeklaert | Betreiber-Rueckfrage                       |
-| NUFORC        | nicht geprueft (CTO-Anfrage laeuft) | abwarten   |
+| Source       | Status     | Next step                                  |
+|--------------|------------|--------------------------------------------|
+| GEIPAN       | unclarified| Request written permission from CNES/GEIPAN|
+| Enigma Labs  | unclarified| Ask for official API access                |
+| ufo-hunters  | unclarified| Contact the operators                      |
+| NUFORC       | not checked (CTO inquiry pending) | wait       |
 
-KEIN Source-Modul, KEIN Scraper fuer eine dieser Quellen, bis der
-jeweilige Status "freigegeben"/"geklaert nach Rueckfrage" ist und
-der Betreiber das dokumentiert hat.
+NO source module, NO scraper for any of these sources until the
+respective status is "released" / "clarified after inquiry" and that
+fact is documented here.

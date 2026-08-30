@@ -21,5 +21,5 @@
 /astro-app/verification-screenshots/
 /astro-app/deviations.csv
 /astro-app/backend/__pycache__/
-!/UAP_PHASE0.md
 !/docs/
+!/app/

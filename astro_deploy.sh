@@ -76,7 +76,7 @@ echo "== 6/6 Git: Deploy-Commit (nur wenn Quellcode-Änderungen) =="
 if git -C /home/enigma rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   git -C /home/enigma add astro_crawler.py data_sanity.py astro_deploy.sh \
     locations.json.example messier.csv astro-app app tests docs \
-    LESSONS.md UAP_PHASE0.md 2>/dev/null || true
+    LESSONS.md 2>/dev/null || true
   if git -C /home/enigma diff --cached --quiet; then
     echo "Keine Quellcode-Änderungen - kein Commit."
   else
