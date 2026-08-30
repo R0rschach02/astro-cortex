@@ -11,7 +11,10 @@ LIVE="/home/enigma/astro_crawler.py"
 APP_DIR="/home/enigma/astro-app"
 
 echo "== 1/5 Syntax-Check (Workspace-Kopie) =="
-python3 -m py_compile "$WS/astro_crawler.py" "$WS/data_sanity.py"
+# Bewusst /usr/bin/python3: ein aktiviertes VirtualEnv im PATH (z. B.
+# ~/ai_env) hat womoeglich weder pytest noch die Systempakete - der Deploy
+# muss unabhaengig davon immer identisch laufen.
+/usr/bin/python3 -m py_compile "$WS/astro_crawler.py" "$WS/data_sanity.py"
 
 # ruff-Gate: nur Korrektheits-Fehler (F821 undefined name, F823/F811
 # unbenutzte/doppelte Definition - die Bug-Klasse des ClearOutside-Regressions-
@@ -24,7 +27,7 @@ ruff check --select F821,F823,F811 \
 # pytest-Gate: Logik-Tests gegen die WORKSPACE-Version (genau das, was
 # deployed wird). -p no:anyio: Plugin-Konflikt mit System-pytest umgehen.
 echo "== 1c/5 Logik-Tests (pytest, ~/tests) =="
-python3 -m pytest "$HOME/tests" -q -p no:anyio \
+/usr/bin/python3 -m pytest "$HOME/tests" -q -p no:anyio \
   || { echo "PYTEST-FEHLER: Deploy abgebrochen"; exit 1; }
 
 echo "== 2/5 Deploy nach $LIVE (+ data_sanity.py) =="
@@ -47,7 +50,7 @@ systemctl --user is-active astro-app.service
 
 echo "== 5/5 Live-Beweis gegen die laufende API =="
 curl -sf --max-time 15 http://127.0.0.1:8000/api/spots \
-  | python3 -c 'import json,sys; d=json.load(sys.stdin); print("Spots:", len(d["spots"]), "|", ", ".join(s["name"] for s in d["spots"]))'
+  | /usr/bin/python3 -c 'import json,sys; d=json.load(sys.stdin); print("Spots:", len(d["spots"]), "|", ", ".join(s["name"] for s in d["spots"]))'
 
 echo "ExecStart-Pfade zur Referenz:"
 for s in astro-crawler astro-radar astro-app; do
@@ -76,7 +79,7 @@ if git -C /home/enigma fetch origin 2>/dev/null; then
     echo "ABBRUCH: origin/main hat $BEHIND Commits, die lokal fehlen - KEIN Push, KEIN Merge:"
     git -C /home/enigma log --oneline HEAD..origin/main | head -5
     git -C /home/enigma diff --stat HEAD origin/main | tail -3
-    python3 - << 'PYTELE' 2>/dev/null || true
+    /usr/bin/python3 - << 'PYTELE' 2>/dev/null || true
 import sys; sys.path.insert(0, "/home/enigma")
 import astro_crawler as ac, datetime
 state = ac.load_state()

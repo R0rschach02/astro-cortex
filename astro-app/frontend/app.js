@@ -399,9 +399,16 @@ function rvBail(text) {
 }
 
 /* ---------- Regen-Icon-Raster (Open-Meteo, Overworld-Bildsprache) ----------
-   Keine Farbflaechen: pro Gitterpunkt eine klare Wolke mit 0-3 Tropfen,
+   Keine Farbflaechen: pro Gitterpunkt eine Wolke mit 0-3 Tropfen,
    Groesse/Fuellung nach mm; hohle Wolke = Regen absehbar; Blitz-Symbol,
    wo der Punkt in einer aktiven DWD-Gewitterwarnung liegt. */
+
+function setRgHour(h) {
+  rgHour = h;
+  $("rg-slider").value = h;
+  $("rg-label").textContent = h === 0 ? "Jetzt" : `+${h} h`;
+  if (rgLastData) renderRainGrid(rgLastData);
+}
 
  function rgTogglePlay() { 
   rgPlaying = !rgPlaying; 
