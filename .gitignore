@@ -8,6 +8,7 @@
 !/astro_deploy.sh
 !/locations.json.example
 !/tests/
+!/LESSONS.md
 !/messier.csv
 !/.gitignore
 !/.gitattributes
