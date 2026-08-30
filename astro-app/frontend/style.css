@@ -57,6 +57,10 @@ body.night #btn-night { border-color: var(--text); box-shadow: 0 0 8px var(--tex
 body.night .leaflet-tile {
   filter: grayscale(1) brightness(0.45) sepia(1) hue-rotate(-45deg) saturate(3.5);
 }
+/* Tag: OSM-Basiskarte dezent entsaettigen (CARTO-Voyager-Ersatz, siehe app.js) */
+body:not(.night) .basemap-tile img {
+  filter: brightness(0.92) saturate(0.72);
+}
 body.night .leaflet-container { background: #000; }
 .leaflet-control-attribution {
   background: rgba(0,0,0,.5); color: var(--text-dim); font-size: 10px;

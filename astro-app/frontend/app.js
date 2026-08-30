@@ -40,9 +40,12 @@ function initMap() {
   map = L.map("map", { zoomControl: true, tap: true })
         .setView([49.54, 8.63], 10);
 
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-    maxZoom: 18,
-    attribution: '&copy; OpenStreetMap, &copy; CARTO',
+  // Basiskarten: direkt OSM (CARTO verlangt seit 2026 einen API-Key -
+  // siehe LESSONS.md Fall 8). Dezent entsaettigt via CSS (className),
+  // Rotlicht-Dimming greift ueber die bestehende body.night-Kachelregel.
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 18, subdomains: "abc", className: "basemap-tile",
+    attribution: '&copy; OpenStreetMap-Mitwirkende',
   }).addTo(map);
 
   // Lichtverschmutzung (Lorenz-Atlas via Backend-Proxy, Disk-Cache dort).
