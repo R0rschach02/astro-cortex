@@ -710,8 +710,34 @@ def http_get_json(url: str, timeout: int = 15, retries: int = 2) -> dict:
     raise last_exc
 
 
+def _dwd_hits_in_polygon(data: dict, lon: float, lat: float) -> list:
+    """Event-Namen aller DWD-Warnungen, deren Polygon den Standort wirklich
+    enthaelt (Punkt-in-Polygon statt nur BBOX-Treffer)."""
+    hits = []
+    for f in data.get("features", []):
+        event = ((f.get("properties") or {}).get("EVENT") or "").upper()
+        if not event:
+            continue
+        if poly_contains(f.get("geometry") or {}, lon, lat):
+            hits.append(event)
+    return hits
+
+
+def _dwd_classify_hits(hits: list) -> str:
+    """radar_status aus den getroffenen Events; Storm schlaegt Regen."""
+    for event in hits:
+        if any(k in event for k in STORM_KEYWORDS):
+            return "Storm Alert"
+    for event in hits:
+        if any(k in event for k in RAIN_KEYWORDS):
+            return "Rain Alert"
+    return "Clear"
+
+
 def check_dwd_warnings(lat: float, lon: float, rep: SiteReport):
-    """Aktive DWD-Warnungen im ~15 km Radius abfragen und zuordnen."""
+    """Aktive DWD-Warnungen im ~15 km Radius abfragen und zuordnen.
+    Guard-Clause-Struktur: Abfrage-Fehler -> frueher Return mit 'Unknown';
+    Treffer sammeln und klassifizieren in eigenen Helfern."""
     source = "DWD"
     try:
         # ~15 km Radius um die Koordinaten (BBOX-Reihenfolge: lon,lat,lon,lat)
@@ -719,32 +745,15 @@ def check_dwd_warnings(lat: float, lon: float, rep: SiteReport):
         url = f"{DWD_WFS_URL}&bbox={urllib.parse.quote(bbox + ',EPSG:4326')}"
         log.info("[%s] GET Warnungen (BBOX %s)", source, bbox)
         data = http_get_json(url, timeout=15)
-
-        storm, rain, hits = False, False, []
-        for f in data.get("features", []):
-            p = f.get("properties", {})
-            event = (p.get("EVENT") or "").upper()
-            if not event:
-                continue
-            # Nur zaehlen, wenn der Standort wirklich im Warn-Polygon liegt
-            if poly_contains(f.get("geometry") or {}, lon, lat):
-                hits.append(event)
-                if any(k in event for k in STORM_KEYWORDS):
-                    storm = True
-                elif any(k in event for k in RAIN_KEYWORDS):
-                    rain = True
-
-        log.info("[%s] Warnungen im Radius: %s", source, hits or "keine")
-        if storm:
-            rep.radar_status = "Storm Alert"
-        elif rain:
-            rep.radar_status = "Rain Alert"
-        else:
-            rep.radar_status = "Clear"
     except Exception as e:
         log.warning("[%s] Warnungs-Abfrage fehlgeschlagen: %s", source, type(e).__name__)
         log.debug("[%s] Traceback:\n%s", source, traceback.format_exc())
         rep.radar_status = "Unknown"
+        return
+
+    hits = _dwd_hits_in_polygon(data, lon, lat)
+    log.info("[%s] Warnungen im Radius: %s", source, hits or "keine")
+    rep.radar_status = _dwd_classify_hits(hits)
 
 
 def check_brightsky_ground(lat: float, lon: float, rep: SiteReport):
