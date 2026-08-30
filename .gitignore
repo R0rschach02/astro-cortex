@@ -7,6 +7,7 @@
 !/data_sanity.py
 !/astro_deploy.sh
 !/locations.json.example
+!/tests/
 !/messier.csv
 !/.gitignore
 !/.gitattributes
