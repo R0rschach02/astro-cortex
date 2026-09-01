@@ -166,3 +166,18 @@ das Deploy-Gate gebrochen).
     Permission-Denied Exit 1 und set -euo pipefail bricht die stille
     Zuweisung ab; immer "|| true" bei diagnostischen find-Aufrufen in
     strict-mode-Skripten.
+
+## 14. Log-Ausschnitte koennen Cache-Timing-Artefakte zeigen
+ Bug-Report: "Standort X kriegt nur den 2h-Call, keinen 2-Tage-Forecast"
+ (gestuetzt auf einen Radar-Tick-Logauschnitt). Primaerpruefung des
+ Cache-Inhalts zeigte: ALLE Standorte hatten frische 56-h-Reihen. Das
+ Artefakt: Cache-TREFFER loggen keine Zeile, nur Cache-MISSES fetchen
+ sichtbar. Im zitierten Tick war Standort A zufaellig abgelaufen
+ (Fetch-Logzeile), Standort B noch gecacht (nur der ungecachte 2h-Call
+ loggt immer). Abwesenheit einer Logzeile ist kein Beweis der
+ Abwesenheit des Calls.
+ -> Erst Cache/DB-Zustand pruefen, dann Bug-Report schreiben.
+ Zusaetzlich (Fall 13-Verwandt): Der parallele 404-Report war
+ zustaendsbezogen wahr (Forecast-Key vor dem ersten Heavy-Tick noch nicht
+ vorhanden) - Symptome zweier Bug-Reports hatten eine gemeinsame,
+ unschuldige Ursache.

@@ -380,9 +380,35 @@ def api_rain_grid(bbox: str, zoom: int = 9):
 
 
 # --- Vorausschau: stündliche Reihe + Golden Window (latest-wins JSON) ---
+def _norm_key(s: str) -> str:
+    """Namens-Normalisierung fuer robuste Lookups: Unicode-NFC (z.B.
+    umlaut-formen), Whitespace-Folding, casefold, Underscore/Bindestrich
+    wie Leerzeichen (slug-Formen wie 'ellerstadt_ost' treffen damit
+    'Ellerstadt Ost'). Klammern/Kommata im Namen bleiben zulaessig,
+    werden aber nicht mehr exakt benoetigt."""
+    import unicodedata
+    n = unicodedata.normalize("NFC", s or "").strip().casefold()
+    n = n.replace("_", " ").replace("-", " ")
+    return " ".join(n.split())
+
+
 @app.get("/api/forecast")
-def api_forecast(name: str):
-    """Vorausschau eines Standorts bis Sonnenaufgang (vom letzten Heavy-Crawl)."""
+def api_forecast(name: Optional[str] = None, id: Optional[str] = None):
+    """Vorausschau eines Standorts bis Sonnenaufgang (vom letzten Heavy-
+    Crawl). Lookup: ?id= hat Vorrang (stabile id aus locations.json),
+    sonst ?name= - exakt, dann normalisiert (NFC/Whitespace/casefold)."""
+    if id:
+        try:
+            locs = ac.active_locations(ac.DEFAULT_LOCATIONS) \
+                + ac.load_watchlist()
+        except Exception:
+            locs = []
+        loc = next((l for l in locs if l.get("id") == id), None)
+        if loc is None:
+            raise HTTPException(404, f"Kein Standort mit id '{id}'")
+        name = loc.get("name") or name
+    if not name:
+        raise HTTPException(400, "name= oder id= erforderlich")
     try:
         with open(ac.FORECAST_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -390,7 +416,14 @@ def api_forecast(name: str):
         raise HTTPException(503, "Vorausschau noch nicht aufgebaut "
                                  "(wartet auf den nächsten Heavy-Crawl)")
     if name not in data:
-        raise HTTPException(404, f"Keine Vorausschau für '{name}'")
+        norm = {_norm_key(k): k for k in data}
+        hit = norm.get(_norm_key(name))
+        if hit:
+            return data[hit]
+        raise HTTPException(
+            404, f"Keine Vorausschau für '{name}' "
+                 f"(neuer Standort? Der nächste Heavy-Tick "
+                 f"(30 min) liefert sie nach)")
     return data[name]
 
 

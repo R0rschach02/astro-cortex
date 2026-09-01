@@ -1,3 +1,7 @@
+import json
+
+import pytest
+
 """Forecast-Bausteine: Zeitfenster-Logik + build_forecast-Smoke."""
 
 
@@ -69,3 +73,80 @@ def test_hour_score_grenzwerte_wolken(ac):
     assert ac._hour_score({"dark": False, "clouds": 51}, "planet")[0] is False
     ok, _ = ac._hour_score({"dark": False, "clouds": 30}, "planet")
     assert ok is True
+
+
+# ---------- /api/forecast: id-Lookup, Normalisierung, kein 422 ----------
+# TestClient-Tests gegen das Backend-Modul (wie der laufende Dienst import
+# es, gleiche Route-Validierung - ein fehlender Parameter wuerde hier als
+# 422 auftauchen, genau das Verhalten, das es zu verhindern gilt).
+
+import importlib.util as _ilu
+import sys as _sys
+
+_sys.path.insert(0, "/home/enigma/astro-app/backend")  # lpcache-Nachbarmodul
+
+
+@pytest.fixture(scope="module")
+def backend(ac, tmp_path_factory):
+    spec = _ilu.spec_from_file_location(
+        "backend_main", "/home/enigma/astro-app/backend/main.py")
+    mod = _ilu.module_from_spec(spec)
+    _sys.modules["backend_main"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+@pytest.fixture()
+def forecast_env(backend, ac, tmp_path, monkeypatch):
+    """Forecast-JSON + Locations auf Testdaten umbiegen."""
+    fc = tmp_path / "forecast.json"
+    fc.write_text(json.dumps({
+        "Ellerstadt Ost": {"nights": [], "marker": "ellerstadt"},
+        "Mannheim Neckarplatten": {"nights": [], "marker": "mannheim"},
+    }))
+    monkeypatch.setattr(backend.ac, "FORECAST_PATH", str(fc))
+    monkeypatch.setattr(
+        backend.ac, "DEFAULT_LOCATIONS",
+        [{"id": "ellerstadt_east", "name": "Ellerstadt Ost",
+          "lat": 49.4645591, "lon": 8.2677846}])
+    monkeypatch.setattr(backend.ac, "active_locations", lambda d: d)
+    monkeypatch.setattr(backend.ac, "load_watchlist", lambda: [])
+    from fastapi.testclient import TestClient
+    return TestClient(backend.app)
+
+
+def test_forecast_by_id(forecast_env):
+    r = forecast_env.get("/api/forecast", params={"id": "ellerstadt_east"})
+    assert r.status_code == 200, r.text
+    assert r.json()["marker"] == "ellerstadt"
+
+
+def test_forecast_by_name(forecast_env):
+    r = forecast_env.get("/api/forecast", params={"name": "Ellerstadt Ost"})
+    assert r.status_code == 200, r.text
+    assert r.json()["marker"] == "ellerstadt"
+
+
+def test_forecast_name_mit_sonderzeichen_kein_422(forecast_env):
+    # Klammern/Kommata im Query: muss 200 (Treffer) oder saubere 404 sein,
+    # NIEMALS 422 (Parameter-Validierung)
+    r = forecast_env.get("/api/forecast",
+                         params={"name": "Ellerstadt Ost (Pfalz)"})
+    assert r.status_code in (200, 404), r.text
+
+
+def test_forecast_slug_form_trifft(forecast_env):
+    # 'ellerstadt_ost' (slug) -> normalisiert -> 'Ellerstadt Ost'
+    r = forecast_env.get("/api/forecast", params={"name": "ellerstadt_ost"})
+    assert r.status_code == 200, r.text
+
+
+def test_forecast_fehlend_gibt_klare_404(forecast_env):
+    r = forecast_env.get("/api/forecast", params={"id": "unbekannt"})
+    assert r.status_code == 404 and ("Kein Standort" in r.text
+                                     or "Keine Vorausschau" in r.text)
+
+
+def test_forecast_horizon_konstanten(ac):
+    assert ac.FORECAST_HORIZON_HOURS >= 48
+    assert ac.FORECAST_FETCH_WINDOW_H == ac.FORECAST_HORIZON_HOURS + 8

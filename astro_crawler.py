@@ -905,6 +905,12 @@ def check_brightsky_clouds(lat: float, lon: float, rep: SiteReport):
 NIGHT_CACHE_PATH = os.path.expanduser("~/.astro_crawler_night.json")
 NIGHT_TTL_MIN = 30  # Boden-Nachtverlauf aendert sich langsam -> selten abfragen
 
+# Vorausschau-Horizont: jede aktive Location MUSS mind. so weit in die
+# Zukunft Boden-/Stunden-Daten bekommen. BrightSky-Fenster = Horizont +
+# 8 h Puffer bis zum Ende der dritten Nacht.
+FORECAST_HORIZON_HOURS = 48
+FORECAST_FETCH_WINDOW_H = FORECAST_HORIZON_HOURS + 8
+
 
 def _rh_from_dew(t_c: Optional[float], td_c: Optional[float]) -> Optional[int]:
     """Rel. Luftfeuchte aus Temp+Taupunkt (Magnus-Naeherung). BrightSky
@@ -951,7 +957,8 @@ def check_brightsky_night(lat: float, lon: float, rep: SiteReport):
         params = urllib.parse.urlencode({
             "lat": lat, "lon": lon,
             "date": now.strftime("%Y-%m-%dT%H:%M"),
-            "last_date": (now + timedelta(hours=56)).strftime("%Y-%m-%dT%H:%M"),
+            "last_date": (now + timedelta(hours=FORECAST_FETCH_WINDOW_H)
+                          ).strftime("%Y-%m-%dT%H:%M"),
         })
         log.info("[BrightSky-Nacht] GET ?%s", params)
         data = http_get_json(f"https://api.brightsky.dev/weather?{params}",
