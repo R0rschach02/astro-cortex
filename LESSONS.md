@@ -181,3 +181,15 @@ das Deploy-Gate gebrochen).
  zustaendsbezogen wahr (Forecast-Key vor dem ersten Heavy-Tick noch nicht
  vorhanden) - Symptome zweier Bug-Reports hatten eine gemeinsame,
  unschuldige Ursache.
+
+## 15. Testzahl-Differenz = Umgebungs-Divergenz, nicht verlorene Tests
+ Deploy-Gate zeigte 52 passed, das eigene ac-test-Alias nur 47 + 1 skip.
+ Ursache: Der Alias laeuft bewusst mit ~/ai_env/bin/pytest, dem hypothesis
+ fehlte - die Property-Test-Datei zaehlt dann als EIN importorskip-Skip
+ statt 5 Tests (52 - 5 + 1 skip = 47). Fruehere 41 = Stand vor dem
+ letzten Deploy. Kein Test war verloren.
+ -> Bei abweichenden Testzahlern zunaechst pytest-Herkunft und fehlende
+    optionale Pakete je Umgebung vergleichen (importorskip-Skip verschluckt
+    ganze Dateien als 1), bevor nach verlorenen Tests gesucht wird.
+    Fix: optionales Paket additiv in die zweite Umgebung installieren,
+    damit beide Zaehler identisch sind.
