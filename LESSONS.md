@@ -193,3 +193,21 @@ das Deploy-Gate gebrochen).
     ganze Dateien als 1), bevor nach verlorenen Tests gesucht wird.
     Fix: optionales Paket additiv in die zweite Umgebung installieren,
     damit beide Zaehler identisch sind.
+
+## 16. Regel-Dict-Refactoring: grüne Suite überlebte einen toten Pfad
+ Der PROFILE_RULES-Umbau ersetzte gemeinsame K.o.-Vergleiche durch
+ Regel-Lookups. Zwei Fehler schlüpften durch: (a) dso.jet_nogo=None
+ (gemeint fuer rate()) wanderte in den STUNDEN-Score, dessen Guard nur
+ den Wert, nicht die REGEL pruefte -> TypeError sobald eine Stunde
+ einen jet-Wert trug (ab 02.09. 00:01, datenabhaengig); (b) None haette
+ still das DSO-Stundenverhalten geaendert (jet-K.o. gab es vor dem
+ Umbau fuer BEIDE Profile). Die Suite war gruen, weil kein Test die
+ Kombination (Profil DSO x Kriterium Jet mit Wert) je durchlief.
+ -> Bei Regel-/Config-Refactorings: jede Kombination Profil x Kriterium
+    mindestens einmal testen; Verhaltensaquivalenz gegen den ALTEN Code
+    pruefen, nicht nur gegen die neue Struktur. Laufzeit-Fehler dieser
+    Art mit traceback reproduzieren, bevor gefixt wird (hier: datetime-
+    now-Mock auf den Fehlerzeitpunkt).
+ Folgeschaden: 4 Tage alte Forecast-Daten, weil das latest-wins-JSON
+ nicht mehr neu geschrieben wurde - Endpoint trimming haelt das jetzt
+ sichtbar (incomplete-Flag), ist aber KEIN Ersatz fuer den Fix.
