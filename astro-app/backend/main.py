@@ -419,12 +419,42 @@ def api_forecast(name: Optional[str] = None, id: Optional[str] = None):
         norm = {_norm_key(k): k for k in data}
         hit = norm.get(_norm_key(name))
         if hit:
-            return data[hit]
+            return _forecast_payload(data[hit], hit)
         raise HTTPException(
             404, f"Keine Vorausschau für '{name}' "
                  f"(neuer Standort? Der nächste Heavy-Tick "
                  f"(30 min) liefert sie nach)")
-    return data[name]
+    return _forecast_payload(data[name], name)
+
+
+def _forecast_payload(entry: dict, key: str) -> dict:
+    """Responsse-Ansicht: verstrichene Stunden abschneiden (aeltester
+    Eintrag = aktuelle Stunde) und Verfuegbarkeit gegen den 48-h-Ziel-
+    horizont kennzeichnen. Die gespeicherten Daten bleiben unveraendert."""
+    import datetime as _dt
+    out = dict(entry)
+    now = _dt.datetime.now()
+    cutoff = now.strftime("%Y-%m-%dT%H:00")
+    series = out.get("series") or []
+    trimmed = [h for h in series if (h.get("ts") or "") >= cutoff]
+    out["series"] = trimmed
+    last = max((h.get("ts") or "") for h in trimmed) if trimmed else None
+    avail_h = 0.0
+    if last:
+        try:
+            avail_h = ((_dt.datetime.fromisoformat(last)
+                        + _dt.timedelta(hours=1)) - now
+                       ).total_seconds() / 3600
+        except Exception:
+            avail_h = 0.0
+    horizon = getattr(ac, "FORECAST_HORIZON_HOURS", 48)
+    out["forecast_hours_remaining"] = round(avail_h, 1)
+    out["incomplete"] = bool(last is None or avail_h < horizon - 1)
+    if out["incomplete"]:
+        out["note"] = (f"Vorausschau unvollständig: nur {avail_h:.0f} h ab "
+                       f"jetzt verfügbar (Ziel ≥ {horizon} h) - der nächste "
+                       f"Heavy-Tick (30 min) ergänzt.")
+    return out
 
 
 # --- FWHM-Sync: Nachtrag-Endpunkt nach Sessionende (kein Live-Anspruch) ---

@@ -150,3 +150,87 @@ def test_forecast_fehlend_gibt_klare_404(forecast_env):
 def test_forecast_horizon_konstanten(ac):
     assert ac.FORECAST_HORIZON_HOURS >= 48
     assert ac.FORECAST_FETCH_WINDOW_H == ac.FORECAST_HORIZON_HOURS + 8
+
+
+# ---------- Bug-Repro 2026-09-04: gemischte Coverages, Mitternachts-Grenze ----------
+def test_build_forecast_gemischte_coverages(isolated, rep):
+    """co=24 h / om=72 h / seeing=71 h / ground=56 h um 00:01 - exakt das
+    Live-Szenario, das ab 02.09. einen TypeError warf (jet-Wert mit
+    Regel-None im gemeinsamen K.o.-Block von _hour_score)."""
+    import os as _os
+    from datetime import datetime as _dt, timedelta as _td
+    from unittest.mock import patch as _patch
+    import json as _json
+    ac = isolated
+    NOW = _dt(2026, 9, 2, 0, 1)
+
+    def mk(start, n, base):
+        return [{"ts": (start + _td(hours=i)).strftime("%Y-%m-%dT%H:00"),
+                 **base} for i in range(n)]
+
+    r = rep()
+    r.fc_clouds = mk(_dt(2026, 9, 1, 23), 24,
+                     {"total": 30, "low": None, "mid": None, "high": None,
+                      "rain": 5})
+    r.fc_clouds_src = "clearoutside"
+    r.fc_clouds_om = mk(_dt(2026, 9, 1, 23), 72,
+                        {"total": 30, "low": 10, "mid": 10, "high": 10,
+                         "rain": 5})
+    r.fc_seeing = mk(_dt(2026, 9, 1, 23), 71, {"seeing": 1.5, "jet": 20})
+    r.fc_ground = mk(_dt(2026, 8, 31, 21), 56,
+                     {"cloud": 40, "prob": 10, "wind": 5, "tau": 6,
+                      "precip": 0.0})
+    r.dark_windows = ["22:00-04:00"]
+    r.moon_window = "01:00-04:00"
+    r.moon_illum = 60.0
+
+    with _patch.object(ac, "datetime") as DT:
+        DT.now.return_value = NOW
+        DT.strptime.side_effect = lambda *a: _dt.strptime(*a)
+        DT.fromisoformat.side_effect = lambda *a: _dt.fromisoformat(*a)
+        ac.build_forecast(r, "dso")   # darf KEINE Exception werfen
+    data = _json.load(open(ac.FORECAST_PATH))
+    assert r.name in data and data[r.name]["series"], \
+        "Forecast muss mit nicht-leerer series geschrieben werden"
+
+
+# ---------- /api/forecast: Trim verstrichener Stunden + 48h-Kennzeichnung ----------
+def _series_from(start, n):
+    from datetime import datetime, timedelta
+    return [{"ts": (start + timedelta(hours=i)).strftime("%Y-%m-%dT%H:00")}
+            for i in range(n)]
+
+
+def test_forecast_trimmt_verstrichene_stunden(forecast_env):
+    from datetime import datetime, timedelta
+    now = datetime.now()
+    fc = forecast_env  # Fixture schreibt Forecast-Datei neu je Test
+    # 2 verstrichene + 50 zukuenftige Stunden unter dem Ellerstadt-Key
+    import importlib.util, sys, json, os
+    be = sys.modules["backend_main"]
+    path = be.ac.FORECAST_PATH
+    data = json.load(open(path))
+    data["Ellerstadt Ost"]["series"] = _series_from(now - timedelta(hours=2), 52)
+    json.dump(data, open(path, "w"))
+    r = fc.get("/api/forecast", params={"id": "ellerstadt_east"})
+    assert r.status_code == 200
+    body = r.json()
+    cutoff = now.strftime("%Y-%m-%dT%H:00")
+    assert all(h["ts"] >= cutoff for h in body["series"]), \
+        "kein Eintrag aelter als die aktuelle Stunde"
+    assert body["incomplete"] is False
+    assert body["forecast_hours_remaining"] >= 47
+
+
+def test_forecast_kennzeichnet_kurzen_horizont(forecast_env):
+    from datetime import datetime, timedelta
+    import sys, json
+    be = sys.modules["backend_main"]
+    path = be.ac.FORECAST_PATH
+    data = json.load(open(path))
+    data["Ellerstadt Ost"]["series"] = _series_from(datetime.now(), 12)
+    json.dump(data, open(path, "w"))
+    r = forecast_env.get("/api/forecast", params={"id": "ellerstadt_east"})
+    body = r.json()
+    assert body["incomplete"] is True
+    assert "unvollständig" in body.get("note", "")

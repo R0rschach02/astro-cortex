@@ -168,7 +168,9 @@ PROFILE_RULES = {
         "seeing_nogo": 3.0,
         "seeing_good": 1.0,
         "moon_maybe": 60,       # %, None = Mond fuer Rating irrelevant
-        "jet_nogo": None,       # DSO-Rating prueft Jetstream nicht
+        "jet_nogo": 30.0,       # Stunden-K.o. (gemeinsam, wie vor dem
+                                # PROFILE_RULES-Umbau); rate() prueft DSO-
+                                # Jetstream weiterhin nicht (siehe rate())
         "tau_nogo": 3.0,        # <  -> Beschlagrisiko (Stunden-K.o.)
         "tau_good": 6.0,        # >= -> Stundengrund
         "wind_nogo": 30.0,
@@ -2066,8 +2068,11 @@ def _hour_score(hour: dict, profile: str) -> tuple[bool, list]:
         return False, ["heller Mond hoch"]
     if tau is not None and R["tau_good"] is not None and tau >= R["tau_good"]:
         reasons.append(f"Tau {tau:.0f}K")
-    # gemeinsame K.o.-Kriterien
-    if jet is not None and jet > R["jet_nogo"]:
+    # gemeinsame K.o.-Kriterien (Regel None = Kriterium entfaellt, z. B.
+    # DSO-Jetstream; Guard NACH Regel, nicht nur nach Wert - Repro-Fall
+    # 2026-09-04: jet-Wert vorhanden, Regel None -> TypeError)
+    if jet is not None and R["jet_nogo"] is not None \
+            and jet > R["jet_nogo"]:
         return False, [f"Jetstream {jet:.0f}"]
     if tau is not None and tau < R["tau_nogo"]:
         return False, ["Beschlagrisiko"]
