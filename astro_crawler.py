@@ -1706,6 +1706,70 @@ def check_ml_milestone():
 
 
 # ---------------------------------------------------------------------------
+# Bias-Korrektur: mittlerer Prognosefehler (vorhergesagt - Ist) je
+# Parameter und Vorlauf-Bucket, angewandt NUR in der Anzeige (/api/
+# forecast), nie auf Bewertung/Rating/Golden-Window. Rohbasis bleibt
+# forecast_verification (append-only); hier entsteht nur ein kleines
+# abgeleitetes Artefakt im latest-wins-JSON-Muster.
+# ---------------------------------------------------------------------------
+BIAS_PATH = os.path.expanduser("~/.astro_crawler_bias.json")
+BIAS_MIN_N = ML_MILESTONE_ROWS   # 50 pro Bucket, sonst keine Korrektur (0)
+
+
+def recompute_bias_corrections():
+    """1x taeglich nach dem Verifikations-Batch: Mittelwert der Fehler je
+    (Parameter, Lead-Bucket). Buckets unter BIAS_MIN_N bekommen bias=None
+    (nicht raten). Ergebnis atomar nach BIAS_PATH + transparente Logzeile."""
+    state = load_state()
+    today = f"{datetime.now():%Y-%m-%d}"
+    if state.get("bias_recompute_date") == today:
+        return
+    state["bias_recompute_date"] = today
+
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        rows = conn.execute(
+            "SELECT CASE WHEN fl.lead_hours <= 24 THEN 'le24' ELSE 'gt24' END,"
+            "       SUM(CASE WHEN v.err_clouds IS NOT NULL THEN 1 ELSE 0 END),"
+            "       AVG(v.err_clouds),"
+            "       SUM(CASE WHEN v.err_seeing IS NOT NULL THEN 1 ELSE 0 END),"
+            "       AVG(v.err_seeing) "
+            "FROM forecast_verification v "
+            "JOIN forecast_log fl ON fl.id = v.forecast_log_id "
+            "WHERE v.matched = 1 "
+            "GROUP BY 1").fetchall()
+        conn.close()
+    except Exception as e:
+        log.warning("[Bias] DB-Check fehlgeschlagen: %s", e)
+        save_state(state)
+        return
+    save_state(state)
+
+    out = {"computed_at": datetime.now().isoformat(timespec="seconds"),
+           "min_n": BIAS_MIN_N, "clouds": {}, "seeing": {}}
+    for bucket, c_n, c_mean, s_n, s_mean in rows or []:
+        for param, n, mean in (("clouds", c_n, c_mean),
+                               ("seeing", s_n, s_mean)):
+            if n is None or mean is None:
+                continue
+            active = n >= BIAS_MIN_N
+            out[param][bucket] = {
+                "bias": round(mean, 2) if active else None,
+                "n": n,
+            }
+            log.info("[Bias] %s %s: %s (n=%d%s)",
+                     "Wolken-Korrektur" if param == "clouds"
+                     else "Seeing-Korrektur",
+                     "<=24h" if bucket == "le24" else ">24h",
+                     f"{mean:+.2f}" if active else "keine (unter Schwelle)",
+                     n, "" if active else f", min={BIAS_MIN_N}")
+    tmp = BIAS_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(out, f, indent=1)
+    os.replace(tmp, BIAS_PATH)
+
+
+# ---------------------------------------------------------------------------
 # Teil B: Live-Abweichungswarnung (Heavy-Takt, nur in astronomischer Nacht)
 # Vergleicht frisch gemessene Ist-Werte mit der PLANUNGS-Vorhersage (max.
 # Vorlauf) fuer genau diese Stunde. Nur Verschlechterung, 90-min-Cooldown.
@@ -3595,6 +3659,13 @@ async def run_cycle(locations: list, headless: bool, send_dashboard: bool,
             check_forecast_verification()
         except Exception as e:
             log.warning("[Verify] Aufruf fehlgeschlagen: %s", e)
+
+        # Bias-Korrektur: 1x taeglich direkt nach dem Verify-Batch neu
+        # berechnen (Anzeige-only, siehe recompute_bias_corrections)
+        try:
+            recompute_bias_corrections()
+        except Exception as e:
+            log.warning("[Bias] Aufruf fehlgeschlagen: %s", e)
 
         # ML-Bereitschaft: 1x taeglich Zeilenzahl je Parameter/Lead-Bucket
         # pruefen, einmalige Meldung ab Schwelle (Flag in State-Datei)

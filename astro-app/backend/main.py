@@ -427,6 +427,52 @@ def api_forecast(name: Optional[str] = None, id: Optional[str] = None):
     return _forecast_payload(data[name], name)
 
 
+def _load_bias() -> dict:
+    """Aktive Bias-Korrekturwerte (vom Crawler taeglich berechnet)."""
+    try:
+        with open(getattr(ac, "BIAS_PATH",
+                          "/home/enigma/.astro_crawler_bias.json"),
+                  "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _apply_bias_to_series(series: list, bias: dict,
+                          now) -> tuple[list, dict]:
+    """Wendet die Bias-Korrektur NUR auf die Anzeigewerte einer Stunde an
+    (clouds/seeing); ok/reasons/Golden-Window sind mit den Rohwerten
+    bewertet und bleiben unveraendert - bewusste Vorgabe (Kalibrierung
+    der Anzeige vor einer etwaigen spaeteren Bewertungskalierung).
+    Rueckgabe: (series, angewandte-Korrekturen-Uebersicht)."""
+    import datetime as _dt
+    applied = {}
+    if not bias:
+        return series, applied
+    out = []
+    for h in series:
+        h = dict(h)
+        ts = h.get("ts")
+        try:
+            lead_h = (_dt.datetime.fromisoformat(ts) - now
+                      ).total_seconds() / 3600
+        except Exception:
+            lead_h = None
+        bucket = "le24" if (lead_h is not None and lead_h <= 24) else "gt24"
+        for param, lo, hi in (("clouds", 0, 100), ("seeing", 0.05, 20)):
+            b = ((bias.get(param) or {}).get(bucket) or {}).get("bias")
+            if b is None or h.get(param) is None:
+                continue
+            h[f"{param}_raw"] = h[param]
+            # err = vorhergesagt - Ist; positives err = Uberschaetzung
+            # -> Korrektur vom Prognosewert ABZIEHEN, dann klemmen
+            h[param] = round(min(hi, max(lo, h[param] - b)), 1)
+            applied[f"{param}_{bucket}"] = {"bias": b, "n":
+                (bias.get(param) or {}).get(bucket, {}).get("n")}
+        out.append(h)
+    return out, applied
+
+
 def _forecast_payload(entry: dict, key: str) -> dict:
     """Responsse-Ansicht: verstrichene Stunden abschneiden (aeltester
     Eintrag = aktuelle Stunde) und Verfuegbarkeit gegen den 48-h-Ziel-
@@ -437,7 +483,11 @@ def _forecast_payload(entry: dict, key: str) -> dict:
     cutoff = now.strftime("%Y-%m-%dT%H:00")
     series = out.get("series") or []
     trimmed = [h for h in series if (h.get("ts") or "") >= cutoff]
+    bias = _load_bias()
+    trimmed, bias_applied = _apply_bias_to_series(trimmed, bias, now)
     out["series"] = trimmed
+    if bias_applied:
+        out["bias_applied"] = bias_applied
     last = max((h.get("ts") or "") for h in trimmed) if trimmed else None
     avail_h = 0.0
     if last:

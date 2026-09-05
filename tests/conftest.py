@@ -6,6 +6,10 @@ import json
 import sys
 
 import pytest
+import importlib.util as _ilu
+import sys as _sys
+
+_sys.path.insert(0, "/home/enigma/astro-app/backend")  # lpcache
 
 WS = "/home/enigma/.zcode/workspace/default"
 
@@ -50,3 +54,37 @@ def rep(ac):
             setattr(r, k, v)
         return r
     return make
+
+
+# --- Backend-/Forecast-Endpoint-Fixtures (geteilt mit test_bias) ---
+@pytest.fixture(scope="module")
+def backend(ac, tmp_path_factory):
+    spec = _ilu.spec_from_file_location(
+        "backend_main", "/home/enigma/astro-app/backend/main.py")
+    mod = _ilu.module_from_spec(spec)
+    _sys.modules["backend_main"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+@pytest.fixture()
+def forecast_env(backend, ac, tmp_path, monkeypatch):
+    """Forecast-JSON + Locations auf Testdaten umbiegen."""
+    fc = tmp_path / "forecast.json"
+    fc.write_text(json.dumps({
+        "Ellerstadt Ost": {"nights": [], "marker": "ellerstadt"},
+        "Mannheim Neckarplatten": {"nights": [], "marker": "mannheim"},
+    }))
+    monkeypatch.setattr(backend.ac, "FORECAST_PATH", str(fc))
+    # raising=False: die LIVE-astro_crawler.py kennt BIAS_PATH erst nach
+    # dem naechsten Deploy - der Test arbeitet ohnehin auf dem tmp-Pfad
+    monkeypatch.setattr(backend.ac, "BIAS_PATH",
+                        str(tmp_path / "bias.json"), raising=False)
+    monkeypatch.setattr(
+        backend.ac, "DEFAULT_LOCATIONS",
+        [{"id": "ellerstadt_east", "name": "Ellerstadt Ost",
+          "lat": 49.4645591, "lon": 8.2677846}])
+    monkeypatch.setattr(backend.ac, "active_locations", lambda d: d)
+    monkeypatch.setattr(backend.ac, "load_watchlist", lambda: [])
+    from fastapi.testclient import TestClient
+    return TestClient(backend.app)

@@ -86,35 +86,6 @@ import sys as _sys
 _sys.path.insert(0, "/home/enigma/astro-app/backend")  # lpcache-Nachbarmodul
 
 
-@pytest.fixture(scope="module")
-def backend(ac, tmp_path_factory):
-    spec = _ilu.spec_from_file_location(
-        "backend_main", "/home/enigma/astro-app/backend/main.py")
-    mod = _ilu.module_from_spec(spec)
-    _sys.modules["backend_main"] = mod
-    spec.loader.exec_module(mod)
-    return mod
-
-
-@pytest.fixture()
-def forecast_env(backend, ac, tmp_path, monkeypatch):
-    """Forecast-JSON + Locations auf Testdaten umbiegen."""
-    fc = tmp_path / "forecast.json"
-    fc.write_text(json.dumps({
-        "Ellerstadt Ost": {"nights": [], "marker": "ellerstadt"},
-        "Mannheim Neckarplatten": {"nights": [], "marker": "mannheim"},
-    }))
-    monkeypatch.setattr(backend.ac, "FORECAST_PATH", str(fc))
-    monkeypatch.setattr(
-        backend.ac, "DEFAULT_LOCATIONS",
-        [{"id": "ellerstadt_east", "name": "Ellerstadt Ost",
-          "lat": 49.4645591, "lon": 8.2677846}])
-    monkeypatch.setattr(backend.ac, "active_locations", lambda d: d)
-    monkeypatch.setattr(backend.ac, "load_watchlist", lambda: [])
-    from fastapi.testclient import TestClient
-    return TestClient(backend.app)
-
-
 def test_forecast_by_id(forecast_env):
     r = forecast_env.get("/api/forecast", params={"id": "ellerstadt_east"})
     assert r.status_code == 200, r.text
