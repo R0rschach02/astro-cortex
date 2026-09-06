@@ -60,7 +60,7 @@ def _age_minutes(ts_iso: str) -> Optional[int]:
     try:
         ts = dt.datetime.fromisoformat(ts_iso)
         return int((dt.datetime.now() - ts).total_seconds() / 60)
-    except Exception:
+    except (ValueError, TypeError):
         return None
 
 
@@ -313,7 +313,7 @@ def api_rain_grid(bbox: str, zoom: int = 9):
     try:
         p = [float(x) for x in bbox.split(",")]
         assert len(p) == 4
-    except Exception:
+    except (ValueError, TypeError, AssertionError):
         raise HTTPException(400, "bbox=lat1,lon1,lat2,lon2 noetig")
     s, w = min(p[0], p[2]), min(p[1], p[3])
     n, e = max(p[0], p[2]), max(p[1], p[3])
@@ -401,7 +401,8 @@ def api_forecast(name: Optional[str] = None, id: Optional[str] = None):
         try:
             locs = ac.active_locations(ac.DEFAULT_LOCATIONS) \
                 + ac.load_watchlist()
-        except Exception:
+        except Exception as e:
+            log.warning("[API] Standort-Lookup fehlgeschlagen: %s", type(e).__name__)
             locs = []
         loc = next((l for l in locs if l.get("id") == id), None)
         if loc is None:
@@ -412,7 +413,7 @@ def api_forecast(name: Optional[str] = None, id: Optional[str] = None):
     try:
         with open(ac.FORECAST_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
-    except Exception:
+    except (OSError, ValueError):
         raise HTTPException(503, "Vorausschau noch nicht aufgebaut "
                                  "(wartet auf den nächsten Heavy-Crawl)")
     if name not in data:
@@ -434,7 +435,7 @@ def _load_bias() -> dict:
                           "/home/enigma/.astro_crawler_bias.json"),
                   "r", encoding="utf-8") as f:
             return json.load(f)
-    except Exception:
+    except (OSError, ValueError):
         return {}
 
 
@@ -456,7 +457,7 @@ def _apply_bias_to_series(series: list, bias: dict,
         try:
             lead_h = (_dt.datetime.fromisoformat(ts) - now
                       ).total_seconds() / 3600
-        except Exception:
+        except (ValueError, TypeError):
             lead_h = None
         bucket = "le24" if (lead_h is not None and lead_h <= 24) else "gt24"
         for param, lo, hi in (("clouds", 0, 100), ("seeing", 0.05, 20)):
@@ -495,7 +496,7 @@ def _forecast_payload(entry: dict, key: str) -> dict:
             avail_h = ((_dt.datetime.fromisoformat(last)
                         + _dt.timedelta(hours=1)) - now
                        ).total_seconds() / 3600
-        except Exception:
+        except (ValueError, TypeError):
             avail_h = 0.0
     horizon = getattr(ac, "FORECAST_HORIZON_HOURS", 48)
     out["forecast_hours_remaining"] = round(avail_h, 1)
@@ -537,7 +538,8 @@ def api_fwhm_sync(body: FwhmBody, request: Request):
             rows.append((ts, fwhm,
                          m.get("location") or body.location,
                          m.get("source") or body.source, now_iso))
-        except Exception:
+        except Exception as e:
+            log.warning("[API] fwhm-Messung uebersprungen (%s): %s", m.get("ts"), type(e).__name__)
             skipped += 1
     if not rows:
         raise HTTPException(400, "keine gueltige Messung dabei "
@@ -579,7 +581,7 @@ def api_changelog():
                   encoding="utf-8") as f:
             data = json.load(f)
         return {"entries": list(reversed(data.get("entries", [])))}
-    except Exception:
+    except (OSError, ValueError):
         raise HTTPException(503, "changelog.json nicht lesbar")
 
 

@@ -359,7 +359,8 @@ async def log_page_state(page, source: str):
         content = await page.content()
         if "Just a moment" in content or "challenge" in content.lower()[:2000]:
             log.warning("[%s] Cloudflare-Challenge erkannt! (Titel: %r)", source, title)
-    except Exception:
+    except Exception as e:
+        log.warning("[%s] Zustandscheck nach Challenge fehlgeschlagen: %s", source, type(e).__name__)
         pass
 
 
@@ -436,7 +437,8 @@ async def scrape_clearoutside(context, lat: float, lon: float, rep: SiteReport):
                 await page.reload(wait_until="domcontentloaded")
                 await page.wait_for_timeout(10000)
                 await log_page_state(page, source)
-        except Exception:
+        except Exception as e:
+            log.warning("[Quelle] Reload nach Challenge fehlgeschlagen: %s", type(e).__name__)
             pass
 
         # --- Strategie 1: Text-Parse (layout-unabhaengig) ---
@@ -562,7 +564,8 @@ async def scrape_meteoblue(context, lat: float, lon: float, rep: SiteReport):
         # CSS/JS-Schnipsel und erzeugen False Positives.
         try:
             main_text = await page.inner_text("main")
-        except Exception:
+        except Exception as e:
+            log.debug("kein main-Element, Fallback body-Text")
             main_text = await page.inner_text("body")
         log.info("[%s] Seitentext: %d Zeichen (Ausschnitt: %r)",
                  source, len(main_text), main_text[:200])
@@ -936,7 +939,7 @@ def check_brightsky_night(lat: float, lon: float, rep: SiteReport):
     try:
         with open(NIGHT_CACHE_PATH, "r", encoding="utf-8") as f:
             cache = json.load(f)
-    except Exception:
+    except (OSError, ValueError):
         pass
     key = f"{lat:.3f}|{lon:.3f}"
     entry = cache.get(key)
@@ -978,7 +981,7 @@ def check_brightsky_night(lat: float, lon: float, rep: SiteReport):
             try:
                 local = datetime.fromisoformat(w["timestamp"]).astimezone(
                     _berlin())
-            except Exception:
+            except (ValueError, TypeError):
                 continue
             if (local.hour >= 20 or local.hour < 6) and local < first_night_cutoff:
                 night_rows.append(w)
@@ -1071,7 +1074,7 @@ def load_state() -> dict:
     try:
         with open(STATE_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
-    except Exception:
+    except (OSError, ValueError):
         return {"ratings": {}, "last_alert": {}}
 
 
@@ -1236,7 +1239,7 @@ def _in_time_window(now: datetime, window: str) -> bool:
         t = now.hour * 60 + now.minute
         a, b = sh * 60 + sm, eh * 60 + em
         return a <= t <= b if a <= b else (t >= a or t <= b)
-    except Exception:
+    except (ValueError, AttributeError):
         return False
 
 
@@ -1251,7 +1254,7 @@ def check_clear_alert(reports: list):
     now = datetime.now()
     try:
         age_h = (now - datetime.fromisoformat(cw["set"])).total_seconds() / 3600
-    except Exception:
+    except (ValueError, TypeError, KeyError):
         age_h = 999.0
     if age_h > CLEAR_WATCH_TTL_H:
         del state["clear_watch"]
@@ -1394,7 +1397,7 @@ def _nearest_crawl(conn, loc, target, modes):
         try:
             dt = abs((datetime.fromisoformat(r[0]) - target
                       ).total_seconds())
-        except Exception:
+        except (ValueError, TypeError):
             continue
         if best_dt is None or dt < best_dt:
             best, best_dt = r, dt
@@ -1417,7 +1420,7 @@ def _night_ko_reason(fc: dict) -> str:
                 for r in h["reasons"]:
                     counts[r] = counts.get(r, 0) + 1
         return max(counts, key=counts.get) if counts else "keine Daten"
-    except Exception:
+    except (ValueError, TypeError, KeyError):
         return "keine Daten"
 
 
@@ -1456,7 +1459,8 @@ def check_evening_push():
                 we = ws + timedelta(hours=max(1, g["hours"]))
                 target = pick_target(loc["lat"], loc["lon"], ws, we,
                                      moon_illum=fc.get("moon_illum"))
-            except Exception:
+            except Exception as e:
+                log.warning("[Abendplan] Ziel-Vorschlag fehlgeschlagen: %s", type(e).__name__)
                 target = None
             tz = (f"Ziel: {target['obj']} {target['name']} "
                   f"({target['avg_alt']}\u00b0)" if target else "kein Ziel-Vorschlag")
@@ -1510,7 +1514,7 @@ def _brightsky_hour_clouds(lat: float, lon: float, target) -> Optional[int]:
             (datetime.fromisoformat(w["timestamp"]) - target
              ).total_seconds()))
         return best["cloud_cover"]
-    except Exception:
+    except (ValueError, TypeError, KeyError):
         return None
 
 
@@ -1547,14 +1551,15 @@ def check_forecast_verification():
         try:
             for l in active_locations(DEFAULT_LOCATIONS) + load_watchlist():
                 loc_coord[l["name"]] = (l["lat"], l["lon"])
-        except Exception:
+        except Exception as e:
+            log.warning("[Verify] Koordinaten-Lookup fehlgeschlagen: %s", type(e).__name__)
             pass
         bs_cache = {}   # (name, stunde) -> cloud_cover|None
         inserts, matched_n, unmatched_n = [], 0, 0
         for (fid, target_s, loc, p_clouds, p_seeing, p_jet, p_tau, p_wind) in rows:
             try:
                 target = datetime.fromisoformat(target_s)
-            except Exception:
+            except (ValueError, TypeError):
                 continue
             h_row = _nearest_crawl(conn, loc, target, modes=("heavy",))
             a_row = _nearest_crawl(conn, loc, target, modes=None)
@@ -1796,7 +1801,7 @@ def check_forecast_deviation(reports: list):
                 "ORDER BY lead_hours DESC LIMIT 1",
                 (rep.name, t_lo, t_hi)).fetchone()
             conn.close()
-        except Exception:
+        except sqlite3.Error:
             continue
         if not row:
             continue
@@ -2033,7 +2038,7 @@ def moon_cached(lat: float, lon: float) -> Optional[dict]:
     try:
         with open(MOON_CACHE_PATH, "r", encoding="utf-8") as f:
             cache = json.load(f)
-    except Exception:
+    except (OSError, ValueError):
         pass
     key = f"v2|{datetime.now():%Y-%m-%d}|{lat:.3f}|{lon:.3f}"
     if key in cache:
@@ -2042,7 +2047,7 @@ def moon_cached(lat: float, lon: float) -> Optional[dict]:
             calc = datetime.fromisoformat(entry["calc_ts"])
             if (datetime.now() - calc).total_seconds() < MOON_CACHE_TTL_H * 3600:
                 return entry
-        except Exception:
+        except (KeyError, ValueError, TypeError):
             pass  # alter Eintrag ohne calc_ts -> neu berechnen
     try:
         data = compute_moon(lat, lon)
@@ -2103,7 +2108,7 @@ def _hh_in_window(hhmm: str, window: Optional[str]) -> bool:
         h, m = map(int, hhmm.split(":"))
         t, a, b = h * 60 + m, sh * 60 + sm, eh * 60 + em
         return a <= t <= b if a <= b else (t >= a or t <= b)
-    except Exception:
+    except (ValueError, AttributeError):
         return False
 
 
@@ -2172,7 +2177,7 @@ def build_forecast(rep: SiteReport, profile: str = "dso"):
             try:
                 local = datetime.fromisoformat(e["ts"]).astimezone(_berlin())
                 ground[local.strftime("%Y-%m-%dT%H")] = e
-            except Exception:
+            except (ValueError, TypeError):
                 continue
         dark_windows = rep.dark_windows or []
         moon_win = rep.moon_window if rep.moon_window and "nie" not in str(
@@ -2282,7 +2287,7 @@ def build_forecast(rep: SiteReport, profile: str = "dso"):
         try:
             with open(FORECAST_PATH, "r", encoding="utf-8") as f:
                 data = json.load(f)
-        except Exception:
+        except (OSError, ValueError):
             pass
         data[rep.name] = {
             "ts": datetime.now().isoformat(timespec="minutes"),
@@ -2507,7 +2512,7 @@ def db_insert_forecast_log(rep: SiteReport, series: list):
         for h in series:
             try:
                 target = datetime.fromisoformat(h["ts"])
-            except Exception:
+            except (ValueError, TypeError):
                 continue
             lead = (target - now).total_seconds() / 3600
             if lead < 0 or lead > 48:
@@ -2618,7 +2623,7 @@ def load_watchlist() -> list:
     try:
         with open(WATCHLIST_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
-    except Exception:
+    except (OSError, ValueError):
         return []
 
 
@@ -2642,7 +2647,7 @@ def prune_watchlist() -> list:
                     active.append(e)
                 else:
                     expired.append(e)
-            except Exception:
+            except (ValueError, TypeError):
                 expired.append(e)
         if expired:
             save_watchlist(active)
@@ -3131,7 +3136,7 @@ def _forecast_window(name: str) -> tuple[Optional[datetime], Optional[datetime],
     try:
         with open(FORECAST_PATH, "r", encoding="utf-8") as f:
             fc = json.load(f).get(name)
-    except Exception:
+    except (OSError, ValueError):
         fc = None
     if fc and fc.get("golden_windows"):
         g = fc["golden_windows"][0]
@@ -3144,7 +3149,7 @@ def _forecast_window(name: str) -> tuple[Optional[datetime], Optional[datetime],
             if end <= start:
                 end += timedelta(days=1)
             return start, end, f"Golden Window {g['night'][8:10]}.{g['night'][5:7]}. {g['start']}-{g['end']}"
-        except Exception:
+        except (ValueError, KeyError, TypeError):
             pass
     if fc and fc.get("series"):
         oks = [h for h in fc["series"] if h["ok"]]
@@ -3291,7 +3296,8 @@ def check_track_alert():
         return
     try:
         transit = datetime.fromisoformat(tw["transit"])
-    except Exception:
+    except Exception as e:
+        log.warning("[Track] Transit-Parsen fehlgeschlagen, Tracking beendet: %s", type(e).__name__)
         del state["track_watch"]; save_state(state); return
     now = datetime.now(_berlin())
     delta_min = (transit - now).total_seconds() / 60
@@ -3414,7 +3420,7 @@ def cmd_session(args, state) -> str:
             dur = datetime.now() - datetime.fromisoformat(row[1])
             mins = int(dur.total_seconds() / 60)
             dur_s = f"{mins // 60}h {mins % 60}min"
-        except Exception:
+        except (ValueError, TypeError):
             dur_s = "?"
         return f"Session #{row[0]} ({row[2]}) beendet nach {dur_s}."
 
@@ -3427,7 +3433,7 @@ def cmd_session(args, state) -> str:
         mins = int((datetime.now() - datetime.fromisoformat(row[1])
                     ).total_seconds() / 60)
         dur_s = f"{mins // 60}h {mins % 60}min"
-    except Exception:
+    except (ValueError, TypeError):
         dur_s = "?"
     return (f"Offene Session #{row[0]}: {row[2]} seit {row[1]} ({dur_s})\n"
             f"Startbedingungen: Heavy-Crawl #{row[3]}")
@@ -3528,7 +3534,7 @@ def heavy_age_min(name: str) -> Optional[float]:
             return None
         return (datetime.now() - datetime.fromisoformat(row[0])
                 ).total_seconds() / 60
-    except Exception:
+    except (ValueError, TypeError, AttributeError):
         return None
 
 

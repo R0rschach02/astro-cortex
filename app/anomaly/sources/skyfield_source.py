@@ -12,9 +12,12 @@ berechnend (deterministisch bei gleicher BSP/TLE-Eingabe).
 """
 from __future__ import annotations
 
+import logging
 import os
 from datetime import datetime, timezone
 from typing import Optional
+
+log = logging.getLogger("anomaly.skyfield")
 
 _SKYFIELD_DIR = os.path.expanduser("~/.skyfield")
 DE421 = os.path.join(_SKYFIELD_DIR, "de421.bsp")
@@ -59,7 +62,8 @@ def body_altaz(name: str, dt_utc: datetime, lat: float, lon: float,
         alt, az, _ = apparent.altaz()
         return {"alt_deg": round(alt.degrees, 4),
                 "az_deg": round(az.degrees % 360.0, 4)}
-    except Exception:
+    except Exception as e:  # noqa: BLE001 - Ephemeriden-Fehler bewusst breit, sichtbar geloggt
+        log.warning("[Skyfield] Koerper-Berechnung fehlgeschlagen: %s", type(e).__name__)
         return None
 
 
@@ -90,7 +94,8 @@ def iss_altaz(tle_line1: str, tle_line2: str, dt_utc: datetime,
             "visibility_window": (alt.degrees > 10.0
                                   and sun.get("alt_deg", 0) < -6.0),
         }
-    except Exception:
+    except Exception as e:  # noqa: BLE001 - TLE/Bahn-Fehler bewusst breit, sichtbar geloggt
+        log.warning("[Skyfield] ISS-Berechnung fehlgeschlagen: %s", type(e).__name__)
         return None
 
 

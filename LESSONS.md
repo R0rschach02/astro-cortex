@@ -211,3 +211,20 @@ das Deploy-Gate gebrochen).
  Folgeschaden: 4 Tage alte Forecast-Daten, weil das latest-wins-JSON
  nicht mehr neu geschrieben wurde - Endpoint trimming haelt das jetzt
  sichtbar (incomplete-Flag), ist aber KEIN Ersatz fuer den Fix.
+
+## 17. Breites except + fehlender Bezeichner = stilles Versagen (2x)
+ Zwei Vorfälle derselben Klasse: Ein NameError (bzw. fehlender Import)
+ INNERHALB eines try-Blocks wurde vom breiten except Exception gefangen
+ und nur als Nebenwirkung sichtbar (Korrektur griff nie / TypeError an
+ anderer Stelle). Systemdurchgang 2026-09-06 ueber alle Module:
+ 43 stille/breite Handler nachbehandelt - 33 auf erwartete Fehltypen
+ verengt (JSON/Parse: OSError+ValueError etc.), 10 bewusst breite mit
+ sichtbarem log.warning versehen (Playwright/Quellen/Ephemeriden);
+ Restbestand dokumentiert per ruff-Zaehler im Deploy.
+ -> Neue Regeln im Deploy-Gate: E722 (nacktes except) hart ueberall;
+    BLE001 hart fuer data_sanity/lpcache/app-anomaly (bewusst breite
+    Stellen tragen noqa MIT Begruendung); astro_crawler/backend als
+    Zaehler-Ausgabe - neue breite excepts fallen im Deploy-Log auf.
+ -> Meta: Auch der Behebungsversuch hatte einen Bug (zeilenbasierter
+    Patch ersetzte Handler-Bodies mit) - nach jedem Massenpatch
+    py_compile VOR weiteren Schritten laufen lassen.

@@ -120,7 +120,8 @@ def _fetch(url: str, timeout: int = 20) -> bytes | None:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             if resp.status == 200:
                 return resp.read()
-    except Exception:
+    except Exception as e:  # noqa: BLE001 - Netzwerk bewusst breit, debug geloggt
+        log.debug("LP-Kachel offline/fehlerhaft: %s", type(e).__name__)
         return None
     return None
 

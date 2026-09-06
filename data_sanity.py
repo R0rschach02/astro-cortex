@@ -57,7 +57,7 @@ def _suppressed_today(key: str) -> bool:
     try:
         with open(STATE_PATH, "r", encoding="utf-8") as f:
             st = json.load(f)
-    except Exception:
+    except (OSError, ValueError):
         st = {}
     return st.get(key) == f"{datetime.now():%Y-%m-%d}"
 
@@ -66,7 +66,7 @@ def _mark_reported(key: str):
     try:
         with open(STATE_PATH, "r", encoding="utf-8") as f:
             st = json.load(f)
-    except Exception:
+    except (OSError, ValueError):
         st = {}
     st[key] = f"{datetime.now():%Y-%m-%d}"
     tmp = STATE_PATH + ".tmp"
@@ -217,16 +217,16 @@ def run_sanity(reports: list, db_path: str) -> dict:
            "error_ratio": [], "cross_clouds": []}
     try:
         out["ranges"] = check_value_ranges(reports)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - Sanity darf nie werfen
         log.warning("[sanity] ranges fehlgeschlagen: %s", type(e).__name__)
-    try:
+    try:  # noqa: BLE001 - Sanity darf nie werfen
         conn = sqlite3.connect(db_path)
         out["stale_crawls"] = check_stale_crawls(conn)
         out["stale_forecast"] = check_stale_forecast_series(conn)
         out["error_ratio"] = check_error_ratio(conn)
         out["cross_clouds"] = check_cross_source_clouds(conn)
         conn.close()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 - Sanity darf nie werfen
         log.warning("[sanity] DB-Pruefungen fehlgeschlagen: %s",
                     type(e).__name__)
     n = sum(len(v) for v in out.values())

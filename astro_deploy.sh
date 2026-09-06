@@ -34,10 +34,20 @@ echo "== 1/5 Syntax-Check (Workspace-Kopie) =="
 # ruff-Gate: nur Korrektheits-Fehler (F821 undefined name, F823/F811
 # unbenutzte/doppelte Definition - die Bug-Klasse des ClearOutside-Regressions-
 # Feblers). Reine Stil-Warnungen (E/W) blockieren bewusst NICHT.
-echo "== 1b/5 Statische Korrektheit (ruff F8xx) =="
-ruff check --select F821,F823,F811 \
+# E722 (nacktes except) hart: keiner im Bestand. BLE001 (breites except)
+# hart fuer Module mit sauberem Bestand; fuer astro_crawler/backend als
+# Zaehler-Ausgabe (Bestand dokumentiert, neue Treffer fallen im Diff auf).
+echo "== 1b/5 Statische Korrektheit (ruff F8xx + E722 + BLE001) =="
+ruff check --select F821,F823,F811,E722 \
   "$WS/astro_crawler.py" "$WS/data_sanity.py" "$APP_DIR/backend/main.py" \
   || { echo "RUFF-FEHLER: Deploy abgebrochen"; exit 1; }
+ruff check --select BLE001 "$WS/data_sanity.py" \
+  "$APP_DIR/backend/lpcache.py" "$HOME/app/anomaly" \
+  || { echo "RUFF-FEHLER (BLE001): Deploy abgebrochen"; exit 1; }
+for m in "$WS/astro_crawler.py" "$APP_DIR/backend/main.py"; do
+  n=$(ruff check --select BLE001 "$m" 2>/dev/null | grep -c BLE001 || true)
+  echo "  Hinweis: $m: $n breite except-Handler (bewusst, mit Logging)"
+done
 
 # pytest-Gate: Logik-Tests gegen die WORKSPACE-Version (genau das, was
 # deployed wird). -p no:anyio: Plugin-Konflikt mit System-pytest umgehen.
