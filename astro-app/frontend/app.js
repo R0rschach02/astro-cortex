@@ -158,13 +158,13 @@ function cell(v, fmtFn) {
 }
 
 function nightLabel(night) {
-  const d = new Date();
-  const today = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  const tom = new Date(d.getTime() + 86400000);
-  const tomorrow = `${tom.getFullYear()}-${String(tom.getMonth()+1).padStart(2,'0')}-${String(tom.getDate()).padStart(2,'0')}`;
-  if (night === today) return "Heute Nacht";
-  if (night === tomorrow) return "Morgen Nacht (+1)";
-  return `Nacht auf ${esc(night.slice(8,10))}.${esc(night.slice(5,7))}. (+2)`;
+  // Absolute Datumsangabe statt relativem "Heute/+1/+2": das night-Feld
+  // (YYYY-MM-DD) ist im Forecast-Datensatz vorhanden - reine Anzeige-Sache.
+  const WD = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+  const y = +night.slice(0, 4), m = +night.slice(5, 7), d = +night.slice(8, 10);
+  const dt = new Date(y, m - 1, d);
+  if (isNaN(dt)) return esc(night);
+  return `${WD[dt.getDay()]}, ${String(d).padStart(2, "0")}.${String(m).padStart(2, "0")}.${y}`;
 }
 
 function forecastHtml(fc) {

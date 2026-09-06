@@ -87,6 +87,23 @@ if git -C /home/enigma rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   git -C /home/enigma add astro_crawler.py data_sanity.py astro_deploy.sh \
     locations.json.example messier.csv astro-app app tests docs \
     LESSONS.md 2>/dev/null || true
+  # Changelog-Gate (diff-basiert): Frontend-Dateien mit Nutzer-Sichtbarkeit
+  # im Commit, aber changelog.json unveraendert -> Abbruch. Override fuer
+  # seltene rein interne Frontend-Aenderungen: CHANGELOG_OVERRIDE=1
+  FE_CHANGED=$(git -C /home/enigma diff --cached --name-only \
+    | grep -cE "astro-app/frontend/(app\.js|style\.css|index\.html)$" || true)
+  CL_CHANGED=$(git -C /home/enigma diff --cached --name-only \
+    | grep -c "astro-app/frontend/changelog.json$" || true)
+  if [ "$FE_CHANGED" -gt 0 ] && [ "$CL_CHANGED" -eq 0 ]; then
+    if [ "${CHANGELOG_OVERRIDE:-0}" = "1" ]; then
+      echo "  HINWEIS: Frontend geaendert ohne Changelog-Eintrag (CHANGELOG_OVERRIDE=1 aktiv)."
+    else
+      echo "CHANGELOG-GATE: Frontend-Dateien geaendert, aber changelog.json nicht."
+      echo "  Nutzerrelevante Aenderung? Dann Eintrag in changelog.json nachziehen."
+      echo "  Rein intern? Dann erneut mit CHANGELOG_OVERRIDE=1 starten."
+      exit 1
+    fi
+  fi
   if git -C /home/enigma diff --cached --quiet; then
     echo "Keine Quellcode-Änderungen - kein Commit."
   else
