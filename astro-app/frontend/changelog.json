@@ -125,6 +125,55 @@
    "tag": "neu",
    "desc": "Regenradar-Layer (RainViewer) mit Play/Pause-Loop durch die letzten ~2 h + Nowcast und Zeitstempel-Anzeige; Satellit-Toggle mit Empty-Handling. Dazu zwei proactive Pushes: taeglicher Abendplan ab 18 Uhr (Golden Windows mit Ziel-Vorschlag, Sammelzeile fuer Rest) und Live-Abweichungswarnung waehrend der Nacht (Wolken +30pp oder Seeing +1.0\" gegen die Planungs-Vorhersage, nur Verschlechterung, 90-min-Cooldown).",
    "usage": "PWA: Layer-Control → 'Regenradar' — Pushes kommen automatisch"
+  },
+  {
+   "date": "2026-08-24",
+   "title": "Regen-Tropfen an den Standorten",
+   "tag": "nachgetragen aus Projektverlauf",
+   "desc": "Die Standort-Marker auf der Karte zeigen jetzt selbst einen kleinen Regentropfen, wenn dort Niederschlag gemeldet wird - der Tropfen wird groesser, je mehr es regnet, und erscheint als Umriss, wenn Regen nur angesagt ist. So siehst du auf einen Blick, welche deiner Plätze nass sind.",
+   "usage": "Karte: Tropfen-Symbol direkt am Standort-Marker (ab 30% Regenwahrscheinlichkeit als Umriss)"
+  },
+  {
+   "date": "2026-08-24",
+   "title": "Weniger Einzel-Nachrichten bei Abweichungen",
+   "tag": "nachgetragen aus Projektverlauf",
+   "desc": "Wenn das Wetter von der Vorhersage abweicht, waehrend keine Beobachtung laeuft, gibt es dafuer jetzt abends EINE zusammengefasste Zeile im Abendplan statt mehrerer einzelner Nachrichten. Waehrend einer laufenden Beobachtung bleibt die sofortige Warnung wie bisher.",
+   "usage": "Telegram: Abendplan enthaelt ggf. 'Heute X Vorhersage-Abweichung(en)...'"
+  },
+  {
+   "date": "2026-08-30",
+   "title": "Neue Beobachtungsstandorte in der Pfalz",
+   "tag": "nachgetragen aus Projektverlauf",
+   "desc": "Ellerstadt Ost und Fussgoennheim Rand sind jetzt dabei - zwei dunkle Plaetze in der Pfalz (Kontakte von Marcel, Uebernachtung moeglich). Sie laufen voll mit: Ampel, Vorausschau, Abendplan und Alarme.",
+   "usage": "Karte: beide neue Marker; Abby fragen lohnt sich vor der ersten Nacht dort"
+  },
+  {
+   "date": "2026-08-30",
+   "title": "Karten-Hintergrund auf OpenStreetMap",
+   "tag": "nachgetragen aus Projektverlauf",
+   "desc": "Die Basis-Karte kommt jetzt von OpenStreetMap - der bisherige Anbieter verlangt ploetzlich einen API-Schluessel. Optik bleibt ruhig und dunkel, der Rotlicht-Modus funktioniert wie bisher.",
+   "usage": "Nichts zu tun - Karte laedt automatisch neu"
+  },
+  {
+   "date": "2026-08-30",
+   "title": "Regen-Anzeige komplett neu: Symbole statt Farbflaechen",
+   "tag": "nachgetragen aus Projektverlauf",
+   "desc": "Regen wird nicht mehr als grosse Farbflaeche gezeichnet, sondern als verstaendliche Wolken-Symbole mit Tropfen ueber die Region verteilt: mehr Tropfen = mehr Regen, bei einer Gewitterwarnung kommt ein Blitz dazu. Mit dem Zeit-Regler unten links kannst du durch die naechsten 6 Stunden spulen, die Play-Taste laeuft automatisch durch. Die alte Radar-Karte bleibt als 'Radar-Rohansicht' im Layer-Menue.",
+   "usage": "Karte: Regler unten links (0 = jetzt, +6 h = spaeter); Play = Automatik"
+  },
+  {
+   "date": "2026-09-05",
+   "title": "Fix: Vorausschau war einige Tage unvollstaendig",
+   "tag": "nachgetragen aus Projektverlauf",
+   "desc": "Die mehrtaegige Vorausschau hatte sich ueber mehrere Tage nicht mehr aktualisiert und zeigte veraltete Stunden - ein Fehler im Aufbau ist behoben. Zusaetzlich beginnt sie jetzt immer mit der aktuellen Stunde und sagt klar Bescheid, wenn gerade weniger als 2 Tage verfuegbar sind.",
+   "usage": "Vorausschau-Tab aktualisiert sich wieder mit jedem Lauf (alle 30 min)"
+  },
+  {
+   "date": "2026-09-05",
+   "title": "Wolken-Vorhersage wird automatisch genauer",
+   "tag": "nachgetragen aus Projektverlauf",
+   "desc": "Die App gleicht jetzt taeglich ab, wie die Wolken-Vorhersage in der Vergangenheit danebenlag, und justiert die angezeigten Werte automatisch nach. Bisher war die Vorhersage deutlich zu optimistisch (real war es im Schnitt 9-11% mehr Bewoelkung als angesagt) - das wird jetzt in der Anzeige ausglichen. Die Ampel-Bewertung selbst bleibt vorerst unveraendert.",
+   "usage": "Vorausschau-Tab: Werte sind bereits korrigiert; nichts zu tun"
   }
  ]
 }
