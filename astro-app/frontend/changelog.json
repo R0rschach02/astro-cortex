@@ -181,6 +181,13 @@
    "tag": "neu",
    "desc": "Die Vorausschau ist jetzt mit echten Daten beschriftet (z. B. \"Sa, 06.09.2026\") statt \"Heute / +1 / +2\" - besonders praktisch bei der Planung ueber mehrere Tage. Und die Standorte haben sich geaendert: Neu dabei ist der Untere Luisenpark in Mannheim; Fussgoennheim Rand ist raus (dessen bisherige Werte bleiben in der Historie).",
    "usage": "Vorausschau-Tab: Nacht-Beschriftung zeigt das Datum; Karte: neuer Marker Unterer Luisenpark"
+  },
+  {
+   "date": "2026-09-06",
+   "title": "Beobachtungsfenster starten im Herbst/Winter frueher",
+   "tag": "neu",
+   "desc": "Die Vorausschau sucht guenstige Fenster nicht mehr stur ab 20 Uhr, sondern ab dem echten Ende der Daemmerung - im Herbst und Winter faengt die Suche damit bis zu 2 Stunden frueher an. Fuer Planeten-Zaehlerung kann das Fenster so schon in der Daemmerung beginnen; fuer Deep-Sky bleibt der Beginn wie gehabt an der tiefen Nacht gekoppelt.",
+   "usage": "Vorausschau-Tab: fruehere erste Stunde im Herbst/Winter automatisch"
   }
  ]
 }

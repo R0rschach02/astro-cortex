@@ -205,3 +205,50 @@ def test_forecast_kennzeichnet_kurzen_horizont(forecast_env):
     body = r.json()
     assert body["incomplete"] is True
     assert "unvollständig" in body.get("note", "")
+
+
+# ---------- Golden Window: dynamischer Abend-Start (buergerl. Daemmerung) ----------
+def test_evening_min_hour_heute_zwischen_17_und_21(ac):
+    h = ac._evening_min_hour(49.4645591, 8.2677846)  # Ellerstadt Ost
+    assert 17 <= h <= 21, h
+
+
+def test_evening_min_hour_winter_deutlich_frueher(ac):
+    from datetime import datetime
+    h = ac._evening_min_hour(49.4645591, 8.2677846,
+                             today=datetime(2026, 12, 21, 12, 0))
+    # 21.12.: Sonnenuntergang ~16:20, erste VOLLE Stunde mit sun_alt<=-6
+    # laut de421: 17 oder 18 - jedenfalls deutlich vor dem Hartkode 20
+    assert 17 <= h <= 18, h
+    assert h < 20, "Winter muss frueher starten als der alte Hartkode"
+
+
+def test_build_forecast_raster_nimmt_fruehe_stunden_auf(isolated, rep):
+    """Bei frueher Daemmerung (Mock: 19 Uhr) muss die Serie die 19-Uhr-
+    Stunde enthalten (frueher Hartkode 20 verschenkte sie)."""
+    import json as _json
+    from datetime import datetime, timedelta
+    from unittest.mock import patch
+    ac = isolated
+    NOW = datetime(2026, 10, 15, 14, 0)   # Herbsttag
+    monkey = lambda *a, **k: 19
+    ac._evening_min_hour = monkey
+
+    def mk(start, n, base):
+        return [{"ts": (start + timedelta(hours=i)).strftime("%Y-%m-%dT%H:00"),
+                 **base} for i in range(n)]
+
+    r = rep()
+    r.fc_clouds_om = mk(datetime(2026, 10, 15, 19), 60,
+                        {"total": 10, "low": 0, "mid": 0, "high": 10, "rain": 0})
+    r.dark_windows = ["19:30-06:00"]
+    with patch.object(ac, "datetime") as DT:
+        DT.now.return_value = NOW
+        DT.strptime.side_effect = lambda *a: datetime.strptime(*a)
+        DT.fromisoformat.side_effect = lambda *a: datetime.fromisoformat(*a)
+        ac.build_forecast(r, "dso")
+    data = _json.load(open(ac.FORECAST_PATH))
+    hours = [h["ts"] for h in data[r.name]["series"]]
+    assert any(h.endswith("T19:00") for h in hours), hours[:3]
+    first = data[r.name]["series"][0]
+    assert first["night"] == "2026-10-15"   # 19 Uhr gehoert zum Abend dieses Tages

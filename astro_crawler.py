@@ -1657,6 +1657,39 @@ def export_deviation_csv():
 ML_MILESTONE_ROWS = 50
 
 
+def _evening_min_hour(lat: float, lon: float, today=None) -> int:
+    """Erste volle Stunde, ab der die Sonne heute unter -6 Grad steht
+    (Ende der buergerlichen Daemmerung, ~Sonnenuntergang + 30-40 min).
+    Bestimmt dynamisch den Abend-Anfang des Vorausschau-Rasters statt
+    des frueheren Hartkodierens auf 20:00 - im Herbst/Winter wird es
+    frueh genug dunkel, um Stunden davor nicht zu verschwenden. Die
+    DSO-Bewertung selbst bleibt an astronomischer Dunkelheit gekoppelt
+    (dark-Flag in _hour_score). Fallback bei Fehler: 20."""
+    try:
+        from skyfield.api import Loader, wgs84
+        load = Loader(SKYFIELD_DIR)
+        eph = load("de421.bsp")
+        ts = load.timescale()
+        topo = wgs84.latlon(lat, lon)
+        obs = eph["earth"] + topo
+        sun = eph["sun"]
+        today = today or datetime.now()
+        # Stundenraster 15-23 Uhr lokale Zeit genuegt (Serie ist stuendlich)
+        grid = [today.replace(hour=h, minute=0, second=0, microsecond=0)
+                for h in range(15, 24)]
+        t = [ts.from_datetime(g.replace(tzinfo=_berlin())) for g in grid]
+        alts = [obs.at(ti).observe(sun).apparent().altaz()[0].degrees
+                for ti in t]
+        for h, alt in zip(range(15, 24), alts):
+            if alt <= -6.0:
+                return h
+        return 20
+    except Exception as e:  # noqa: BLE001 - Fallback ist definiert und sichtbar
+        log.warning("[Raster] Daemmerungs-Stunde fehlgeschlagen (%s), "
+                    "Fallback 20", type(e).__name__)
+        return 20
+
+
 def check_ml_milestone():
     """1x taeglich im Radar-Zyklus: verifizierte forecast_verification-Zeilen
     je Parameter (Wolken/Seeing) und Vorlauf-Bucket (<=24 h / >24 h) zaehlen.
@@ -2191,6 +2224,7 @@ def build_forecast(rep: SiteReport, profile: str = "dso"):
                               + timedelta(hours=1)).isoformat(timespec="minutes")
 
         series = []
+        ev_min_h = _evening_min_hour(rep.lat or 49.5, rep.lon or 8.6)
         log.info("[Forecast-Diag] %s: co=%d (%s..%s) om=%d (%s..%s) seeing=%d ground=%d",
                  rep.name, len(co), min(co) if co else '-', max(co) if co else '-',
                  len(om), min(om) if om else '-', max(om) if om else '-',
@@ -2200,8 +2234,12 @@ def build_forecast(rep: SiteReport, profile: str = "dso"):
             if dt_h < now:
                 continue
             hh = dt_h.hour
-            # Raster: Nachtstunden 20:00-06:59 (7 mit Puffer fuer Sommer-Aufgang)
-            if not (hh >= 20 or hh < 7):
+            # Raster: abends dynamisch ab Ende der buergerlichen Daemmerung
+            # (siehe _evening_min_hour), morgens 06:59 als Sommer-Puffer.
+            # DSO-Bewertung filtert ueber das dark-Flag weiterhin auf
+            # astronomische Dunkelheit; das Planet-Profil nutzt die
+            # Daemmerungsstunden bewusst mit.
+            if not (hh >= ev_min_h or hh < 7):
                 continue
             hhmm = dt_h.strftime("%H:%M")
             cl, omc = co.get(k), om.get(k)
@@ -2228,7 +2266,8 @@ def build_forecast(rep: SiteReport, profile: str = "dso"):
                 "hhmm": hhmm,
                 # Nacht-Datum: Stunden >= 20 gehoeren zum Abend-Datum,
                 # Stunden < 7 zum Vortag
-                "night": (dt_h if hh >= 20 else dt_h - timedelta(days=1)
+                "night": (dt_h if hh >= ev_min_h
+                          else dt_h - timedelta(days=1)
                           ).strftime("%Y-%m-%d"),
                 "clouds": clouds_v, "src": src,
                 "lmh": [((cl or omc) or {}).get(x)
