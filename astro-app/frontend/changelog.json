@@ -184,10 +184,10 @@
   },
   {
    "date": "2026-09-06",
-   "title": "Beobachtungsfenster starten im Herbst/Winter frueher",
+   "title": "Vorausschau ab 18 Uhr: der ganze Abend auf einen Blick",
    "tag": "neu",
-   "desc": "Die Vorausschau sucht guenstige Fenster nicht mehr stur ab 20 Uhr, sondern ab dem echten Ende der Daemmerung - im Herbst und Winter faengt die Suche damit bis zu 2 Stunden frueher an. Fuer Planeten-Zaehlerung kann das Fenster so schon in der Daemmerung beginnen; fuer Deep-Sky bleibt der Beginn wie gehabt an der tiefen Nacht gekoppelt.",
-   "usage": "Vorausschau-Tab: fruehere erste Stunde im Herbst/Winter automatisch"
+   "desc": "Die Vorausschau zeigt jetzt jeden Abend ab 18 Uhr durchgehend - auch die hellen Stunden. So siehst du den ganzen Uebergang (18 Uhr hell -> Daemmerung -> dunkel) und kannst besser planen, wann du losfahren und aufbauen willst. Dunkle Stunden sind wie bisher markiert; Fenster fuer Deep-Sky beginnen weiterhin erst, wenn es richtig dunkel ist.",
+   "usage": "Vorausschau-Tab: erste Stunde ist jetzt 18 Uhr - Sommer wie Winter"
   }
  ]
 }

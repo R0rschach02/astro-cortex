@@ -46,7 +46,7 @@ def test_build_forecast_smoke(isolated, rep):
     hours = data[r.name].get("series") or data[r.name].get("hours") or []
     for h in hours:
         hh = int((h.get("ts") or h.get("hhmm", "00:00"))[11:13])
-        assert hh >= 20 or hh < 7, f"Tagesstunde {hh} im Nachtraster"
+        assert hh >= 18 or hh < 7, f"Tagesstunde {hh} im Nachtraster"
 
 
 # ---------- _hour_score (nach PROFILE_RULES-Umstellung) ----------
@@ -207,48 +207,58 @@ def test_forecast_kennzeichnet_kurzen_horizont(forecast_env):
     assert "unvollständig" in body.get("note", "")
 
 
-# ---------- Golden Window: dynamischer Abend-Start (buergerl. Daemmerung) ----------
-def test_evening_min_hour_heute_zwischen_17_und_21(ac):
-    h = ac._evening_min_hour(49.4645591, 8.2677846)  # Ellerstadt Ost
-    assert 17 <= h <= 21, h
-
-
-def test_evening_min_hour_winter_deutlich_frueher(ac):
-    from datetime import datetime
-    h = ac._evening_min_hour(49.4645591, 8.2677846,
-                             today=datetime(2026, 12, 21, 12, 0))
-    # 21.12.: Sonnenuntergang ~16:20, erste VOLLE Stunde mit sun_alt<=-6
-    # laut de421: 17 oder 18 - jedenfalls deutlich vor dem Hartkode 20
-    assert 17 <= h <= 18, h
-    assert h < 20, "Winter muss frueher starten als der alte Hartkode"
-
-
-def test_build_forecast_raster_nimmt_fruehe_stunden_auf(isolated, rep):
-    """Bei frueher Daemmerung (Mock: 19 Uhr) muss die Serie die 19-Uhr-
-    Stunde enthalten (frueher Hartkode 20 verschenkte sie)."""
+# ---------- Golden Window: fester Planungs-Start um 18 Uhr lokal ----------
+def _mk_series_forecast(ac, rep, now, dark_window="22:00-04:00"):
     import json as _json
     from datetime import datetime, timedelta
     from unittest.mock import patch
-    ac = isolated
-    NOW = datetime(2026, 10, 15, 14, 0)   # Herbsttag
-    monkey = lambda *a, **k: 19
-    ac._evening_min_hour = monkey
-
     def mk(start, n, base):
         return [{"ts": (start + timedelta(hours=i)).strftime("%Y-%m-%dT%H:00"),
                  **base} for i in range(n)]
-
     r = rep()
-    r.fc_clouds_om = mk(datetime(2026, 10, 15, 19), 60,
+    om_start = now.replace(hour=18, minute=0, second=0, microsecond=0)
+    r.fc_clouds_om = mk(om_start, 84,
                         {"total": 10, "low": 0, "mid": 0, "high": 10, "rain": 0})
-    r.dark_windows = ["19:30-06:00"]
+    r.dark_windows = [dark_window]
     with patch.object(ac, "datetime") as DT:
-        DT.now.return_value = NOW
+        DT.now.return_value = now
         DT.strptime.side_effect = lambda *a: datetime.strptime(*a)
         DT.fromisoformat.side_effect = lambda *a: datetime.fromisoformat(*a)
         ac.build_forecast(r, "dso")
-    data = _json.load(open(ac.FORECAST_PATH))
-    hours = [h["ts"] for h in data[r.name]["series"]]
-    assert any(h.endswith("T19:00") for h in hours), hours[:3]
-    first = data[r.name]["series"][0]
-    assert first["night"] == "2026-10-15"   # 19 Uhr gehoert zum Abend dieses Tages
+    return _json.load(open(ac.FORECAST_PATH))[r.name]
+
+
+def test_forecast_starts_at_18_local(isolated, rep):
+    """Sommer UND Winter: erste Serie-Stunde ist 18:00 lokal (Konstante,
+    nicht daemmerungsabhaengig)."""
+    from datetime import datetime
+    ac = isolated
+    for now in (datetime(2026, 7, 21, 15, 0),    # Hochsommer
+                datetime(2026, 12, 21, 15, 0)):   # Hochwinter
+        data = _mk_series_forecast(ac, rep, now)
+        first = data["series"][0]["ts"]
+        assert first.endswith("T18:00"), (now.date(), first)
+        assert data["series"][0]["night"] == f"{now:%Y-%m-%d}"
+
+
+def test_bright_hours_appear_in_forecast(isolated, rep):
+    """Helle Stunden (18-21 Uhr im Hochsommer) stehen mit dark:false in der
+    Liste - Planungsuebersicht, kein Verstecken."""
+    from datetime import datetime
+    data = _mk_series_forecast(isolated, rep, datetime(2026, 7, 21, 15, 0))
+    hours = {h["hhmm"]: h for h in data["series"]}
+    for hh in ("18:00", "19:00", "20:00"):
+        assert hh in hours, hh
+        assert hours[hh]["dark"] is False, hh
+        assert hours[hh]["ok"] is False and "hell" in hours[hh]["reasons"], hh
+
+
+def test_dark_flag_still_correct(isolated, rep):
+    """dark:true nur in astronomisch dunklen Stunden - unabhaengig vom
+    frueheren Rasterstart (22-04 dunkel, 18-21 hell)."""
+    from datetime import datetime
+    data = _mk_series_forecast(isolated, rep, datetime(2026, 7, 21, 15, 0))
+    dark_hh = {h["hhmm"] for h in data["series"] if h["dark"] is True}
+    assert dark_hh <= {"22:00", "23:00", "00:00", "01:00", "02:00",
+                       "03:00", "04:00"}, dark_hh
+    assert "22:00" in dark_hh and "21:00" not in dark_hh
