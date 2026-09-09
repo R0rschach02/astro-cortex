@@ -380,6 +380,58 @@ def api_rain_grid(bbox: str, zoom: int = 9):
 
 
 # --- Vorausschau: stündliche Reihe + Golden Window (latest-wins JSON) ---
+# --- Observable: was ist mit dem Equipment JETZT prinzipiell sichtbar ---
+@app.get("/api/observable")
+def api_observable(id: str, equipment: str,
+                   camera: Optional[str] = None,
+                   seeing: Optional[float] = None):
+    """Filtert den Objektkatalog nach Hoehe/Grenzgroesse/Nacht.
+    id= Standort (locations.json, liefert bortle_class), equipment=
+    Teleskop-Key, camera= optionaler Kamera-Key (guiding-Kameras werden
+    ignoriert), seeing= optional - sonst letzte Heavy-Messung des
+    Standorts aus der DB."""
+    import sys as _sys
+    _sys.path.insert(0, "/home/enigma")
+    from app.engine import equipment as eq_mod
+    from app.engine import observable_filter as of
+
+    try:
+        locs = ac.active_locations(ac.DEFAULT_LOCATIONS) \
+            + ac.load_watchlist()
+    except Exception as e:  # noqa: BLE001 - sichtbar geloggt
+        log.warning("[API] Standort-Lookup fehlgeschlagen: %s",
+                    type(e).__name__)
+        locs = []
+    loc = next((l for l in locs if l.get("id") == id), None)
+    if loc is None:
+        raise HTTPException(404, f"Kein Standort mit id '{id}'")
+
+    try:
+        inventory = eq_mod.load_equipment()
+        eq = eq_mod.build_equipment(inventory, equipment, camera)
+    except (SystemExit, KeyError, ValueError) as e:
+        raise HTTPException(400, f"Equipment ungueltig: {e}")
+
+    seeing_val = seeing
+    if seeing_val is None:
+        try:
+            conn = _db()
+            row = conn.execute(
+                "SELECT seeing FROM crawls WHERE location_name=? "
+                "AND seeing IS NOT NULL ORDER BY ts DESC LIMIT 1",
+                (loc["name"],)).fetchone()
+            conn.close()
+            seeing_val = row[0] if row else None
+        except Exception as e:  # noqa: BLE001 - sichtbar geloggt
+            log.warning("[API] Seeing-Lookup fehlgeschlagen: %s",
+                        type(e).__name__)
+
+    from datetime import datetime as _dtm, timezone as _tzm
+    return of.observation_summary(
+        eq, int(loc.get("bortle_class", 6)), seeing_val,
+        _dtm.now(_tzm.utc), loc["lat"], loc["lon"])
+
+
 def _norm_key(s: str) -> str:
     """Namens-Normalisierung fuer robuste Lookups: Unicode-NFC (z.B.
     umlaut-formen), Whitespace-Folding, casefold, Underscore/Bindestrich
