@@ -7,7 +7,7 @@
 
 **Letzte Aktualisierung:** 2026-09-08
 **Verifiziert durch:** Igor (Nutzer)
-**Storage-Ort des Equipment:** Bei Marcel (Garten + Keller), nicht beim Nutzer
+**Storage-Ort des Equipment:** Bei Kollaborateur (Garten + Keller), nicht beim Nutzer
 
 ---
 
@@ -90,11 +90,11 @@ https://www.lightpollutionmap.info möglich.
 
 ## Storage & Logistik
 
-- **Haupt-Storage:** Bei Marcel (Garten + Keller)
-- **Begründung:** Marcel hat einen Garten (Aufbau möglich) und einen Keller
-  (sichere Verstauung). Der Nutzer hat keinen Führerschein, Marcel ist der
+- **Haupt-Storage:** Bei Kollaborateur (Garten + Keller)
+- **Begründung:** Kollaborateur hat einen Garten (Aufbau möglich) und einen Keller
+  (sichere Verstauung). Der Nutzer hat keinen Führerschein, der Kollaborateur ist der
   Logistik-Knotenpunkt.
-- **Transport:** Bollerwagen + Auto (Marcel oder Dritter)
+- **Transport:** Bollerwagen + Auto (Kollaborateur oder Dritter)
 - **Standorte mit Übernachtung:** Gönnheim (Bernd), eventuell Königsstuhl (TBD)
 
 ---
