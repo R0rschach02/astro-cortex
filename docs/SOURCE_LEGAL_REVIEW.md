@@ -101,6 +101,50 @@ the fair-use notice covers THIRD-PARTY content only and grants nothing
 to third parties. Operators are named on the about page (inquiry
 possible). Status: UNCLARIFIED.
 
+
+## 4) VRN Open Data (ÖPNV Rhein-Neckar) — GTFS-Daten — RELEASED (mit Lücke beim Static-Feed)
+
+Checked on: 2026-09-13. Method: direct raw-HTML retrieval (curl) of
+https://www.vrn.de/opendata/ and https://opendata.vrn.de/ including the
+dataset detail pages.
+
+Places checked:
+- Portal dataset list (opendata.vrn.de): vrn-liniennetz, vrn-steige,
+  vrn-haltestellen (geojson/csv/arcgis), vrn-und-rnn-gtfs-realtime.
+- Detail page "VRN und RNN GTFS Realtime Echtzeitfahrplandaten" —
+  embedded DCAT metadata, verbatim:
+
+  > "license https://www.govdata.de/dl-de/by-2-0 spatial VRN
+  > Verbundgebiet, RNN Verbundgebiet"
+
+- Detail page "VRT GTFS-Sollfahrplandaten aktuell" — verbatim:
+
+  > "license https://www.govdata.de/dl-de/by-2-0 spatial VRT
+  > Verbundgebiet"
+
+- Probed endpoints: https://www.vrn.de/efa/ (404), efa.vrn.de (unreachable),
+  XML_TRIP_REQUEST2 on www.vrn.de (404) — no public HAFAS/EFA trip API.
+- Search for a VRN-eigenen GTFS-Static feed: NONE published. The only
+  static GTFS dataset on the portal covers the VRT network (neighbour
+  Verbund, Mainz/Wiesbaden area), NOT the VRN area (Mannheim/Pfalz).
+
+Assessment:
+- DATA LICENSE: Datenlizenz Deutschland BY-2.0 (free use including
+  commercial, attribution required) — status RELEASED for the published
+  datasets (haltestellen/steige/liniennetz, VRN+RNN realtime, VRT static).
+- GAP: no VRN GTFS-Static timetable feed is published; realtime alone is
+  insufficient for timetable planning (V1 needs schedules).
+- No public trip-planning API (EFA/HAFAS) found — connections must be
+  computed locally from GTFS-Static data.
+
+Next steps (decision needed):
+1. Ask VRN (contact via portal) whether a VRN GTFS-Static feed exists or
+   is planned; until then
+2. Fallback candidates to verify at build time: DELFI-derived Germany
+   feed (gtfs.de, covers VRN area, large) or Mobility Database VRN entry;
+   check their licenses before use. Community trip APIs (transport.rest)
+   are NOT authorised for production use and stay out.
+
 ---
 
 ## Overall status
@@ -111,6 +155,7 @@ possible). Status: UNCLARIFIED.
 | Enigma Labs  | unclarified| Ask for official API access                |
 | ufo-hunters  | unclarified| Contact the operators                      |
 | NUFORC       | not checked (CTO inquiry pending) | wait       |
+| VRN Open Data (GTFS) | released (dl-de/by-2-0), VRN-Static-Feed fehlt | VRN anfragen / DELFI-Fallback pruefen |
 
 NO source module, NO scraper for any of these sources until the
 respective status is "released" / "clarified after inquiry" and that
