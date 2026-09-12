@@ -2,6 +2,14 @@
 sichtbar? Reine Filterung (Hoehe, Grenzgroesse, Nacht) - bewusst KEINE
 Empfehlungs-Logik und keine Beobachtungsplanung.
 
+V1-Grenzen (bewusst, kein Bug, siehe docs/EQUIPMENT_INVENTORY.md):
+- Filter (UHC/narrowband/Mond) gehen NICHT in die Limiting-Magnitude-
+  Berechnung ein - sie verschieben Grenzgroessen nicht linear, sondern
+  veraendern den Kontrast je Objekttyp.
+- Barlow-Linsen fliessen ausschliesslich als Vergroesserungs-Faktor in
+  die Magnification-Korrektur von limiting_magnitude(), falls eine
+  konkrete Vergroesserung uebergeben wird - nie als "mehr Oeffnung".
+
 Nutzt skyfield + lokales de421 (identische Basis wie skyfield_source);
 Objektkoordinaten aus messier.csv (ra_hours/dec_degrees, J2000).
 """
