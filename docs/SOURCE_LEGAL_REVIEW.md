@@ -145,6 +145,42 @@ Next steps (decision needed):
    check their licenses before use. Community trip APIs (transport.rest)
    are NOT authorised for production use and stay out.
 
+
+## 5) DELFI / gtfs.de (deutschlandweiter GTFS-Static) — RELEASED (CC 4.0)
+
+Checked on: 2026-09-13. Method: direct raw-HTML retrieval (curl) of the
+feed detail page https://gtfs.de/de/feeds/de_full/.
+
+Places checked:
+- https://gtfs.de/de/feeds/de_full/ — verbatim metadata:
+
+  > "Datengrundlage NeTEx Datensatz, DELFI e.V. [...] Lizenz Creative
+  > Commons 4.0 Download"
+
+  Download (free of charge, no key/registration):
+  > //download.gtfs.de/germany/free/latest.zip
+  (Feed "Deutschland komplett": 272 MB, 1.8M trips, 674K stops,
+  last update 2026-09-12, regularly regenerated from the publicly
+  available DELFI NeTEx dataset.)
+- Secondary corroboration (not used as evidence): transitous.org sources
+  page states the gtfs.de DELFI-derived data is published under
+  CC-BY-4.0; the gtfs.de realtime page names CC BY-SA 4.0 for the RT
+  stream. The static-feed page itself says "Creative Commons 4.0"
+  without spelling out BY vs BY-SA.
+
+Assessment:
+- Status RELEASED: free download, no key, Creative Commons 4.0 with
+  attribution (DELFI e.V. as data basis, gtfs.de as publisher).
+- Open detail to confirm AT BUILD TIME from the feed's own LICENSE
+  file: exact variant (CC BY 4.0 vs CC BY-SA 4.0). Either way
+  attribution is required and either permits our non-commercial use;
+  if BY-SA, derived datasets (our bbox-filtered working cache) must
+  keep the same license — document in the generated cache header.
+- Operational note: the 272 MB full feed is filtered to the VRN region
+  at load time (bbox), so the working cache stays small. A future VRN
+  GTFS-Static feed (see source #4, VRN inquiry running) can replace
+  this source without interface changes.
+
 ---
 
 ## Overall status
