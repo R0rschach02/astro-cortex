@@ -1,0 +1,65 @@
+{
+    "telescopes": {
+        "newton_150": {
+            "name": "Skywatcher Quattro 150P",
+            "aperture_mm": 150,
+            "focal_length_mm": 600,
+            "type": "newton"
+        }
+    },
+    "cameras": {
+        "asi662mc": {
+            "name": "ZWO ASI662MC",
+            "pixel_size_um": 2.9,
+            "sensor_width_mm": 8.47,
+            "role": "imaging"
+        },
+        "canon_600d": {
+            "name": "Canon 600D",
+            "pixel_size_um": 4.3,
+            "sensor_width_mm": 22.3,
+            "role": "imaging"
+        },
+        "asi120mc_s": {
+            "name": "ZWO ASI120MC-S",
+            "role": "guiding"
+        }
+    },
+    "eyepieces": {
+        "swa_26mm": {
+            "name": "Omegon SWA 26mm 70 Grad",
+            "focal_length_mm": 26,
+            "barrel_inch": 2
+        }
+    },
+    "barlow_lenses": {
+        "omegon_ed": {
+            "name": "Omegon ED Barlow",
+            "factor_visual": 2.0,
+            "factor_photographic": 1.5,
+            "barrel_inch": 2
+        }
+    },
+    "filters": {
+        "antlia_triband": {
+            "name": "Antlia 2\" Triband RGB Ultra",
+            "type": "narrowband",
+            "barrel_inch": 2
+        },
+        "omegon_uhc": {
+            "name": "Omegon Pro UHC 2\"",
+            "type": "light_pollution",
+            "barrel_inch": 2
+        },
+        "omegon_moon": {
+            "name": "Omegon variable Polarising Mondfilter 2\"",
+            "type": "moon",
+            "barrel_inch": 2
+        },
+        "svbony_uvir": {
+            "name": "SVBONY UV/IR Sperrfilter 1.25\"",
+            "type": "uv_ir_cut",
+            "barrel_inch": 1.25
+        }
+    }
+}

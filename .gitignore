@@ -27,3 +27,7 @@
 # Bytecode niemals versionieren (Whitelist gab Verzeichnisse inkl. __pycache__ frei)
 __pycache__/
 *.pyc
+
+# Equipment-Inventar: echte Datei gitignored, Example committed (wie locations)
+/equipment.json
+!/equipment.json.example
