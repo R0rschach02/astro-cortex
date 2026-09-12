@@ -42,7 +42,7 @@ ruff check --select F821,F823,F811,E722 \
   "$WS/astro_crawler.py" "$WS/data_sanity.py" "$APP_DIR/backend/main.py" \
   || { echo "RUFF-FEHLER: Deploy abgebrochen"; exit 1; }
 ruff check --select BLE001 "$WS/data_sanity.py" \
-  "$APP_DIR/backend/lpcache.py" "$HOME/app/anomaly" \
+  "$APP_DIR/backend/lpcache.py" "$HOME/app/anomaly" "$HOME/app/sources" \
   || { echo "RUFF-FEHLER (BLE001): Deploy abgebrochen"; exit 1; }
 for m in "$WS/astro_crawler.py" "$APP_DIR/backend/main.py"; do
   n=$(ruff check --select BLE001 "$m" 2>/dev/null | grep -c BLE001 || true)
