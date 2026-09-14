@@ -188,6 +188,27 @@
    "tag": "neu",
    "desc": "Die Vorausschau zeigt jetzt jeden Abend ab 18 Uhr durchgehend - auch die hellen Stunden. So siehst du den ganzen Uebergang (18 Uhr hell -> Daemmerung -> dunkel) und kannst besser planen, wann du losfahren und aufbauen willst. Dunkle Stunden sind wie bisher markiert; Fenster fuer Deep-Sky beginnen weiterhin erst, wenn es richtig dunkel ist.",
    "usage": "Vorausschau-Tab: erste Stunde ist jetzt 18 Uhr - Sommer wie Winter"
+  },
+  {
+   "date": "2026-09-13",
+   "title": "Neuer Standort: Koenigsstuhl Heidelberg",
+   "tag": "neu",
+   "desc": "Der Koenigsstuhl ist jetzt als achter Standort dabei - Hoehenlage mit geschaetzter Bortle-Klasse 4, also deutlich dunklerer Himmel als in der Stadt. Tages-Tour von Mannheim (~20 km); es gibt dort keine Uebernachtungs-Infrastruktur. Er laeuft voll mit: Ampel, Vorausschau, Abendplan und Alarme.",
+   "usage": "Karte: neuer Marker suedlich von Heidelberg"
+  },
+  {
+   "date": "2026-09-13",
+   "title": "Neue Abfrage: Was ist mit dem Teleskop gerade sichtbar?",
+   "tag": "neu",
+   "desc": "Fuer Technik-Interessierte: Ein neuer API-Abruf (/api/observable) rechnet aus, welche Messier-Objekte vom gewaehlten Standort aus mit deinem Teleskop (150 mm) prinzipiell sichtbar sind - abhaengig von Helligkeitsgrenze (Bortle-Klasse), Seeing und Hoehe ueber dem Horizont. Reine Filterung, keine Empfehlungen. Die Anzeige in der App folgt spaeter.",
+   "usage": "API: /api/observable?id=ellerstadt_east&equipment=newton_150"
+  },
+  {
+   "date": "2026-09-14",
+   "title": "Grundstein gelegt: Anreise per Bahn einplanen",
+   "tag": "neu",
+   "desc": "Vorbereitung fuer die Frage \"Wann muss die letzte Bahn losfahren?\": Fahrplandaten (GTFS) koennen jetzt geladen und Verbindungen mit bis zu zwei Umstiegen gerechnet werden - komplett offline auf dem eigenen Rechner, auf Basis offener Daten (DELFI/VRN-Umfeld). Die Anzeige im Abendplan folgt, sobald der Fahrplan-Feed eingespielt ist.",
+   "usage": "Noch intern - API-Endpunkt und Anzeige folgen"
   }
  ]
 }

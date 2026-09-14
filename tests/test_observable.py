@@ -139,7 +139,11 @@ def test_observable_endpoint(observable_env):
     assert 11.5 <= body["limiting_magnitude"] <= 12.5
     assert body["observable_count"] == len(body["objects"])
     assert body["filter_applied"]["bortle"] == 5
-    assert all(o["altitude"] > 30 for o in body["objects"])
+    # Grenzfall: der Endpoint filtert 'alt < 30' (>= 30 bleibt); Objekte
+    # exakt auf der Kante (z.B. 30.0 nach Rundung) sind zulaessig. Der
+    # Test prueft deshalb >=, nicht strikt > (zeitabhaengige Kantenobjekte
+    # schlugen sonst je nach Ausfuehrungstag zu).
+    assert all(o["altitude"] >= 30 for o in body["objects"])
 
 
 def test_observable_endpoint_fehlerfaelle(observable_env):
