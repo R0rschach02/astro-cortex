@@ -1779,6 +1779,28 @@ def recompute_bias_corrections():
         json.dump(out, f, indent=1)
     os.replace(tmp, BIAS_PATH)
 
+    # Zeitreihe (V2): aktive Buckets zusaetzlich in bias_history -
+    # append-only, UNIQUE(computed_at, bucket) schuetzt vor Doppelticks.
+    # Inaktive Buckets (bias null) werden bewusst NICHT historisiert
+    # (Spalte NOT NULL); ihre n-Werte stehen im jeweiligen Tages-JSON.
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        for param, buckets in (("clouds", out["clouds"]),
+                               ("seeing", out["seeing"])):
+            for bucket, entry in buckets.items():
+                if entry.get("bias") is None:
+                    continue
+                conn.execute(
+                    "INSERT OR IGNORE INTO bias_history (computed_at, bucket,"
+                    " bias, sample_n) VALUES (?,?,?,?)",
+                    (out["computed_at"], f"{param}_{bucket}h",
+                     entry["bias"], entry["n"]))
+        conn.commit()
+        conn.close()
+    except Exception as e:  # noqa: BLE001 - Historie darf Kern nie blockieren
+        log.warning("[Bias] Historie-Schreiben fehlgeschlagen: %s",
+                    type(e).__name__)
+
 
 # ---------------------------------------------------------------------------
 # Teil B: Live-Abweichungswarnung (Heavy-Takt, nur in astronomischer Nacht)
@@ -2417,6 +2439,25 @@ def db_init():
         )""")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_flog_target "
                  "ON forecast_log(location_name, target_ts)")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS bias_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            computed_at TEXT NOT NULL,          -- ISO8601
+            bucket TEXT NOT NULL,               -- 'clouds_le24h'|'clouds_gt24h'|
+                                                -- 'seeing_le24h'|'seeing_gt24h'
+            bias REAL NOT NULL,                 -- nur aktive Buckets (n >= min)
+            sample_n INTEGER NOT NULL,
+            UNIQUE (computed_at, bucket)
+        )""")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_bias_history_bucket "
+                 "ON bias_history(bucket, computed_at)")
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS schema_meta (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )""")
+    conn.execute("INSERT OR IGNORE INTO schema_meta (key, value) "
+                 "VALUES ('schema_version', '2')")  # 2: bias_history + meta
     conn.execute("""
         CREATE TABLE IF NOT EXISTS dew_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -40,6 +40,10 @@ def isolated(ac, tmp_path, monkeypatch):
     monkeypatch.setattr(ac, "DB_PATH", str(tmp_path / "test.db"))
     monkeypatch.setattr(ac, "STATE_PATH", str(tmp_path / "state.json"))
     monkeypatch.setattr(ac, "DEVIATION_CSV_PATH", str(tmp_path / "dev.csv"))
+    # BIAS_PATH MUSS mit isoliert werden: vergessenes Patchen schrieb
+    # Test-Fixture-Werte in die echte ~/.astro_crawler_bias.json (Leak
+    # gefunden 2026-09-14 - Suite-Lauf überschrieb Live-Daten)
+    monkeypatch.setattr(ac, "BIAS_PATH", str(tmp_path / "bias.json"))
     ac.db_init()
     return ac
 
@@ -88,3 +92,25 @@ def forecast_env(backend, ac, tmp_path, monkeypatch):
     monkeypatch.setattr(backend.ac, "load_watchlist", lambda: [])
     from fastapi.testclient import TestClient
     return TestClient(backend.app)
+
+
+@pytest.fixture()
+def backend_env(monkeypatch, tmp_path):
+    """Backend-Modul mit tmp-DB/State fuer Endpoint-Tests (bias-history)."""
+    import importlib.util as ilu
+    import sys as _s
+    _s.path.insert(0, "/home/enigma/astro-app/backend")
+    # main.py importiert 'astro_crawler' (LIVE-Datei) - fuer Tests auf die
+    # Workspace-Instanz zeigen lassen, damit neue Schemata sofort testbar
+    # sind (Deploy haelt die Live-Datei erst nach)
+    ws = _load("t_ac", f"{WS}/astro_crawler.py")
+    _s.modules["astro_crawler"] = ws
+    spec = ilu.spec_from_file_location(
+        "backend_env", "/home/enigma/astro-app/backend/main.py")
+    mod = ilu.module_from_spec(spec)
+    _s.modules["backend_env"] = mod
+    spec.loader.exec_module(mod)
+    _s.modules["astro_crawler"] = ws
+    monkeypatch.setattr(mod.ac, "DB_PATH", str(tmp_path / "env.db"))
+    mod.ac.db_init()
+    return mod

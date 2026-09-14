@@ -432,6 +432,59 @@ def api_observable(id: str, equipment: str,
         _dtm.now(_tzm.utc), loc["lat"], loc["lon"])
 
 
+# --- Bias-Transparenz: aktuelle Werte (V1) + Zeitreihe (V2) ---
+def _bias_stats_payload() -> Optional[dict]:
+    try:
+        with open(getattr(ac, "BIAS_PATH",
+                          "/home/enigma/.astro_crawler_bias.json"),
+                  "r", encoding="utf-8") as f:
+            raw = json.load(f)
+    except (OSError, ValueError):
+        return None
+    buckets = {}
+    for param in ("clouds", "seeing"):
+        for bucket, entry in (raw.get(param) or {}).items():
+            buckets[f"{param}_{bucket}h"] = {
+                "bias": entry.get("bias"),
+                "sample_n": entry.get("n"),
+                "min_n_threshold": raw.get("min_n"),
+                "applied": entry.get("bias") is not None,
+            }
+    return {
+        "computed_at": raw.get("computed_at"),
+        "buckets": buckets,
+        "applied_to": "/api/forecast (display layer only)",
+        "not_applied_to": "rating, golden_window (intentional)",
+    }
+
+
+@app.get("/api/bias-stats")
+def api_bias_stats():
+    payload = _bias_stats_payload()
+    if payload is None:
+        raise HTTPException(503, "Bias-Daten noch nicht berechnet "
+                                 "(naechster taeglicher Lauf liefert sie)")
+    return payload
+
+
+@app.get("/api/bias-history")
+def api_bias_history(days: int = Query(30, ge=1, le=365)):
+    try:
+        conn = _db()
+        cutoff = (dt.datetime.now()
+                  - dt.timedelta(days=days)).isoformat(timespec="seconds")
+        rows = conn.execute(
+            "SELECT computed_at, bucket, bias, sample_n FROM bias_history "
+            "WHERE computed_at >= ? ORDER BY computed_at DESC, bucket",
+            (cutoff,)).fetchall()
+        conn.close()
+    except Exception as e:  # noqa: BLE001 - sichtbar geloggt
+        log.warning("[API] bias-history fehlgeschlagen: %s", type(e).__name__)
+        raise HTTPException(503, "bias_history nicht verfuegbar")
+    return [{"computed_at": r[0], "bucket": r[1], "bias": r[2],
+             "sample_n": r[3]} for r in rows]
+
+
 def _norm_key(s: str) -> str:
     """Namens-Normalisierung fuer robuste Lookups: Unicode-NFC (z.B.
     umlaut-formen), Whitespace-Folding, casefold, Underscore/Bindestrich

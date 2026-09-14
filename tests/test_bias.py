@@ -99,3 +99,110 @@ def test_bias_clamping_an_den_grenzen(forecast_env):
                             params={"id": "ellerstadt_east"}).json()
     assert body["series"][0]["clouds"] == 0
     assert body["series"][1]["clouds"] == 68
+
+
+# ---------- V1: /api/bias-stats ----------
+def test_bias_stats_returns_current_values(isolated):
+    import importlib.util as ilu, sys as _s, json as _j
+    _s.path.insert(0, "/home/enigma/astro-app/backend")
+    ac = isolated
+    # Echte Struktur: aktiver + inaktiver Bucket
+    _j.dump({"computed_at": "2026-09-14T22:00:00", "min_n": 50,
+             "clouds": {"le24": {"bias": -8.9, "n": 880}},
+             "seeing": {"le24": {"bias": None, "n": 10}}},
+            open(ac.BIAS_PATH, "w"))
+    spec = ilu.spec_from_file_location("be_bias", "/home/enigma/astro-app/backend/main.py")
+    be = ilu.module_from_spec(spec); _s.modules["be_bias"] = be
+    spec.loader.exec_module(be)
+    import pytest as _pt
+    from unittest.mock import patch as _patch
+    # Backend-ac ist die LIVE-Instanz: BIAS_PATH dorthin spiegeln (nur Lesen)
+    with _patch.object(be.ac, "BIAS_PATH", ac.BIAS_PATH):
+        payload = be._bias_stats_payload()
+    assert payload["computed_at"] == "2026-09-14T22:00:00"
+    c = payload["buckets"]["clouds_le24h"]
+    assert c["bias"] == -8.9 and c["sample_n"] == 880 and c["applied"] is True
+    assert c["min_n_threshold"] == 50
+    assert "display layer only" in payload["applied_to"]
+
+
+def test_bias_stats_low_sample_size_no_correction(isolated):
+    import importlib.util as ilu, sys as _s, json as _j
+    from unittest.mock import patch as _patch
+    ac = isolated
+    _j.dump({"computed_at": "t", "min_n": 50,
+             "clouds": {"le24": {"bias": None, "n": 10}},
+             "seeing": {}}, open(ac.BIAS_PATH, "w"))
+    spec = ilu.spec_from_file_location("be_bias2", "/home/enigma/astro-app/backend/main.py")
+    be = ilu.module_from_spec(spec); _s.modules["be_bias2"] = be
+    spec.loader.exec_module(be)
+    with _patch.object(be.ac, "BIAS_PATH", ac.BIAS_PATH):
+        payload = be._bias_stats_payload()
+    assert payload["buckets"]["clouds_le24h"]["applied"] is False
+    assert payload["buckets"]["clouds_le24h"]["bias"] is None
+
+
+# ---------- V2: bias_history ----------
+def test_bias_history_append_daily(isolated):
+    """Zwei recomputes (verschiedene computed_at) -> zwei Zeilen je Bucket;
+    nur AKTIVE Buckets werden historisiert."""
+    import json as _j
+    ac = isolated
+    conn = __import__("sqlite3").connect(ac.DB_PATH)
+    # 60 Zeilen clouds le24 (aktiv) + 10 seeing (inaktiv -> keine Zeile)
+    rows = [(12, 10, None)] * 60 + [(12, None, 0.3)] * 10
+    _seed(ac, conn, rows)
+    conn.close()
+    ac.recompute_bias_corrections()
+    # gestriger Lauf simulieren: Zeile von heute auf gestern zurueckdatieren
+    import sqlite3 as _sq0
+    c0 = _sq0.connect(ac.DB_PATH)
+    from datetime import datetime as _dt0, timedelta as _td0
+    gestern = (_dt0.now() - _td0(days=1)).isoformat(timespec="seconds")
+    c0.execute("UPDATE bias_history SET computed_at=? WHERE bucket='clouds_le24h'", (gestern,))
+    c0.commit(); c0.close()
+    st = _j.load(open(ac.STATE_PATH)); st["bias_recompute_date"] = ""
+    _j.dump(st, open(ac.STATE_PATH, "w"))
+    ac.recompute_bias_corrections()
+    import sqlite3 as _sq
+    conn = _sq.connect(ac.DB_PATH)
+    n = conn.execute("SELECT COUNT(*) FROM bias_history").fetchone()[0]
+    buckets = {r[0] for r in conn.execute("SELECT DISTINCT bucket FROM bias_history")}
+    ver = conn.execute("SELECT value FROM schema_meta WHERE key='schema_version'").fetchone()[0]
+    conn.close()
+    assert n == 2          # 2 Laeufe x 1 aktiver Bucket (clouds_le24h)
+    assert buckets == {"clouds_le24h"}
+    assert ver == "2"
+
+
+def test_bias_history_endpoint_returns_last_n_days(backend_env, tmp_path):
+    """Endpoint: nur Zeilen >= cutoff, absteigend sortiert."""
+    import sqlite3 as _sq
+    from datetime import datetime as _dt, timedelta as _td
+    from unittest.mock import patch as _patch
+    from fastapi.testclient import TestClient
+    conn = _sq.connect(backend_env.ac.DB_PATH)
+    now = _dt.now()
+    rows = [(now - _td(days=1)).isoformat(timespec="seconds"), "clouds_le24h", -9.0, 800],
+    for d, b, bi, n in [
+        ((now - _td(days=1)).isoformat(timespec="seconds"), "clouds_le24h", -9.0, 800),
+        ((now - _td(days=10)).isoformat(timespec="seconds"), "clouds_le24h", -10.0, 700),
+        ((now - _td(days=60)).isoformat(timespec="seconds"), "clouds_le24h", -12.0, 600)]:
+        conn.execute("INSERT OR IGNORE INTO bias_history (computed_at, bucket,"
+                     " bias, sample_n) VALUES (?,?,?,?)", (d, b, bi, n))
+    conn.commit(); conn.close()
+    with _patch.object(backend_env.ac, "DB_PATH", backend_env.ac.DB_PATH):
+        client = TestClient(backend_env.app)
+        r = client.get("/api/bias-history", params={"days": 30})
+        body = r.json()
+        assert r.status_code == 200 and len(body) == 2   # 60-Tage-Zeile raus
+        assert body[0]["computed_at"] >= body[1]["computed_at"]
+
+
+def test_bias_history_no_data_returns_empty_list(backend_env):
+    from unittest.mock import patch as _patch
+    from fastapi.testclient import TestClient
+    with _patch.object(backend_env.ac, "DB_PATH", backend_env.ac.DB_PATH):
+        client = TestClient(backend_env.app)
+        r = client.get("/api/bias-history", params={"days": 30})
+        assert r.status_code == 200 and r.json() == []
