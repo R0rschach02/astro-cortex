@@ -76,6 +76,10 @@ function initMap() {
   rainGridLayer = L.layerGroup().addTo(map);
   rgActive = true;
 
+  // Vorhersage-Zuverlaessigkeit + Bot-Befehle: einklappbares Widget
+  // top-left (data-cached, offline-faehig via localStorage).
+  initInfoWidget();
+
   // Zeitregler: spult die Icons durch die OM-Stundenprognose (0 = jetzt).
   // Play/Pause laeuft automatisch durch - self-rescheduling setTimeout wie
   // beim RainViewer-Loop (robuster als setInterval), kein neuer Request.
@@ -772,3 +776,170 @@ window.addEventListener("DOMContentLoaded", () => {
     navigator.serviceWorker.register("sw.js").catch(e => console.warn("SW:", e));
   }
 });
+
+
+/* ---------- Info-Widget: Vorhersage-Zuverlaessigkeit + Bot-Befehle ---------- */
+const BIAS_LABELS = {
+  clouds_le24h: ["Wolken \u226424 h", "pp", "kurzfristig"],
+  clouds_gt24h: ["Wolken >24 h", "pp", "langfristig"],
+  seeing_le24h: ["Seeing \u226424 h", "\u2033", "kurzfristig"],
+  seeing_gt24h: ["Seeing >24 h", "\u2033", "langfristig"],
+};
+const BIAS_COLORS = {
+  clouds_le24h: "#4db2ff", clouds_gt24h: "#0a4aa8",
+  seeing_le24h: "#ffd24a", seeing_gt24h: "#ff8c42",
+};
+
+function biasTendenz(bucket, bias) {
+  if (bias == null) return "zu wenig Daten \u2013 keine Korrektur aktiv";
+  const [name, unit, wo] = BIAS_LABELS[bucket] || [bucket, ""];
+  const b = Math.abs(bias);
+  if (b < 0.3) return `${name}: sehr akkurat`;
+  const richtung = bias < 0 ? "zu optimistisch" : "zu vorsichtig";
+  const staerke = b > 10 ? "deutlich" : b > 3 ? "merklich" : "leicht";
+  return `System ${richtung} (${wo}), ${staerke}: real ~${b.toFixed(1)} ${unit} ${bias < 0 ? "mehr" : "weniger"} als angesagt`;
+}
+
+function initInfoWidget() {
+  const btn = document.createElement("button");
+  btn.id = "info-widget-btn";
+  btn.title = "Vorhersage-Zuverlaessigkeit & Bot-Befehle";
+  btn.innerHTML = "\u{1F4CA}";
+  const panel = document.createElement("div");
+  panel.id = "info-widget";
+  panel.className = "hidden";
+  panel.innerHTML = `
+    <div class="iw-head">
+      <div class="iw-tabs">
+        <button class="iw-tab active" data-tab="bias">Vorhersage-Zuverlaessigkeit</button>
+        <button class="iw-tab" data-tab="bot">Telegram-Befehle</button>
+      </div>
+      <button id="iw-close" title="Schlie\u00dfen">\u2715</button>
+    </div>
+    <div id="iw-body"></div>`;
+  document.body.appendChild(btn);
+  document.body.appendChild(panel);
+  btn.addEventListener("click", () => {
+    panel.classList.toggle("hidden");
+    if (!panel.classList.contains("hidden")) loadInfoWidget();
+  });
+  panel.querySelector("#iw-close").addEventListener("click",
+    () => panel.classList.add("hidden"));
+  panel.querySelectorAll(".iw-tab").forEach(t =>
+    t.addEventListener("click", () => {
+      panel.querySelectorAll(".iw-tab").forEach(x =>
+        x.classList.toggle("active", x === t));
+      renderInfoWidget(currentInfoData, t.dataset.tab);
+    }));
+  // Klick ausserhalb schliesst (aber nicht wenn im Panel geklickt wird)
+  document.addEventListener("pointerdown", (e) => {
+    if (panel.classList.contains("hidden")) return;
+    if (panel.contains(e.target) || btn.contains(e.target)) return;
+    panel.classList.add("hidden");
+  });
+}
+
+let currentInfoData = null;   // Cache: einmal laden pro Oeffnen
+
+async function loadInfoWidget() {
+  const body = $("iw-body");
+  const cached = localStorage.getItem("astro_info_cache");
+  let data = currentInfoData;
+  if (!data) {
+    try {
+      const [stats, hist, cmds] = await Promise.all([
+        api("/api/bias-stats"), api("/api/bias-history?days=30"),
+        api("/api/telegram-commands")]);
+      data = { stats, hist, cmds };
+      currentInfoData = data;
+      localStorage.setItem("astro_info_cache", JSON.stringify(data));
+    } catch (e) {
+      console.warn("info-widget offline:", e);
+      data = cached ? JSON.parse(cached) : null;
+      if (data) data._offline = true;
+    }
+  }
+  renderInfoWidget(data, "bias");
+}
+
+function renderInfoWidget(data, tab) {
+  const body = $("iw-body");
+  if (!data) {
+    body.innerHTML = "<div class='iw-empty'>Daten noch nicht verf\u00fcgbar "
+      + "(offline und kein gespeicherter Stand).</div>";
+    return;
+  }
+  if (tab === "bot") { body.innerHTML = iwBotHtml(data.cmds); return; }
+  body.innerHTML = iwBiasHtml(data.stats, data.hist, !!data._offline);
+}
+
+function iwBiasHtml(stats, hist, offline) {
+  if (!stats || !stats.buckets) return "<div class='iw-empty'>Noch keine "
+    + "Bias-Daten berechnet.</div>";
+  const cards = Object.entries(BIAS_LABELS).map(([k, [name, unit]]) => {
+    const b = stats.buckets[k] || {};
+    const bias = b.bias == null ? "\u2013" : `${b.bias > 0 ? "+" : ""}${b.bias.toFixed(2)} ${unit}`;
+    const n = b.sample_n != null ? `n=${b.sample_n}` : "";
+    return `<div class="iw-card ${b.applied ? "" : "iw-inactive"}">
+      <div class="iw-card-name">${name}</div>
+      <div class="iw-card-val">${bias}</div>
+      <div class="iw-card-n">${n}${b.applied === false ? " \u00b7 zu wenig Daten" : ""}</div>
+      <div class="iw-card-tendenz">${biasTendenz(k, b.bias)}</div>
+    </div>`;
+  }).join("");
+  return `
+    <div class="iw-sub">Wie genau stimmen die Prognosen?
+      ${offline ? "<span class='iw-offline'>(offline: letzter Stand)</span>"
+                : ""} \u00b7 Stand: ${esc(stats.computed_at || "?")}</div>
+    <div class="iw-cards">${cards}</div>
+    <div class="iw-chart-title">Entwicklung (30 Tage) \u2014 Abweichung = Prognose vs. Realit\u00e4t</div>
+    ${iwChartSvg(hist || [])}
+    <div class="iw-note">Das System sagt tendenziell ${Math.abs((stats.buckets.clouds_le24h || {}).bias || 0) > 3 ? "zu optimistische Wolkenprognosen" : "gute Wolkenprognosen"}. Seeing ist sehr akkurat. Die Korrektur wird t\u00e4glich berechnet und in der Anzeige angewendet.</div>
+    <div class="iw-foot">Korrektur auf Anzeige angewendet, nicht auf Rating. Rating bleibt bewusst unkorrigiert, bis sich die Korrektur bew\u00e4hrt hat.</div>`;
+}
+
+function iwChartSvg(hist) {
+  // Kleines Mehrfach-Liniendiagramm als Inline-SVG (keine externe Lib).
+  const W = 320, H = 120, PAD = 6;
+  const buckets = Object.keys(BIAS_COLORS);
+  const points = {};
+  buckets.forEach(b => points[b] = []);
+  const dates = [...new Set(hist.map(h => h.computed_at.slice(0, 10)))].sort();
+  hist.forEach(h => (points[h.bucket] || []).push(h));
+  const vals = hist.filter(h => buckets.includes(h.bucket)).map(h => h.bias);
+  if (!vals.length || dates.length < 2)
+    return "<div class='iw-empty'>Zeitreihe entsteht \u2013 ab dem zweiten "
+      + "Tag sehen Sie hier die Entwicklung.</div>";
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (hi - lo < 1) { hi += 0.5; lo -= 0.5; }
+  const x = d => PAD + (W - 2 * PAD) * (dates.indexOf(d.slice(0, 10)) / (dates.length - 1));
+  const y = v => PAD + (H - 2 * PAD) * (1 - (v - lo) / (hi - lo));
+  const zero = lo < 0 && hi > 0
+    ? `<line x1="${PAD}" x2="${W - PAD}" y1="${y(0)}" y2="${y(0)}" stroke="#666" stroke-dasharray="2 3" stroke-width="0.7"/>` : "";
+  const lines = buckets.map(b => {
+    const pts = points[b].slice().sort((a, c) => a.computed_at < c.computed_at ? -1 : 1);
+    if (!pts.length) return "";
+    const path = pts.map((p, i) =>
+      `${i ? "L" : "M"}${x(p.computed_at).toFixed(1)},${y(p.bias).toFixed(1)}`).join(" ");
+    const dots = pts.map(p =>
+      `<circle cx="${x(p.computed_at).toFixed(1)}" cy="${y(p.bias).toFixed(1)}" r="2.4" fill="${BIAS_COLORS[b]}"><title>${b} ${p.bias} (n=${p.sample_n})</title></circle>`).join("");
+    return `<path d="${path}" fill="none" stroke="${BIAS_COLORS[b]}" stroke-width="1.6"/>${dots}`;
+  }).join("");
+  const legend = buckets.map(b =>
+    `<span><i style="background:${BIAS_COLORS[b]}"></i>${BIAS_LABELS[b][0]}</span>`).join("");
+  return `<div class="iw-chart"><svg viewBox="0 0 ${W} ${H}" role="img">${zero}${lines}</svg>
+    <div class="iw-legend">${legend}</div></div>`;
+}
+
+function iwBotHtml(cmds) {
+  const list = (cmds && cmds.commands) || [];
+  return `
+    <div class="iw-sub">Was der Bot kann</div>
+    <table class="iw-cmds">${list.map(c => `
+      <tr><td class="iw-cmd">${esc(c.command)}${c.usage ? "<br><small>" + esc(c.usage) + "</small>" : ""}</td>
+          <td>${esc(c.description)}</td></tr>`).join("")}
+    </table>
+    <div class="iw-note">Alle Befehle funktionieren direkt im Chat mit
+      ${esc((cmds && cmds.bot_name) || "@AstroCrawler007bot")}.
+      Schreibe einfach /help, dann bekommst du diese Liste.</div>`;
+}

@@ -485,6 +485,16 @@ def api_bias_history(days: int = Query(30, ge=1, le=365)):
              "sample_n": r[3]} for r in rows]
 
 
+@app.get("/api/telegram-commands")
+def api_telegram_commands():
+    """Befehls-Referenz des Bots (read-only) - gespeist aus der gleichen
+    Konstante, gegen die der Sync-Test die Handler prueft."""
+    return {
+        "bot_name": "@AstroCrawler007bot",
+        "commands": getattr(ac, "TELEGRAM_COMMANDS", []),
+    }
+
+
 def _norm_key(s: str) -> str:
     """Namens-Normalisierung fuer robuste Lookups: Unicode-NFC (z.B.
     umlaut-formen), Whitespace-Folding, casefold, Underscore/Bindestrich

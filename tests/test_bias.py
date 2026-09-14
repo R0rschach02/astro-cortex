@@ -206,3 +206,33 @@ def test_bias_history_no_data_returns_empty_list(backend_env):
         client = TestClient(backend_env.app)
         r = client.get("/api/bias-history", params={"days": 30})
         assert r.status_code == 200 and r.json() == []
+
+
+# ---------- /api/telegram-commands ----------
+def test_api_telegram_commands(backend_env):
+    from fastapi.testclient import TestClient
+    client = TestClient(backend_env.app)
+    r = client.get("/api/telegram-commands")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["bot_name"] == "@AstroCrawler007bot"
+    assert len(body["commands"]) >= 12
+    first = body["commands"][0]
+    assert first["command"].startswith("/") and first["description"]
+
+
+def test_telegram_commands_complete():
+    """Sync: jeder im Dispatch behandelte Befehl hat einen Eintrag in
+    TELEGRAM_COMMANDS (und umgekehrt) - UI zeigt nie Phantom-Befehle."""
+    import importlib.util as ilu, sys as _s, re as _re
+    spec = ilu.spec_from_file_location(
+        "ac_cmds", "/home/enigma/.zcode/workspace/default/astro_crawler.py")
+    m = ilu.module_from_spec(spec); _s.modules["ac_cmds"] = m
+    spec.loader.exec_module(m)
+    src = open("/home/enigma/.zcode/workspace/default/astro_crawler.py",
+               encoding="utf-8").read()
+    dispatched = set(_re.findall(r'cmd == "(/[a-z]+)"', src))
+    documented = {c["command"] for c in m.TELEGRAM_COMMANDS}
+    assert dispatched - {"/start"} == documented, \
+        f"Dispatch ohne Doku: {dispatched - documented} | " \
+        f"Doku ohne Dispatch: {documented - dispatched}"

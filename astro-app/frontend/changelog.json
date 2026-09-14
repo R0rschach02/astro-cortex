@@ -209,6 +209,13 @@
    "tag": "neu",
    "desc": "Vorbereitung fuer die Frage \"Wann muss die letzte Bahn losfahren?\": Fahrplandaten (GTFS) koennen jetzt geladen und Verbindungen mit bis zu zwei Umstiegen gerechnet werden - komplett offline auf dem eigenen Rechner, auf Basis offener Daten (DELFI/VRN-Umfeld). Die Anzeige im Abendplan folgt, sobald der Fahrplan-Feed eingespielt ist.",
    "usage": "Noch intern - API-Endpunkt und Anzeige folgen"
+  },
+  {
+   "date": "2026-09-14",
+   "title": "Neu: Wie zuverlaessig sind die Vorhersagen?",
+   "tag": "neu",
+   "desc": "Oben links gibt es jetzt ein kleines Diagramm-Symbol. Dahinter: Wie genau die Wetter-Vorhersagen stimmen (gemessen an vergangenen Abweichungen, taeglich aktualisiert) und eine Liste aller Telegram-Bot-Befehle mit Erklaerung. Einfach antippen - die Ansicht klaert auf, wie stark die Anzeige automatisch nachkorrigiert wird (Wolken werden z.B. real oft ~9% trueber als angesagt).",
+   "usage": "Karte: Symbol oben links antippen; zwei Reiter (Zuverlaessigkeit / Bot-Befehle)"
   }
  ]
 }

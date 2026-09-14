@@ -3506,6 +3506,49 @@ def cmd_mode(args) -> str:
             "Temperatur/Feuchte als Ampel.")
 
 
+# Bot-Befehls-Referenz (Single Source fuer /api/telegram-commands und
+# HELP_TEXT-Verwandtschaft). Muss mit dem Dispatch in handle_command
+# synchron bleiben - test_telegram_commands_complete sichert das.
+TELEGRAM_COMMANDS = [
+    {"command": "/status", "description":
+        "Aktueller Status aller Standorte: Ampel (GO/MAYBE/NO-GO) mit Wolken, "
+        "Seeing, Regen und Radar auf einen Blick"},
+    {"command": "/spots", "description":
+        "Kurze Liste aller Standorte mit Koordinaten (fuer /watch etc.)"},
+    {"command": "/watch", "usage": "/watch 49.4 8.5 [Stunden]",
+     "description":
+        "Live-Standort temporär beobachten lassen (z.B. unterwegs); "
+        "Standard 2 Stunden"},
+    {"command": "/unwatch", "description":
+        "Live-Beobachtung wieder beenden"},
+    {"command": "/rate", "usage": "/rate 1-5 [Kommentar]",
+     "description":
+        "Beobachtung bewerten (1 schlecht - 5 top). Sammelt Lern-Daten "
+        "fuer das Modell"},
+    {"command": "/mode", "description":
+        "Zwischen DSO- und Planeten-Modus umschalten (andere Bewertung)"},
+    {"command": "/clear", "usage": "/clear 49.4 8.5",
+     "description":
+        "Wolken-Entwicklung für eine Position abfragen"},
+    {"command": "/session", "usage": "/session [Standort]",
+     "description":
+        "Beobachtungs-Session starten/stoppen (trackt Beschlag, Wind-"
+        "Eskalation, Abweichungen live mit)"},
+    {"command": "/track", "usage": "/track Messier-Nummer",
+     "description":
+        "Objekt-Transit beobachten (wann kulminiert es, Meridian-Flip-"
+        "Warnung)"},
+    {"command": "/callsheet", "usage": "/callsheet [49.4 8.5]",
+     "description":
+        "Abendzettel: Golden Window, Ziel-Vorschlag, Mond - kompakt fuer "
+        "den Trip zum Standort"},
+    {"command": "/dew", "description":
+        "Beschlag-Prognose (Taupunkt-Abstand) fuer alle Standorte"},
+    {"command": "/help", "description":
+        "Diese Befehlsliste"},
+]
+
+
 async def handle_command(text: str, state) -> Optional[str]:
     parts = text.split()
     cmd = parts[0].split("@")[0].lower()   # auch '/cmd@botname' erlauben
