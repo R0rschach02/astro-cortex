@@ -848,7 +848,7 @@ async function loadInfoWidget() {
   if (!data) {
     try {
       const [stats, hist, cmds] = await Promise.all([
-        api("/api/bias-stats"), api("/api/bias-history?days=30"),
+        api("/api/bias-stats"), api("/api/bias-history?days=365"),
         api("/api/telegram-commands")]);
       data = { stats, hist, cmds };
       currentInfoData = data;
@@ -892,7 +892,7 @@ function iwBiasHtml(stats, hist, offline) {
       ${offline ? "<span class='iw-offline'>(offline: letzter Stand)</span>"
                 : ""} \u00b7 Stand: ${esc(stats.computed_at || "?")}</div>
     <div class="iw-cards">${cards}</div>
-    <div class="iw-chart-title">Entwicklung (30 Tage) \u2014 Abweichung = Prognose vs. Realit\u00e4t</div>
+    <div class="iw-chart-title">Gesamter Zeitverlauf \u2014 Abweichung = Prognose vs. Realit\u00e4t</div>
     ${iwChartSvg(hist || [])}
     <div class="iw-note">Das System sagt tendenziell ${Math.abs((stats.buckets.clouds_le24h || {}).bias || 0) > 3 ? "zu optimistische Wolkenprognosen" : "gute Wolkenprognosen"}. Seeing ist sehr akkurat. Die Korrektur wird t\u00e4glich berechnet und in der Anzeige angewendet.</div>
     <div class="iw-foot">Korrektur auf Anzeige angewendet, nicht auf Rating. Rating bleibt bewusst unkorrigiert, bis sich die Korrektur bew\u00e4hrt hat.</div>`;
@@ -925,10 +925,22 @@ function iwChartSvg(hist) {
       `<circle cx="${x(p.computed_at).toFixed(1)}" cy="${y(p.bias).toFixed(1)}" r="2.4" fill="${BIAS_COLORS[b]}"><title>${b} ${p.bias} (n=${p.sample_n})</title></circle>`).join("");
     return `<path d="${path}" fill="none" stroke="${BIAS_COLORS[b]}" stroke-width="1.6"/>${dots}`;
   }).join("");
+  const last = {};
+  buckets.forEach(b => {
+    const s = points[b].slice().sort((a, c) =>
+      a.computed_at < c.computed_at ? -1 : 1);
+    if (s.length) last[b] = s[s.length - 1];
+  });
+  const fmtV = (b, v) => v == null ? "\u2013"
+    : `${v > 0 ? "+" : ""}${v.toFixed(b.startsWith("clouds") ? 1 : 2)}`;
   const legend = buckets.map(b =>
-    `<span><i style="background:${BIAS_COLORS[b]}"></i>${BIAS_LABELS[b][0]}</span>`).join("");
+    `<span class="${last[b] ? "" : "iw-legend-empty"}">
+       <i style="background:${BIAS_COLORS[b]}"></i>${BIAS_LABELS[b][0]}
+       ${last[b] ? `<b>${fmtV(b, last[b].bias)}</b>` : "(keine Daten)"}
+     </span>`).join("");
+  const span = `<div class="iw-chart-span">${dates[0].slice(5)} \u2013 ${dates[dates.length - 1].slice(5)} (${dates.length} Tage)</div>`;
   return `<div class="iw-chart"><svg viewBox="0 0 ${W} ${H}" role="img">${zero}${lines}</svg>
-    <div class="iw-legend">${legend}</div></div>`;
+    <div class="iw-legend">${legend}</div>${span}</div>`;
 }
 
 function iwBotHtml(cmds) {

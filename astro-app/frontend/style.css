@@ -302,13 +302,13 @@ body.night .leaflet-pane .rv-tile { filter: brightness(0.7); }
 
 /* ---- Info-Widget: Vorhersage-Zuverlaessigkeit + Bot-Befehle (top-left) ---- */
 #info-widget-btn {
-  position: absolute; top: 10px; left: 10px; z-index: 1200;
+  position: absolute; top: 58px; right: 10px; z-index: 1200;
   width: 40px; height: 40px; border-radius: 10px; font-size: 18px;
   background: rgba(15, 20, 28, .82); border: 1px solid #2c3542;
   color: var(--text); cursor: pointer;
 }
 #info-widget {
-  position: absolute; top: 58px; left: 10px; z-index: 1190;
+  position: absolute; top: 104px; right: 10px; z-index: 1190;
   width: min(360px, 80vw); max-height: 72vh; overflow-y: auto;
   background: rgba(12, 16, 23, .94); border: 1px solid #2c3542;
   border-radius: 12px; padding: 10px 12px;
@@ -349,3 +349,8 @@ body.night .leaflet-pane .rv-tile { filter: brightness(0.7); }
 .iw-offline { color: #ffd24a; }
 body.night #info-widget-btn { background: rgba(20, 8, 8, .9);
   border-color: #3a2020; }
+#info-widget.hidden { display: none; }
+.iw-chart-span { font-size: 10px; color: var(--text-dim); text-align: right;
+  margin-top: 2px; }
+.iw-legend b { color: var(--text); font-weight: 700; }
+.iw-legend-empty { opacity: .5; }
