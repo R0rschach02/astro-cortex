@@ -447,6 +447,8 @@ def _bias_stats_payload() -> Optional[dict]:
             buckets[f"{param}_{bucket}h"] = {
                 "bias": entry.get("bias"),
                 "sample_n": entry.get("n"),
+                "bias_7d": entry.get("bias_7d"),
+                "n_7d": entry.get("n_7d"),
                 "min_n_threshold": raw.get("min_n"),
                 "applied": entry.get("bias") is not None,
             }
@@ -474,7 +476,8 @@ def api_bias_history(days: int = Query(30, ge=1, le=365)):
         cutoff = (dt.datetime.now()
                   - dt.timedelta(days=days)).isoformat(timespec="seconds")
         rows = conn.execute(
-            "SELECT computed_at, bucket, bias, sample_n FROM bias_history "
+            "SELECT computed_at, bucket, bias, sample_n, bias_7d, n_7d "
+            "FROM bias_history "
             "WHERE computed_at >= ? ORDER BY computed_at DESC, bucket",
             (cutoff,)).fetchall()
         conn.close()
@@ -482,7 +485,9 @@ def api_bias_history(days: int = Query(30, ge=1, le=365)):
         log.warning("[API] bias-history fehlgeschlagen: %s", type(e).__name__)
         raise HTTPException(503, "bias_history nicht verfuegbar")
     return [{"computed_at": r[0], "bucket": r[1], "bias": r[2],
-             "sample_n": r[3]} for r in rows]
+             "sample_n": r[3],
+             "bias_7d": r[4] if len(r) > 4 else None,
+             "n_7d": r[5] if len(r) > 5 else None} for r in rows]
 
 
 @app.get("/api/telegram-commands")

@@ -880,11 +880,15 @@ function iwBiasHtml(stats, hist, offline) {
     const b = stats.buckets[k] || {};
     const bias = b.bias == null ? "\u2013" : `${b.bias > 0 ? "+" : ""}${b.bias.toFixed(2)} ${unit}`;
     const n = b.sample_n != null ? `n=${b.sample_n}` : "";
+    const b7 = b.bias_7d != null
+      ? `${b.bias_7d > 0 ? "+" : ""}${b.bias_7d.toFixed(k.startsWith("clouds") ? 1 : 2)} ${unit} <small>(7&nbsp;Tage)</small>`
+      : "<small>7-Tage-Wert: zu wenig Daten</small>";
     return `<div class="iw-card ${b.applied ? "" : "iw-inactive"}">
       <div class="iw-card-name">${name}</div>
-      <div class="iw-card-val">${bias}</div>
+      <div class="iw-card-val">${bias} <small>insgesamt</small></div>
+      <div class="iw-card-val iw-card-7d">${b7}</div>
       <div class="iw-card-n">${n}${b.applied === false ? " \u00b7 zu wenig Daten" : ""}</div>
-      <div class="iw-card-tendenz">${biasTendenz(k, b.bias)}</div>
+      <div class="iw-card-tendenz">${biasTendenz(k, b.bias_7d != null ? b.bias_7d : b.bias)}</div>
     </div>`;
   }).join("");
   return `
@@ -893,6 +897,7 @@ function iwBiasHtml(stats, hist, offline) {
                 : ""} \u00b7 Stand: ${esc(stats.computed_at || "?")}</div>
     <div class="iw-cards">${cards}</div>
     <div class="iw-chart-title">Gesamter Zeitverlauf \u2014 Abweichung = Prognose vs. Realit\u00e4t</div>
+    <div class="iw-chart-hint">Kr\u00e4ftige Linie: letzte 7 Tage (Treffsicherheit jetzt) \u00b7 d\u00fcnn gestrichelt: Gesamtdurchschnitt (Referenz)</div>
     ${iwChartSvg(hist || [])}
     <div class="iw-note">Das System sagt tendenziell ${Math.abs((stats.buckets.clouds_le24h || {}).bias || 0) > 3 ? "zu optimistische Wolkenprognosen" : "gute Wolkenprognosen"}. Seeing ist sehr akkurat. Die Korrektur wird t\u00e4glich berechnet und in der Anzeige angewendet.</div>
     <div class="iw-foot">Korrektur auf Anzeige angewendet, nicht auf Rating. Rating bleibt bewusst unkorrigiert, bis sich die Korrektur bew\u00e4hrt hat.</div>`;
@@ -916,14 +921,24 @@ function iwChartSvg(hist) {
   const y = v => PAD + (H - 2 * PAD) * (1 - (v - lo) / (hi - lo));
   const zero = lo < 0 && hi > 0
     ? `<line x1="${PAD}" x2="${W - PAD}" y1="${y(0)}" y2="${y(0)}" stroke="#666" stroke-dasharray="2 3" stroke-width="0.7"/>` : "";
+  // Y-Skala aus BEIDEN Wertreihen (7T + gesamt)
+  const allVals = hist.flatMap(h => buckets.includes(h.bucket)
+    ? [h.bias, h.bias_7d].filter(v => v != null) : []);
+  let lo2 = Math.min(...allVals), hi2 = Math.max(...allVals);
+  if (hi2 - lo2 < 1) { hi2 += 0.5; lo2 -= 0.5; }
+  lo = lo2; hi = hi2;
   const lines = buckets.map(b => {
     const pts = points[b].slice().sort((a, c) => a.computed_at < c.computed_at ? -1 : 1);
     if (!pts.length) return "";
-    const path = pts.map((p, i) =>
-      `${i ? "L" : "M"}${x(p.computed_at).toFixed(1)},${y(p.bias).toFixed(1)}`).join(" ");
-    const dots = pts.map(p =>
-      `<circle cx="${x(p.computed_at).toFixed(1)}" cy="${y(p.bias).toFixed(1)}" r="2.4" fill="${BIAS_COLORS[b]}"><title>${b} ${p.bias} (n=${p.sample_n})</title></circle>`).join("");
-    return `<path d="${path}" fill="none" stroke="${BIAS_COLORS[b]}" stroke-width="1.6"/>${dots}`;
+    const mk = (key, width, dash) => pts
+      .filter(p => p[key] != null)
+      .map((p, i, arr) => `${arr.length - 1 - i ? "L" : "M"}${x(p.computed_at).toFixed(1)},${y(p[key]).toFixed(1)}`)
+      .join(" ");
+    const dots = pts.filter(p => p.bias_7d != null).map(p =>
+      `<circle cx="${x(p.computed_at).toFixed(1)}" cy="${y(p.bias_7d).toFixed(1)}" r="2.6" fill="${BIAS_COLORS[b]}"><title>${b}: 7T ${p.bias_7d} (n=${p.n_7d}) | gesamt ${p.bias} (n=${p.sample_n})</title></circle>`).join("");
+    const gesamt = `<path d="${mk("bias", 1.6, "")}" fill="none" stroke="${BIAS_COLORS[b]}" stroke-width="1.0" stroke-dasharray="3 3" opacity=".65"/>`;
+    const rolling = `<path d="${mk("bias_7d", 1.6, "")}" fill="none" stroke="${BIAS_COLORS[b]}" stroke-width="2.2"/>`;
+    return gesamt + rolling + dots;
   }).join("");
   const last = {};
   buckets.forEach(b => {
@@ -933,11 +948,13 @@ function iwChartSvg(hist) {
   });
   const fmtV = (b, v) => v == null ? "\u2013"
     : `${v > 0 ? "+" : ""}${v.toFixed(b.startsWith("clouds") ? 1 : 2)}`;
-  const legend = buckets.map(b =>
-    `<span class="${last[b] ? "" : "iw-legend-empty"}">
-       <i style="background:${BIAS_COLORS[b]}"></i>${BIAS_LABELS[b][0]}
-       ${last[b] ? `<b>${fmtV(b, last[b].bias)}</b>` : "(keine Daten)"}
-     </span>`).join("");
+  const legend = buckets.map(b => {
+    if (!last[b]) return `<span class="iw-legend-empty">
+       <i style="background:${BIAS_COLORS[b]}"></i>${BIAS_LABELS[b][0]} (keine Daten)</span>`;
+    const v7 = last[b].bias_7d != null ? fmtV(b, last[b].bias_7d) : "\u2013";
+    return `<span><i style="background:${BIAS_COLORS[b]}"></i>${BIAS_LABELS[b][0]}
+       <b>${v7}</b> / gesamt ${fmtV(b, last[b].bias)}</span>`;
+  }).join("");
   const span = `<div class="iw-chart-span">${dates[0].slice(5)} \u2013 ${dates[dates.length - 1].slice(5)} (${dates.length} Tage)</div>`;
   return `<div class="iw-chart"><svg viewBox="0 0 ${W} ${H}" role="img">${zero}${lines}</svg>
     <div class="iw-legend">${legend}</div>${span}</div>`;

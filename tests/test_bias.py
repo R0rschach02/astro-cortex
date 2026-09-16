@@ -172,7 +172,13 @@ def test_bias_history_append_daily(isolated):
     conn.close()
     assert n == 2          # 2 Laeufe x 1 aktiver Bucket (clouds_le24h)
     assert buckets == {"clouds_le24h"}
-    assert ver == "2"
+    assert ver == "3"      # v3: rolling bias_7d/n_7d-Spalten
+    # Rolling-Fenster: alle 60 Zeilen liegen innerhalb 7 Tagen -> bias_7d
+    # muss dem kumulativen Mittel (+4.0) entsprechen, n_7d=60
+    conn = _sq.connect(ac.DB_PATH)
+    row = conn.execute("SELECT bias, bias_7d, n_7d FROM bias_history "
+                       "WHERE bucket='clouds_le24h' ORDER BY computed_at DESC").fetchone()
+    assert row[0] == 10.0 and row[1] == 10.0 and row[2] == 60, row
 
 
 def test_bias_history_endpoint_returns_last_n_days(backend_env, tmp_path):
@@ -236,3 +242,24 @@ def test_telegram_commands_complete():
     assert dispatched - {"/start"} == documented, \
         f"Dispatch ohne Doku: {dispatched - documented} | " \
         f"Doku ohne Dispatch: {documented - dispatched}"
+
+
+# ---------- Zeitzonen-Regression: BrightSky-Einzelstunde (Lesson 17-Fall) ----------
+def test_brightsky_hour_clouds_utc_timestamps(isolated):
+    """BrightSky antwortet UTC-Timestamps; target ist lokal. Vor dem Fix
+    warf der aware-naive-Vergleich still TypeError (seit 23.08. Wolken-
+    Verify tot). Hier laeuft die ECHTE Funktion, nur der HTTP-Layer ist
+    injiziert."""
+    from datetime import datetime as _dt
+    ac = isolated
+    calls = []
+    def fake_http(url, timeout=10, retries=2):
+        calls.append(url)
+        return {"weather": [
+            {"timestamp": "2026-09-15T18:00:00+00:00", "cloud_cover": 20},  # 20:00 MESZ
+            {"timestamp": "2026-09-15T17:00:00+00:00", "cloud_cover": 80}]}  # 19:00 MESZ
+    ac.http_get_json = fake_http
+    val = ac._brightsky_hour_clouds(49.46, 8.26,
+                                    _dt(2026, 9, 15, 20, 0))
+    assert val == 20, f"20:00 MESZ muss cloud_cover=20 treffen, got {val}"
+    assert "date=2026-09-15T17" in calls[0] or "17%3A30" in calls[0], calls[0]

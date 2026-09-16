@@ -228,3 +228,18 @@ das Deploy-Gate gebrochen).
  -> Meta: Auch der Behebungsversuch hatte einen Bug (zeilenbasierter
     Patch ersetzte Handler-Bodies mit) - nach jedem Massenpatch
     py_compile VOR weiteren Schritten laufen lassen.
+
+## 18. Gruener Test auf Mock + never-live-geprueft = 3 Wochen tote Metrik
+ _brightsky_hour_clouds (Wolken-Einzelstunden-Verifikation) warf seit dem
+ 23.08. in JEDEM Lauf einen aware-naive TypeError (BrightSky liefert
+ UTC-Timestamps, target ist lokal naive) - still gefangen vom breiten
+ except, immer None. 34.659 Verification-Zeilen ohne err_clouds, der
+ Wolken-Bias eingefroren (n=880), der Graph bekam recht. Der Test der
+ Einfuehrungsrunde mockte EXAKT die Funktion, die live brach - gruen auf
+ Mock ist kein Live-Beweis. Gefunden erst, weil der Nutzer sich ueber
+ fehlende Steigung im Bias-Chart wunderte.
+ -> Web-Quellen-Funktionen mindestens einmal live gegen die echte API
+    testen (curl-aehnlicher Smoke), Zeitzonen bei allen Zeitvergleichen
+    explizit normalisieren; Mock-Tests duerfen nie als einziger Beweis
+    fuer Netzwerkcode gelten. LESSONS-17-Klasse (broad except stielt den
+    Fehler), verschchaerft um die Mock-Luecke.

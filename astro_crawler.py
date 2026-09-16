@@ -1376,7 +1376,8 @@ def check_wind_alert(reports: list):
 # ---------------------------------------------------------------------------
 FORECAST_VERIFY_TOL_MIN = 20   # Matching-Toleranz um target_ts
 FORECAST_VERIFY_TIMEOUT_H = 24  # aelter ohne Match -> final matched=0
-FORECAST_VERIFY_BATCH = 2000   # Zeilen pro Tageslauf (Rest kommt morgen)
+FORECAST_VERIFY_BATCH = 60000  # hoeher seit 16.09.: Nachverifikation des
+                               # Wolken-Ausfalls seit 23.08. (sonst 2000)
 
 
 def _nearest_crawl(conn, loc, target, modes):
@@ -1506,19 +1507,29 @@ def _brightsky_hour_clouds(lat: float, lon: float, target) -> Optional[int]:
     den 5h-Worst-Case aus crawls (Befund B: Worst-Case-Ist vs. Einzelstunden-
     Vorhersage erzeugte strukturelle +-100pp-Differenzen)."""
     try:
-        date = target.strftime("%Y-%m-%dT%H:00")
+        # BrightSky interpretiert date/last_date als UTC - die Zielstunde
+        # ist lokal naive: nach UTC wandeln, +/-30 min Fenster fragen
+        t_utc = target.replace(tzinfo=_berlin()).astimezone(timezone.utc)
         params = urllib.parse.urlencode(
             {"lat": round(lat, 6), "lon": round(lon, 6),
-             "date": date, "last_date": date})
+             "date": (t_utc - timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M"),
+             "last_date": (t_utc + timedelta(minutes=30)).strftime("%Y-%m-%dT%H:%M")})
         data = http_get_json(f"https://api.brightsky.dev/weather?{params}",
                              timeout=10)
         rows = [w for w in (data.get("weather") or [])
                 if w.get("cloud_cover") is not None]
         if not rows:
             return None
+        # BrightSky liefert UTC-Timestamps (+00:00), target ist lokal naive:
+        # bewusst nach Europe/Berlin normalisieren (Lesson: aware-naive-
+        # Vergleich warf seit 23.08. still TypeError -> Wolken-Verify tot)
+        def _local_naive(ts_s):
+            ts = datetime.fromisoformat(ts_s)
+            if ts.tzinfo is not None:
+                ts = ts.astimezone(_berlin()).replace(tzinfo=None)
+            return ts
         best = min(rows, key=lambda w: abs(
-            (datetime.fromisoformat(w["timestamp"]) - target
-             ).total_seconds()))
+            (_local_naive(w["timestamp"]) - target).total_seconds()))
         return best["cloud_cover"]
     except (ValueError, TypeError, KeyError):
         return None
@@ -1739,6 +1750,20 @@ def recompute_bias_corrections():
 
     try:
         conn = sqlite3.connect(DB_PATH)
+        since7 = (datetime.now() - timedelta(days=7)
+                  ).isoformat(timespec="seconds")
+        rows7 = dict()   # (param, bucket) -> {"mean":.., "n":..}
+        for r7 in conn.execute(
+                "SELECT CASE WHEN fl.lead_hours <= 24 THEN 'le24' ELSE 'gt24' END,"
+                "       AVG(CASE WHEN v.err_clouds IS NOT NULL THEN v.err_clouds END),"
+                "       SUM(CASE WHEN v.err_clouds IS NOT NULL THEN 1 ELSE 0 END),"
+                "       AVG(CASE WHEN v.err_seeing IS NOT NULL THEN v.err_seeing END),"
+                "       SUM(CASE WHEN v.err_seeing IS NOT NULL THEN 1 ELSE 0 END) "
+                "FROM forecast_verification v "
+                "JOIN forecast_log fl ON fl.id = v.forecast_log_id "
+                "WHERE v.matched = 1 AND v.verified_at >= ? GROUP BY 1",
+                (since7,)):
+            rows7[r7[0]] = r7
         rows = conn.execute(
             "SELECT CASE WHEN fl.lead_hours <= 24 THEN 'le24' ELSE 'gt24' END,"
             "       SUM(CASE WHEN v.err_clouds IS NOT NULL THEN 1 ELSE 0 END),"
@@ -1764,9 +1789,16 @@ def recompute_bias_corrections():
             if n is None or mean is None:
                 continue
             active = n >= BIAS_MIN_N
+            r7 = rows7.get(bucket)
+            if param == "clouds":
+                m7, n7 = r7[1], r7[2] if r7 else (None, 0)
+            else:
+                m7, n7 = r7[3], r7[4] if r7 else (None, 0)
             out[param][bucket] = {
                 "bias": round(mean, 2) if active else None,
                 "n": n,
+                "bias_7d": round(m7, 2) if (m7 is not None and n7 >= 20) else None,
+                "n_7d": n7 or 0,
             }
             log.info("[Bias] %s %s: %s (n=%d%s)",
                      "Wolken-Korrektur" if param == "clouds"
@@ -1791,10 +1823,11 @@ def recompute_bias_corrections():
                 if entry.get("bias") is None:
                     continue
                 conn.execute(
-                    "INSERT OR IGNORE INTO bias_history (computed_at, bucket,"
-                    " bias, sample_n) VALUES (?,?,?,?)",
+                    "INSERT OR REPLACE INTO bias_history (computed_at, bucket,"
+                    " bias, sample_n, bias_7d, n_7d) VALUES (?,?,?,?,?,?)",
                     (out["computed_at"], f"{param}_{bucket}h",
-                     entry["bias"], entry["n"]))
+                     entry["bias"], entry["n"],
+                     entry.get("bias_7d"), entry.get("n_7d")))
         conn.commit()
         conn.close()
     except Exception as e:  # noqa: BLE001 - Historie darf Kern nie blockieren
@@ -2458,6 +2491,14 @@ def db_init():
         )""")
     conn.execute("INSERT OR IGNORE INTO schema_meta (key, value) "
                  "VALUES ('schema_version', '2')")  # 2: bias_history + meta
+    # Migration v3: Rolling-Fenster-Spalten (Treffsicherheit 'jetzt' statt
+    # lebenslanger Durchschnitt, der sich kaum bewegt)
+    have_bh = {r[1] for r in conn.execute("PRAGMA table_info(bias_history)")}
+    if "bias_7d" not in have_bh:
+        conn.execute("ALTER TABLE bias_history ADD COLUMN bias_7d REAL")
+        conn.execute("ALTER TABLE bias_history ADD COLUMN n_7d INTEGER")
+    conn.execute("INSERT OR REPLACE INTO schema_meta (key, value) "
+                 "VALUES ('schema_version', '3')")  # 3: rolling columns
     conn.execute("""
         CREATE TABLE IF NOT EXISTS dew_events (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
