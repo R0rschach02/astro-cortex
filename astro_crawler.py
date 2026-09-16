@@ -1107,6 +1107,16 @@ def set_profile(profile: str):
     log.info("[Profil] gewechselt auf '%s' (Ratings zurueckgesetzt)", profile)
 
 
+def weather_pushes_allowed(state: dict) -> bool:
+    """Proaktive Wetter-Pushes (Rating-Wechsel, Regen-/Gewitter-Alarm,
+    Clear-Sky, Wind-Eskalation) nur wenn der UI-Schalter 'Astro-Observation'
+    aktiv ist ODER eine Beobachtungs-Session laeuft. Abendplan/Meilensteine
+    sind keine Wetter-Alarme und bleiben unberuehrt."""
+    if state.get("observation_mode"):
+        return True
+    return db_open_session() is not None
+
+
 def evaluate_alerts(reports: list[SiteReport], state: dict,
                     radar_only: bool = False,
                     profile: str = "dso") -> Optional[str]:
@@ -1123,6 +1133,18 @@ def evaluate_alerts(reports: list[SiteReport], state: dict,
     bekannten Radar-Status -> keine Flatter-Alarme nach Aussetzern.
     """
     now = datetime.now()
+    if not weather_pushes_allowed(state):
+        log.info("[Alarm] Weather-Push stumm (observation_mode aus, "
+                 "keine Session aktiv)")
+        # Ratings trotzdem fortschreiben, damit der Vergleichsstatus
+        # erhalten bleibt und beim Einschalten keine Pingflut entsteht
+        for r in reports:
+            try:
+                state["ratings"][r.name] = r.rate(profile)[0]
+            except Exception as e:  # noqa: BLE001 - sichtbar geloggt
+                log.warning("[Alarm] Rating-Fortschreibung %s: %s",
+                            r.name, type(e).__name__)
+        return None
     state.setdefault("radar", {})
     state.setdefault("ratings", {})
     state.setdefault("last_alert", {})

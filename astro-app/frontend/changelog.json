@@ -216,6 +216,13 @@
    "tag": "neu",
    "desc": "Oben links gibt es jetzt ein kleines Diagramm-Symbol. Dahinter: Wie genau die Wetter-Vorhersagen stimmen (gemessen an vergangenen Abweichungen, taeglich aktualisiert) und eine Liste aller Telegram-Bot-Befehle mit Erklaerung. Einfach antippen - die Ansicht klaert auf, wie stark die Anzeige automatisch nachkorrigiert wird (Wolken werden z.B. real oft ~9% trueber als angesagt).",
    "usage": "Karte: Symbol oben links antippen; zwei Reiter (Zuverlaessigkeit / Bot-Befehle)"
+  },
+  {
+   "date": "2026-09-16",
+   "title": "Beobachtungs-Schalter + volle Zuverlaessigkeits-Historie",
+   "tag": "neu",
+   "desc": "Im Zuverlaessigkeits-Fenster gibt es jetzt unten einen Kippschalter \"ASTRO OBSERVATION\" (Flugzeug-Cockpit-Stil): Ist er nicht gelegt, schickt der Telegram-Bot KEINE Wetter-Alarme mehr - nur wenn du wirklich beobachtest (oder eine Session laeuft), wird aktiv gewarnt. Abendplan und Co. bleiben unberuehrt. Das Zuverlaessigkeits-Diagramm zeigt jetzt ausserdem den kompletten Verlauf seit dem 23.08. - rueckwirkend aus den echten Messdaten berechnet, mit krassen Linien fuer die aktuelle Treffsicherheit (letzte 7 Tage) und gestrichelten fuer den Gesamtdurchschnitt.",
+   "usage": "Karte: Diagramm-Symbol oben rechts unten im Panel Schalter legen/umlegen"
   }
  ]
 }

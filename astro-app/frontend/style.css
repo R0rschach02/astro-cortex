@@ -358,3 +358,40 @@ body.night #info-widget-btn { background: rgba(20, 8, 8, .9);
 .iw-card-7d { font-size: 14px; color: #4db2ff; }
 .iw-card-val small { font-size: 10px; color: var(--text-dim); font-weight: 400; }
 .iw-chart-hint { font-size: 10px; color: var(--text-dim); margin-top: 1px; }
+
+/* ---- Flugzeug-Kippschalter (guard-cover Stil) unter der Bias-Statistik ---- */
+.iw-toggle-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; margin-top: 10px; padding-top: 8px;
+  border-top: 1px solid #3a2f1a; background: rgba(0,0,0,.15);
+  border-radius: 0 0 10px 10px;
+}
+.iw-toggle-caption { font-size: 11px; font-weight: 700; letter-spacing: 1px;
+  color: #ffd24a; }
+.iw-toggle-caption small { font-size: 9.5px; color: var(--text-dim);
+  font-weight: 400; letter-spacing: 0; }
+.guard-switch { position: relative; display: inline-block; cursor: pointer; }
+.guard-switch input { position: absolute; opacity: 0; width: 100%; height: 100%;
+  left: 0; top: 0; margin: 0; cursor: pointer; }
+.guard-frame {
+  display: inline-flex; position: relative; width: 84px; height: 34px;
+  background: #1a1f16; border: 2px solid #3a4a2a; border-radius: 6px;
+  overflow: hidden; box-shadow: inset 0 2px 6px rgba(0,0,0,.8);
+  align-items: center;
+}
+.guard-on, .guard-off { flex: 1; text-align: center; font: bold 11px/34px
+  "Courier New", monospace; color: #55606a; z-index: 2; transition: color .15s; }
+.guard-cover {
+  position: absolute; top: 0; bottom: 0; left: -3px; width: 46px;
+  background: repeating-linear-gradient(-45deg, #ffd24a 0 7px, #171a12 7px 14px);
+  border-right: 2px solid #0d0f0a; transition: left .18s ease-in-out;
+  border-radius: 4px 0 0 4px; z-index: 3;
+  box-shadow: 2px 0 6px rgba(0,0,0,.7);
+}
+.guard-switch input:checked + .guard-frame .guard-cover { left: 41px; }
+.guard-switch input:checked + .guard-frame .guard-on { color: #b6ff7a;
+  text-shadow: 0 0 8px #6fdd2f; }
+.guard-switch:not(:checked) input + .guard-frame .guard-off,
+.guard-switch input:not(:checked) + .guard-frame .guard-off { color: #ff9d5c; }
+.guard-switch input:disabled + .guard-frame { opacity: .6; }
+body.night .iw-toggle-row { border-color: #3a2020; }

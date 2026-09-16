@@ -490,6 +490,31 @@ def api_bias_history(days: int = Query(30, ge=1, le=365)):
              "n_7d": r[5] if len(r) > 5 else None} for r in rows]
 
 
+class ObsModeBody(BaseModel):
+    active: bool
+
+
+@app.get("/api/observation-mode")
+def api_observation_mode():
+    try:
+        state = ac.load_state()
+    except (OSError, ValueError):
+        state = {}
+    return {"observation_mode": bool(state.get("observation_mode", False))}
+
+
+@app.post("/api/observation-mode")
+def api_observation_mode_set(body: ObsModeBody, request: Request):
+    state = ac.load_state()
+    state["observation_mode"] = bool(body.active)
+    try:
+        ac.save_state(state)
+    except (OSError, ValueError) as e:
+        raise HTTPException(503, f"State nicht speicherbar ({type(e).__name__})")
+    log.info("[API] observation_mode -> %s", body.active)
+    return {"observation_mode": body.active}
+
+
 @app.get("/api/telegram-commands")
 def api_telegram_commands():
     """Befehls-Referenz des Bots (read-only) - gespeist aus der gleichen

@@ -263,3 +263,36 @@ def test_brightsky_hour_clouds_utc_timestamps(isolated):
                                     _dt(2026, 9, 15, 20, 0))
     assert val == 20, f"20:00 MESZ muss cloud_cover=20 treffen, got {val}"
     assert "date=2026-09-15T17" in calls[0] or "17%3A30" in calls[0], calls[0]
+
+
+# ---------- Beobachtungs-Schalter: Gate + Endpoints ----------
+def test_observation_mode_gate(isolated, rep):
+    """ohne Schalter und ohne Session: evaluate_alerts bleibt stumm;
+    mit observation_mode: Alarmpfad offen."""
+    from datetime import datetime as _dt
+    ac = isolated
+    import json as _j
+    # keine Session, kein Schalter -> None auch bei Rating-Kipp-Szenario
+    r = rep(radar_status="Clear", clouds_total=10, seeing=1.0)
+    st = {"ratings": {"Testort": "NO-GO"}, "last_alert": {}}
+    out = ac.evaluate_alerts([r], st, radar_only=False, profile="dso")
+    assert out is None
+    # Schalter an -> gleiche Konstellation liefert Rating-Wechsel-Alarm
+    st2 = {"ratings": {"Testort": "NO-GO"}, "last_alert": {},
+           "observation_mode": True}
+    out2 = ac.evaluate_alerts([r], st2, radar_only=False, profile="dso")
+    assert out2 is not None and "Testort" in out2
+
+
+def test_observation_mode_endpoints(backend_env):
+    from fastapi.testclient import TestClient
+    client = TestClient(backend_env.app)
+    r0 = client.get("/api/observation-mode")
+    assert r0.status_code == 200 and r0.json()["observation_mode"] in (True, False)
+    r1 = client.post("/api/observation-mode",
+                     json={"active": True})
+    assert r1.status_code == 200 and r1.json()["observation_mode"] is True
+    r2 = client.get("/api/observation-mode")
+    assert r2.json()["observation_mode"] is True
+    client.post("/api/observation-mode", json={"active": False})
+    assert client.get("/api/observation-mode").json()["observation_mode"] is False

@@ -816,7 +816,16 @@ function initInfoWidget() {
       </div>
       <button id="iw-close" title="Schlie\u00dfen">\u2715</button>
     </div>
-    <div id="iw-body"></div>`;
+    <div id="iw-body"></div>
+    <div class="iw-toggle-row">
+      <div class="iw-toggle-caption">ASTRO&nbsp;OBSERVATION<br>
+        <small>Wetter-Alarme nur aktiv, wenn gelegt</small></div>
+      <label class="guard-switch" title="Beobachtungs-Modus schalten">
+        <input type="checkbox" id="obs-mode-sw">
+        <span class="guard-frame"><span class="guard-cover"></span>
+          <span class="guard-on">ON</span><span class="guard-off">OFF</span></span>
+      </label>
+    </div>`;
   document.body.appendChild(btn);
   document.body.appendChild(panel);
   btn.addEventListener("click", () => {
@@ -825,6 +834,22 @@ function initInfoWidget() {
   });
   panel.querySelector("#iw-close").addEventListener("click",
     () => panel.classList.add("hidden"));
+  // Beobachtungs-Schalter: Zustand laden, Aenderung sofort POSTen
+  const sw = panel.querySelector("#obs-mode-sw");
+  api("/api/observation-mode").then(d => {
+    sw.checked = !!d.observation_mode;
+  }).catch(() => {});
+  sw.addEventListener("change", async () => {
+    sw.disabled = true;
+    try {
+      const d = await api("/api/observation-mode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: sw.checked }) });
+      sw.checked = !!d.observation_mode;
+    } catch (e) { console.warn("observation-mode:", e); sw.checked = !sw.checked; }
+    sw.disabled = false;
+  });
   panel.querySelectorAll(".iw-tab").forEach(t =>
     t.addEventListener("click", () => {
       panel.querySelectorAll(".iw-tab").forEach(x =>
