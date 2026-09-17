@@ -223,6 +223,13 @@
    "tag": "neu",
    "desc": "Im Zuverlaessigkeits-Fenster gibt es jetzt unten einen Kippschalter \"ASTRO OBSERVATION\" (Flugzeug-Cockpit-Stil): Ist er nicht gelegt, schickt der Telegram-Bot KEINE Wetter-Alarme mehr - nur wenn du wirklich beobachtest (oder eine Session laeuft), wird aktiv gewarnt. Abendplan und Co. bleiben unberuehrt. Das Zuverlaessigkeits-Diagramm zeigt jetzt ausserdem den kompletten Verlauf seit dem 23.08. - rueckwirkend aus den echten Messdaten berechnet, mit krassen Linien fuer die aktuelle Treffsicherheit (letzte 7 Tage) und gestrichelten fuer den Gesamtdurchschnitt.",
    "usage": "Karte: Diagramm-Symbol oben rechts unten im Panel Schalter legen/umlegen"
+  },
+  {
+   "date": "2026-09-17",
+   "title": "Komplett-Redesign: Astro CC wird zum Cockpit",
+   "tag": "neu",
+   "desc": "Die App ist jetzt eine echte Kommandozentrale: Die Karte ist die Windschutzscheibe im Zentrum, drumherum ein fester Cockpit-Rahmen. Links massive Hardware-Schalter fuer die Sensoren (Regen, Radar, Satellit, Warnungen, Lichtverschmutzung) mit Status-LEDs - kein Menue mehr. Rechts das Intel-Panel mit der Vorhersage-Zuverlaessigkeit, darunter ein Matrix-Terminal (COMMS FEED), das live Rating-Wechsel, Warnungen und System-Ereignisse als gruenen Text-Lauf mitzeigt. Ganz unten rechts der grosse ASTRO-OBSERVATION-Waffenschalter. Unten eine industrielle Zeitlinie fuer die 6-Stunden-Vorhersage. Oben: UTC-Uhr, GPS-Koordinaten, blinkender System-Status. Alles kantig, dunkel, Monospace.",
+   "usage": "Direkt erkennbar: links Sensoren schalten, rechts Intel lesen, unten Zeit spulen, Schalter unten rechts legt die Alarme scharf"
   }
  ]
 }

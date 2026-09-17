@@ -28,7 +28,7 @@ body.night {
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { height: 100%; margin: 0; }
 body {
-  display: flex; flex-direction: column;
+  display: block; /* Cockpit-Grid (siehe unten) regelt das Layout */
   background: var(--bg); color: var(--text);
   font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   overscroll-behavior: none;
@@ -52,7 +52,7 @@ body {
 body.night #btn-night { border-color: var(--text); box-shadow: 0 0 8px var(--text); }
 
 /* ---- Karte ---- */
-#map { flex: 1; min-height: 0; }
+#map { min-height: 0; }
 /* Rotlicht: auch die Kartenkacheln rot-einfärben (dunkel, entsättigt, rot) */
 body.night .leaflet-tile {
   filter: grayscale(1) brightness(0.45) sepia(1) hue-rotate(-45deg) saturate(3.5);
@@ -395,3 +395,219 @@ body.night #info-widget-btn { background: rgba(20, 8, 8, .9);
 .guard-switch input:not(:checked) + .guard-frame .guard-off { color: #ff9d5c; }
 .guard-switch input:disabled + .guard-frame { opacity: .6; }
 body.night .iw-toggle-row { border-color: #3a2020; }
+
+/* ===================== COCKPIT-RAHMEN (Command & Control) =====================
+   Palette: Void-Schwarz / Anthrazit / Dunkelblau, Akzente Amber (Warnung),
+   Terminal-Grün (Comms), Taktisch-Blau (Sensorik), Rot (kriegerisch).
+   Alles kantig (border-radius 0), Daten in Monospace. */
+:root {
+  --void: #07090c; --panel: #10151c; --panel2: #0b0f14;
+  --line: #1d2733; --line-hi: #2d3d4f;
+  --txt: #c9d6e2; --dim: #5d7186;
+  --amber: #ffb347; --amber2: #ffd24a; --red: #ff4b3e;
+  --grn: #3aff7c; --grn2: #9dff57; --cyan: #4db2ff;
+  --mono: "Courier New", ui-monospace, Menlo, monospace;
+}
+.mono, .tp-label, .ct-line, .hw-btn, .panel-hdr, .tl-label { font-family: var(--mono); }
+
+#cockpit {
+  position: fixed; inset: 0; display: grid;
+  grid-template-areas: "top top top" "left map right" "bottom bottom bottom";
+  grid-template-rows: 48px 1fr 52px;
+  grid-template-columns: 168px 1fr 340px;
+  background: var(--void); gap: 2px;
+}
+#topbar { grid-area: top; }
+#left-panel { grid-area: left; }
+#map-wrap { grid-area: map; position: relative; min-width: 0; }
+#right-panel { grid-area: right; }
+#bottom-panel { grid-area: bottom; }
+#map { position: absolute; inset: 0; background: #0a0d12; }
+#cockpit.collapse-left { grid-template-columns: 0 1fr 340px; }
+#cockpit.collapse-right { grid-template-columns: 168px 1fr 0; }
+#cockpit.collapse-left.collapse-right { grid-template-columns: 0 1fr 0; }
+#cockpit.collapse-left #left-panel,
+#cockpit.collapse-right #right-panel { overflow: hidden; border: none; }
+
+/* ---------- Oberes Panel ---------- */
+#topbar {
+  display: flex; align-items: center; gap: 14px; padding: 0 12px;
+  background: linear-gradient(180deg, #141a22, #0d1218);
+  border-bottom: 1px solid var(--line-hi);
+  padding-top: 0; border-radius: 0;
+}
+.tp-brand { font-family: var(--mono); font-weight: 700; letter-spacing: 3px;
+  font-size: 18px; color: var(--amber2); }
+.tp-sub { display: block; font-size: 8.5px; letter-spacing: 2.5px;
+  color: var(--dim); }
+.tp-block { font-size: 12px; color: var(--txt); display: flex;
+  align-items: center; gap: 6px; border-left: 1px solid var(--line);
+  padding-left: 12px; }
+.tp-label { color: var(--dim); font-size: 10px; letter-spacing: 1px; }
+#tp-status .led { width: 9px; height: 9px; background: var(--grn);
+  box-shadow: 0 0 8px var(--grn); animation: led-blink 2s infinite; }
+#tp-status.stale .led { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+#tp-status.stale #tp-status-text { color: var(--amber); }
+@keyframes led-blink { 0%, 92% { opacity: 1; } 96% { opacity: .25; } }
+#freshness { margin-left: auto; }
+
+/* ---------- Panels allgemein ---------- */
+#left-panel, #right-panel {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 0; padding: 10px; overflow-y: auto;
+}
+.panel-hdr { font-size: 10.5px; letter-spacing: 3px; color: var(--amber);
+  border-bottom: 1px solid var(--line-hi); padding-bottom: 4px;
+  margin-bottom: 8px; }
+
+/* ---------- Hardware-Buttons (Sensoren) ---------- */
+.hw-stack { display: flex; flex-direction: column; gap: 6px; }
+.hw-stack-row { flex-direction: row; }
+.hw-btn {
+  position: relative; display: flex; align-items: center; gap: 8px;
+  padding: 9px 10px; border-radius: 0 !important;
+  background: linear-gradient(180deg, #232b34, #171d24);
+  border: 1px solid #333e4a; border-top-color: #45526200;
+  box-shadow: inset 0 1px 0 #3a4757, 0 2px 3px rgba(0,0,0,.6);
+  color: #8fa1b3; font: 700 13px var(--mono); letter-spacing: 2px;
+  cursor: pointer; user-select: none; text-align: left;
+  transition: background .12s, color .12s;
+}
+.hw-btn:active { transform: translateY(1px); box-shadow: inset 0 2px 5px #000; }
+.hw-btn .hw-sub { font-size: 8px; letter-spacing: 1px; color: var(--dim);
+  margin-left: auto; font-weight: 400; }
+.hw-led { width: 8px; height: 8px; background: #2a323c; border-radius: 0;
+  box-shadow: inset 0 0 2px #000; flex: none; }
+.hw-btn.active { color: var(--grn2); border-color: #3f6d33;
+  background: linear-gradient(180deg, #1d2a1c, #121a12); }
+.hw-btn.active .hw-led { background: var(--grn); box-shadow: 0 0 9px var(--grn); }
+.hw-btn.active .hw-sub { color: #4d7a45; }
+.hw-mini { padding: 6px 10px; font-size: 15px; justify-content: center;
+  min-width: 38px; }
+
+/* ---------- Rechtes Panel: Intel ---------- */
+.right-scroll { max-height: 40vh; overflow-y: auto; }
+.iw-tabs { display: flex; gap: 4px; margin-bottom: 6px; }
+.iw-tab { flex: 1; background: #141a22; border: 1px solid var(--line);
+  border-radius: 0 !important; color: var(--dim); font: 700 10.5px var(--mono);
+  letter-spacing: 2px; padding: 5px 0; cursor: pointer; }
+.iw-tab.active { color: var(--amber2); border-color: #6d5a1f;
+  background: #191510; }
+#comms-terminal {
+  flex: 1; min-height: 90px; max-height: 22vh; overflow-y: auto;
+  background: #020503; border: 1px solid #1e3a24; border-radius: 0;
+  padding: 6px 8px; font-size: 11px; line-height: 1.55; color: #2fff7a;
+  text-shadow: 0 0 6px rgba(47,255,122,.45);
+  position: relative;
+}
+#comms-terminal::after { /* Scanlines */
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg,
+    rgba(0,0,0,.22) 0 1px, transparent 1px 3px);
+}
+.ct-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  animation: ct-in .25s ease-out; }
+@keyframes ct-in { from { opacity: 0; transform: translateY(4px); } }
+.ct-ts { color: #1d8a4a; margin-right: 4px; }
+#right-panel { display: flex; flex-direction: column; }
+#bias-slot { flex: none; }
+#master-switch-dock {
+  margin-top: auto; padding-top: 10px; border-top: 2px solid #3a2f1a;
+  background: repeating-linear-gradient(-45deg, rgba(255,210,74,.07) 0 10px,
+    transparent 10px 20px), var(--panel2);
+  display: flex; align-items: center; gap: 10px; padding: 10px 8px;
+}
+
+/* ---------- Master-Schalter (Waffensystem-Stil) ---------- */
+.guard-master .guard-frame {
+  width: 132px; height: 46px; flex: none; border-width: 3px;
+  border-color: #4a4a3a; flex-direction: row-reverse;
+}
+.guard-master .guard-on, .guard-master .guard-off {
+  font-size: 15px; line-height: 40px; letter-spacing: 2px;
+}
+.guard-master .guard-cover { width: 68px; }
+.guard-master input:checked + .guard-frame .guard-cover { left: auto; right: -3px; }
+.guard-master input:not(:checked) + .guard-frame .guard-cover { left: -3px; right: auto; }
+.guard-master input:checked + .guard-frame { border-color: #5d7a35;
+  box-shadow: 0 0 14px rgba(94,200,60,.35), inset 0 2px 6px #000; }
+.guard-caption { color: var(--amber2); font-size: 11.5px; letter-spacing: 1.5px; }
+.guard-caption small { color: var(--dim); font-size: 9px; letter-spacing: 0; }
+
+/* ---------- Unteres Panel: Timeline ---------- */
+#bottom-panel {
+  display: flex; align-items: center; gap: 12px; padding: 0 14px;
+  background: linear-gradient(0deg, #141a22, #0d1218);
+  border-top: 1px solid var(--line-hi);
+}
+.tl-label { font-size: 11px; color: var(--dim); letter-spacing: 2px; }
+.tl-label b { color: var(--amber2); }
+.tl-track { flex: 1; position: relative; height: 34px;
+  background: #0a0e13; border: 1px solid var(--line-hi);
+  box-shadow: inset 0 3px 8px #000; display: flex; align-items: center;
+  padding: 0 46px 0 10px; }
+.tl-slot { flex: 1; position: relative; height: 20px; }
+#rg-slider {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 20px;
+  background: transparent; cursor: ew-resize; margin: 0;
+}
+#rg-slider::-webkit-slider-runnable-track {
+  height: 8px; background:
+    repeating-linear-gradient(90deg, #2d3a47 0 8px, #131a22 8px 16px);
+  border: 1px solid #3a4a5a;
+}
+#rg-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 26px; height: 26px; margin-top: -10px;
+  background: linear-gradient(180deg, #ffd24a, #c98f1e);
+  border: 2px solid #0d0f0a; box-shadow: 0 0 10px rgba(255,210,74,.5);
+  clip-path: polygon(15% 0, 85% 0, 100% 50%, 85% 100%, 15% 100%, 0 50%);
+}
+#rg-slider::-moz-range-track {
+  height: 8px; background: repeating-linear-gradient(90deg, #2d3a47 0 8px, #131a22 8px 16px);
+}
+#rg-slider::-moz-range-thumb {
+  width: 24px; height: 24px; border-radius: 0; background: #ffd24a;
+  border: 2px solid #0d0f0a; box-shadow: 0 0 10px rgba(255,210,74,.5);
+}
+#rg-play { flex: none; }
+
+/* Alte Floating-Elemente entschaerfen (falls noch referenziert) */
+#info-widget, #info-widget-btn { display: none !important; }
+#rg-time { position: static; }
+
+/* Detail-Panel als HUD-Overlay ueber der Karte */
+#panel { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1200;
+  max-height: 62vh; overflow-y: auto; background: rgba(9,12,17,.96);
+  border-top: 2px solid var(--line-hi); border-radius: 0; }
+#map-wrap #panel { grid-area: unset; }
+
+/* Mobile: Panels einklappbar, default zu */
+@media (max-width: 980px) {
+  #cockpit { grid-template-columns: 0 1fr 0; }
+  #cockpit:not(.collapse-left) { grid-template-columns: 178px 1fr 0; }
+  #cockpit:not(.collapse-right) { grid-template-columns: 0 1fr 300px; }
+  #cockpit:not(.collapse-left):not(.collapse-right) {
+    grid-template-columns: 178px 1fr 300px; }
+  .tp-sub, .tp-block:nth-child(2) { display: none; }
+  #right-panel { max-width: 300px; }
+}
+/* Nachtmodus: alles kriegt Rotstich statt Farbe */
+body.night #topbar, body.night #bottom-panel,
+body.night #left-panel, body.night #right-panel {
+  background: #120a08; border-color: #3a2020;
+}
+body.night .tp-brand, body.night .panel-hdr, body.night .tl-label b,
+body.night .guard-caption { color: #ff6a5e; }
+body.night #comms-terminal { color: #ff5f54; border-color: #4a1f1c;
+  text-shadow: 0 0 6px rgba(255,95,84,.4);
+  background: #050202; }
+body.night .hw-btn.active { color: #ffb3ab; border-color: #5a2a26;
+  background: #1d0f0d; }
+body.night .hw-btn.active .hw-led { background: #ff5f54;
+  box-shadow: 0 0 9px #ff5f54; }
+
+/* Kantigkeit erzwingen: keine abgerundeten Ecken im Cockpit */
+.hbtn, .tab, .badge, #panel, #changelog, #cfg-menu, .menu-item,
+.overlay, #comms-terminal, .iw-card, #info-widget {
+  border-radius: 0 !important;
+}

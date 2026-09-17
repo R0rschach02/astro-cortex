@@ -16,6 +16,10 @@ let map, markersLayer, warnLayer, lpLayer, rainGridLayer;
 let rgActive = false, rgDebounce = null, stormRings = [];
 let rgHour = 0, rgLastData = null;   // Zeitregler 0-6 h fuer die Regen-Icons
 let rgPlaying = false, rgTimer = null;
+
+function lastSpatsCache(data) {
+  return data.spots.map(s => [s.name, s.rating]);
+}
 let lastSpots = null;
 let CURRENT_PROFILE = "dso";
 let currentSpot = null;   // fuer Tab-Wechsel im Detail-Panel
@@ -37,7 +41,7 @@ async function api(path, opts) {
 
 /* ---------- Karte ---------- */
 function initMap() {
-  map = L.map("map", { zoomControl: true, tap: true })
+  map = L.map("map", { zoomControl: false, tap: true })
         .setView([49.54, 8.63], 10);
 
   // Basiskarten: direkt OSM (CARTO verlangt seit 2026 einen API-Key -
@@ -79,49 +83,57 @@ function initMap() {
   // Vorhersage-Zuverlaessigkeit + Bot-Befehle: einklappbares Widget
   // top-left (data-cached, offline-faehig via localStorage).
   initInfoWidget();
+  initCockpitStatus();
 
-  // Zeitregler: spult die Icons durch die OM-Stundenprognose (0 = jetzt).
-  // Play/Pause laeuft automatisch durch - self-rescheduling setTimeout wie
-  // beim RainViewer-Loop (robuster als setInterval), kein neuer Request.
-  const rgPanel = document.createElement("div");
-  rgPanel.id = "rg-time";
-  rgPanel.innerHTML = `<button id="rg-play" title="Regen-Verlauf 0-6 h automatisch abspielen">\u25b6</button>
-    <input id="rg-slider" type="range" min="0" max="6"
-      step="1" value="0" aria-label="Regen-Prognose Stunden">
-    <span id="rg-label">Jetzt</span>`;
-  document.body.appendChild(rgPanel);
+  // Zeitregler sitzt statisch im unteren Cockpit-Panel (Timeline):
+  // nur Listener, kein dynamisches Element mehr.
   $("rg-slider").addEventListener("input", (e) => {
     setRgHour(Number(e.target.value));
   });
   $("rg-play").addEventListener("click", rgTogglePlay);
 
-  // RainViewer: Dummy-Overlays nur fuer die Control, Logik via Events.
-  // Kachel-Heatmap ist seit dem Icon-Raster nur noch optionale Rohansicht.
-  const rvRawDummy = L.layerGroup();
-  const rvSatDummy = L.layerGroup();
-  L.control.layers(null, {
-    "Lichtverschmutzung": lpLayer,
-    "Unwetterwarnungen (DWD)": warnLayer,
-    "Regen-Icons (Region)": rainGridLayer,
-    "Radar-Rohansicht (Kachel)": rvRawDummy,
-    "Wolken (Satellit)": rvSatDummy,
-  }, { position: "bottomright", collapsed: true }).addTo(map);
-  map.on("overlayadd", (e) => {
-    if (e.name.includes("Regen-Icons")) {
-      rgActive = true;
-      $("rg-time")?.classList.remove("hidden");
-      fetchRainGrid();
-    }
-    if (e.name.includes("Radar-Rohansicht")) rvStart("radar");
-    if (e.name.includes("Satellit")) rvStart("satellite");
+  // Cockpit-Hardware-Buttons (linkes Panel) ersetzen die Layer-Dropdown-
+  // Control: massiv, permanent sichtbar, LED-Status. Regen-Icons sind
+  // default scharf (wie bisher Standard-Layer).
+  const hwState = { regen: true, radar: false, satellite: false,
+                    warn: false, lp: false };
+  const hwBtn = document.querySelector('.hw-btn[data-layer="regen"]');
+  if (hwBtn) hwBtn.classList.add("active");
+  document.querySelectorAll("#layer-hw-stack .hw-btn").forEach(b => {
+    b.addEventListener("click", () => {
+      const key = b.dataset.layer;
+      hwState[key] = !hwState[key];
+      b.classList.toggle("active", hwState[key]);
+      if (key === "regen") {
+        rgActive = hwState[key];
+        if (rgActive) { fetchRainGrid(); } else { rainGridLayer.clearLayers(); }
+      } else if (key === "radar") {
+        hwState[key] ? rvStart("radar") : rvStop();
+      } else if (key === "satellite") {
+        hwState[key] ? rvStart("satellite") : rvStop();
+      } else if (key === "warn") {
+        hwState[key] ? map.addLayer(warnLayer) : map.removeLayer(warnLayer);
+      } else if (key === "lp") {
+        hwState[key] ? map.addLayer(lpLayer) : map.removeLayer(lpLayer);
+      }
+      commsLog(`SENSOR ${key.toUpperCase()} ${hwState[key] ? "ON" : "OFF"}`);
+    });
   });
-  map.on("overlayremove", (e) => {
-    if (e.name.includes("Regen-Icons")) {
-      rgActive = false;
-      $("rg-time")?.classList.add("hidden");
-    }
-    if (e.name.includes("Radar-Rohansicht") || e.name.includes("Satellit")) rvStop();
+  // Zoom + Panel-Pins
+  $("zoom-in")?.addEventListener("click", () => map.zoomIn());
+  $("zoom-out")?.addEventListener("click", () => map.zoomOut());
+  $("left-panel-pin")?.addEventListener("click", () => {
+    document.getElementById("cockpit").classList.toggle("collapse-left");
+    setTimeout(() => map.invalidateSize(), 200);
   });
+  $("right-panel-pin")?.addEventListener("click", () => {
+    document.getElementById("cockpit").classList.toggle("collapse-right");
+    setTimeout(() => map.invalidateSize(), 200);
+  });
+  if (window.matchMedia("(max-width: 980px)").matches) {
+    document.getElementById("cockpit").classList.add("collapse-left",
+                                                     "collapse-right");
+  }
   // Raster folgt dem Ausschnitt (debounced); Cache im Backend faengt Pan an
   map.on("moveend zoomend", () => {
     if (!rgActive) return;
@@ -629,11 +641,24 @@ async function refresh() {
       CURRENT_PROFILE = data.profile;
       updateModeButton();
     }
+    const prevRatings = (lastSpots && lastSpots.spots)
+      ? Object.fromEntries(lastSpatsCache(lastSpots)) : {};
     renderSpots(data);
+    // Comms-Feed: Rating-Wechsel melden (nur wenn vorher bekannt)
+    for (const s of data.spots) {
+      const before = prevRatings[s.name];
+      if (before && before !== s.rating)
+        commsLog(`${s.name.toUpperCase()} ${before} -> ${s.rating}`);
+    }
     // Warnungen nachladen (Layer nur, wenn aktiviert); Gewitter-Ringe
     // speichern wir zusaetzlich fuer die Blitz-Icons im Regen-Raster
     try {
       const warns = await api("/api/warnings");
+      const nWarn = warns.features.length;
+      if (nWarn !== (window._lastWarnN ?? -1)) {
+        commsLog(nWarn ? `DWD WARNUNGEN: ${nWarn} aktiv` : "DWD: keine Warnungen");
+        window._lastWarnN = nWarn;
+      }
       warnLayer.addData({ type: "FeatureCollection",
                           features: warns.features.filter(f => f.properties.kind !== "other") });
       stormRings = [];
@@ -656,6 +681,10 @@ async function refresh() {
 
 function setFreshness(ts, stale) {
   const el = $("freshness");
+  const st = document.getElementById("tp-status");
+  const stText = document.getElementById("tp-status-text");
+  if (st) st.classList.toggle("stale", !!stale);
+  if (stText) stText.textContent = stale ? "LINK LOST" : "SYSTEM SECURE";
   if (!ts) { el.textContent = stale ? "offline - kein Cache" : "lade…"; return; }
   const age = Math.max(0, Math.round((Date.now() - new Date(ts).getTime()) / 60000));
   el.textContent = (stale ? "OFFLINE - " : "") + `vor ${age} Min`;
@@ -694,6 +723,7 @@ function gpsWatch() {
   if (!navigator.geolocation) { alert("Geolocation hier nicht verfügbar (HTTPS nötig)."); return; }
   $("btn-gps").textContent = "…";
   navigator.geolocation.getCurrentPosition(async (pos) => {
+    setTpCoords(pos.coords.latitude, pos.coords.longitude);
     try {
       const r = await api("/api/watch", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -801,67 +831,67 @@ function biasTendenz(bucket, bias) {
 }
 
 function initInfoWidget() {
-  const btn = document.createElement("button");
-  btn.id = "info-widget-btn";
-  btn.title = "Vorhersage-Zuverlaessigkeit & Bot-Befehle";
-  btn.innerHTML = "\u{1F4CA}";
-  const panel = document.createElement("div");
-  panel.id = "info-widget";
-  panel.className = "hidden";
-  panel.innerHTML = `
-    <div class="iw-head">
-      <div class="iw-tabs">
-        <button class="iw-tab active" data-tab="bias">Vorhersage-Zuverlaessigkeit</button>
-        <button class="iw-tab" data-tab="bot">Telegram-Befehle</button>
-      </div>
-      <button id="iw-close" title="Schlie\u00dfen">\u2715</button>
-    </div>
-    <div id="iw-body"></div>
-    <div class="iw-toggle-row">
-      <div class="iw-toggle-caption">ASTRO&nbsp;OBSERVATION<br>
-        <small>Wetter-Alarme nur aktiv, wenn gelegt</small></div>
-      <label class="guard-switch" title="Beobachtungs-Modus schalten">
-        <input type="checkbox" id="obs-mode-sw">
-        <span class="guard-frame"><span class="guard-cover"></span>
-          <span class="guard-on">ON</span><span class="guard-off">OFF</span></span>
-      </label>
-    </div>`;
-  document.body.appendChild(btn);
-  document.body.appendChild(panel);
-  btn.addEventListener("click", () => {
-    panel.classList.toggle("hidden");
-    if (!panel.classList.contains("hidden")) loadInfoWidget();
-  });
-  panel.querySelector("#iw-close").addEventListener("click",
-    () => panel.classList.add("hidden"));
-  // Beobachtungs-Schalter: Zustand laden, Aenderung sofort POSTen
-  const sw = panel.querySelector("#obs-mode-sw");
-  api("/api/observation-mode").then(d => {
-    sw.checked = !!d.observation_mode;
-  }).catch(() => {});
-  sw.addEventListener("change", async () => {
-    sw.disabled = true;
-    try {
-      const d = await api("/api/observation-mode", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ active: sw.checked }) });
-      sw.checked = !!d.observation_mode;
-    } catch (e) { console.warn("observation-mode:", e); sw.checked = !sw.checked; }
-    sw.disabled = false;
-  });
-  panel.querySelectorAll(".iw-tab").forEach(t =>
+  // Eingebettet im rechten Cockpit-Panel (INTEL): Tabs + Body liegen statisch
+  // in index.html (#iw-tabs / #iw-body im #bias-slot). Kein Floating-Panel
+  // mehr, kein Oeffnen/Schliessen - immer sichtbar, Daten beim Start laden.
+  document.querySelectorAll("#iw-tabs .iw-tab").forEach(t =>
     t.addEventListener("click", () => {
-      panel.querySelectorAll(".iw-tab").forEach(x =>
+      document.querySelectorAll("#iw-tabs .iw-tab").forEach(x =>
         x.classList.toggle("active", x === t));
       renderInfoWidget(currentInfoData, t.dataset.tab);
     }));
-  // Klick ausserhalb schliesst (aber nicht wenn im Panel geklickt wird)
-  document.addEventListener("pointerdown", (e) => {
-    if (panel.classList.contains("hidden")) return;
-    if (panel.contains(e.target) || btn.contains(e.target)) return;
-    panel.classList.add("hidden");
-  });
+  // Master-Schalter ASTRO OBSERVATION (unten im Panel, guard-cover Stil)
+  const sw = document.getElementById("obs-mode-sw");
+  if (sw) {
+    api("/api/observation-mode").then(d => {
+      sw.checked = !!d.observation_mode;
+      commsLog(`OBS MODE ${d.observation_mode ? "ARMED" : "SAFE"}`);
+    }).catch(() => {});
+    sw.addEventListener("change", async () => {
+      sw.disabled = true;
+      try {
+        const d = await api("/api/observation-mode", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ active: sw.checked }) });
+        sw.checked = !!d.observation_mode;
+        commsLog(`OBS MODE -> ${d.observation_mode ? "ARMED" : "SAFE"}`);
+      } catch (e) { console.warn("observation-mode:", e); sw.checked = !sw.checked; }
+      sw.disabled = false;
+    });
+  }
+  loadInfoWidget();
+}
+
+// Comms-Feed: Matrix-Terminal im rechten Panel. Neue Zeilen erscheinen
+// unten (Text laeuft nach oben), autoscroll, max 40 Zeilen.
+function commsLog(text) {
+  const t = document.getElementById("comms-terminal");
+  if (!t) return;
+  const ts = new Date().toISOString().slice(11, 19);
+  const div = document.createElement("div");
+  div.className = "ct-line";
+  div.innerHTML = `<span class="ct-ts">${ts}</span> ${esc(String(text))}`;
+  t.appendChild(div);
+  while (t.children.length > 40) t.removeChild(t.firstChild);
+  t.scrollTop = t.scrollHeight;
+}
+
+// UTC-Uhr + Status-Koppelung im oberen Panel
+function setTpCoords(lat, lon) {
+  const el = document.getElementById("tp-coords");
+  if (el && lat != null) el.textContent =
+    `${lat.toFixed(4)} / ${lon.toFixed(4)}`;
+}
+
+function initCockpitStatus() {
+  const clock = () => {
+    const el = document.getElementById("tp-clock");
+    if (el) el.textContent = new Date().toISOString().slice(11, 19);
+  };
+  clock();
+  setInterval(clock, 1000);
+  commsLog("ASTRO CC ONLINE — SYSTEM SECURE");
 }
 
 let currentInfoData = null;   // Cache: einmal laden pro Oeffnen

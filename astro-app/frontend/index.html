@@ -3,37 +3,98 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Astro Command Center</title>
-  <meta name="theme-color" content="#0b0e13">
+  <title>ASTRO CC — Command &amp; Control</title>
+  <meta name="theme-color" content="#07090c">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="vendor/leaflet.css">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- Kopfleiste: Titel, Aktualitaet, Steuerung -->
-  <header id="topbar">
-    <div id="title">ASTRO&nbsp;CC</div>
-    <button id="btn-mode" class="hbtn mode" title="Profil: DSO / Planetarisch">DSO</button>
-    <div id="freshness" class="freshness">lade…</div>
-    <button id="btn-refresh" class="hbtn" title="Jetzt aktualisieren">&#8635;</button>
-    <button id="btn-night" class="hbtn" title="Rotlicht-Modus umschalten">&#9789;</button>
-    <button id="btn-gps" class="hbtn" title="Live-Standort setzen (GPS)">&#9678;</button>
-    <button id="btn-config" class="hbtn" title="Server-Adresse konfigurieren">&#9881;</button>
-  </header>
+  <div id="cockpit">
 
-  <!-- Karte -->
-  <main id="map"></main>
+    <!-- ============ OBERTES PANEL: STATUS & COMMS ============ -->
+    <header id="topbar">
+      <div id="title" class="tp-brand">ASTRO&nbsp;CC<span class="tp-sub">COMMAND&nbsp;&amp;&nbsp;CONTROL</span></div>
+      <div class="tp-block mono"><span class="tp-label">GPS</span><span id="tp-coords">--.----&nbsp;/&nbsp;--.----</span></div>
+      <div class="tp-block mono"><span class="tp-label">UTC</span><span id="tp-clock">--:--:--</span></div>
+      <div class="tp-block mono" id="tp-status"><span class="led"></span><span id="tp-status-text">SYSTEM&nbsp;SECURE</span></div>
+      <div id="freshness" class="freshness mono">lade…</div>
+      <div class="tp-actions">
+        <button id="btn-mode" class="hbtn mode" title="Profil: DSO / Planetarisch">DSO</button>
+        <button id="btn-refresh" class="hbtn" title="Jetzt aktualisieren">&#8635;</button>
+        <button id="btn-gps" class="hbtn" title="Live-Standort setzen (GPS)">&#9678;</button>
+        <button id="btn-night" class="hbtn" title="Rotlicht-Modus umschalten">&#9789;</button>
+        <button id="btn-config" class="hbtn" title="Server-Adresse konfigurieren">&#9881;</button>
+      </div>
+    </header>
 
-  <!-- Detail-Panel (Tap auf Marker): Jetzt-Status + Vorausschau-Tab -->
-  <section id="panel" class="hidden">
-    <button id="panel-close" class="hbtn">&#10005;</button>
-    <div class="tabs">
-      <button id="tab-now" class="tab active">Jetzt</button>
-      <button id="tab-fc" class="tab">Vorausschau</button>
-    </div>
-    <div id="panel-content"></div>
-  </section>
+    <!-- ============ LINKES PANEL: SENSOREN-KONTROLLE ============ -->
+    <aside id="left-panel">
+      <div class="panel-hdr">SENSOREN</div>
+      <div class="hw-stack" id="layer-hw-stack">
+        <button class="hw-btn" data-layer="regen"><i class="hw-led"></i>REGEN<i class="hw-sub">ICONS&nbsp;OM</i></button>
+        <button class="hw-btn" data-layer="radar"><i class="hw-led"></i>RADAR<i class="hw-sub">RAW&nbsp;TILES</i></button>
+        <button class="hw-btn" data-layer="satellite"><i class="hw-led"></i>SAT<i class="hw-sub">CLOUD&nbsp;IR</i></button>
+        <button class="hw-btn" data-layer="warn"><i class="hw-led"></i>WARN<i class="hw-sub">DWD</i></button>
+        <button class="hw-btn" data-layer="lp"><i class="hw-led"></i>LP<i class="hw-sub">ATLAS</i></button>
+      </div>
+      <div class="panel-hdr" style="margin-top:12px">VIEW</div>
+      <div class="hw-stack hw-stack-row">
+        <button class="hw-btn hw-mini" id="zoom-in" title="Vergrößern">＋</button>
+        <button class="hw-btn hw-mini" id="zoom-out" title="Verkleinern">－</button>
+        <button class="hw-btn hw-mini" id="left-panel-pin" title="Panel ein-/ausklappen">◄</button>
+      </div>
+    </aside>
+
+    <!-- ============ ZENTRUM: WINDSCHUTZSCHEIBE ============ -->
+    <main id="map-wrap"><div id="map"></div></main>
+
+    <!-- Detail-Panel (Tap auf Marker) — als HUD-Overlay über der Karte -->
+    <section id="panel" class="hidden">
+      <button id="panel-close" class="hbtn">&#10005;</button>
+      <div class="tabs">
+        <button id="tab-now" class="tab active">Jetzt</button>
+        <button id="tab-fc" class="tab">Vorausschau</button>
+      </div>
+      <div id="panel-content"></div>
+    </section>
+
+    <!-- ============ RECHTES PANEL: INTELLIGENCE & EXECUTION ============ -->
+    <aside id="right-panel">
+      <div class="panel-hdr">INTEL&nbsp;//&nbsp;ZUVERLÄSSIGKEIT</div>
+      <div id="bias-slot" class="right-scroll">
+        <div id="iw-tabs" class="iw-tabs">
+          <button class="iw-tab active" data-tab="bias">BIAS</button>
+          <button class="iw-tab" data-tab="bot">BOT&nbsp;CMDS</button>
+        </div>
+        <div id="iw-body"></div>
+      </div>
+      <div class="panel-hdr" style="margin-top:8px">COMMS&nbsp;FEED</div>
+      <div id="comms-terminal" class="mono" aria-live="polite"></div>
+      <div id="master-switch-dock">
+        <label class="guard-switch guard-master" title="Astro-Observation: schaltet proaktive Wetter-Alarme">
+          <input type="checkbox" id="obs-mode-sw">
+          <span class="guard-frame">
+            <span class="guard-on">ARMED</span><span class="guard-off">SAFE</span>
+            <span class="guard-cover"></span>
+          </span>
+        </label>
+        <div class="guard-caption mono">ASTRO&nbsp;OBSERVATION<br>
+          <small>Wetter-Alarme nur wenn gelegt</small></div>
+      </div>
+    </aside>
+
+    <!-- ============ UNTERTES PANEL: TIMELINE ============ -->
+    <footer id="bottom-panel">
+      <span class="tl-label mono">T-TRACK&nbsp;<b id="tl-value">NOW</b></span>
+      <div class="tl-track" id="tl-track"><div class="tl-slot" id="tl-slot"
+        ><input type="range" min="0" max="6" step="1" value="0" id="rg-slider" aria-label="Regen-Prognose Stunden"
+        ></div><button id="rg-play" class="hw-btn hw-mini" title="Zeitverlauf abspielen">&#9654;</button></div>
+      <span class="tl-label mono" id="rg-label">Jetzt</span>
+      <button class="hw-btn hw-mini" id="right-panel-pin" title="Intel-Panel ein-/ausklappen">INTEL►</button>
+    </footer>
+  </div>
 
   <!-- Zahnrad-Menü (Popup) -->
   <div id="cfg-menu" class="hidden">
