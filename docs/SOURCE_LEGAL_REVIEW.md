@@ -102,7 +102,27 @@ to third parties. Operators are named on the about page (inquiry
 possible). Status: UNCLARIFIED.
 
 
-## 4) VRN Open Data (ÖPNV Rhein-Neckar) — GTFS-Daten — RELEASED (mit Lücke beim Static-Feed)
+## 4) VRN Open Data (ÖPNV Rhein-Neckar) — GTFS-Daten — RELEASED
+
+UPDATE 2026-09-17: VRN hat auf unsere Anfrage geantwortet (L. Ries,
+Abteilung Digitale Information / Team Big Data). Verbatim:
+
+  > "unseren GTFS Static-Feed veröffentlichen wir unter der Datenlizenz
+  > Deutschland Namensnennung 2.0 frei abrufbar hier:
+  > https://opendata.vrn.de/datasets/vrn-und-rnn-gtfs-sollfahrplandaten-aktuell"
+
+Eigene Primaerpruefung der verlinkten Seite (2026-09-17, curl):
+  > "license https://www.govdata.de/dl-de/by-2.0 spatial VRN
+  > Verbundgebiet, RNN Verbundgebiet" (modified 2025-04-23)
+
+Damit ist der VRN-eigene GTFS-Static-Sollfahrplan verfuegbar - die
+frühere Lücke ist geschlossen. Download-URL wird beim transit-Import
+aus der Portalseite gelöst (Drupal-Portal, Link wird per JS gerendert;
+Seite selbst ist die stabile Referenz). VRN wird wieder PRIMAERquelle
+fuer transit.py (DELFI/gtfs.de bleibt als dokumentierter Fallback,
+Eintrag 5). Status: RELEASED (dl-de/by-2.0, Namensnennung VRN).
+
+Historischer Befund (2026-09-13, vor der Antwort):
 
 Checked on: 2026-09-13. Method: direct raw-HTML retrieval (curl) of
 https://www.vrn.de/opendata/ and https://opendata.vrn.de/ including the
