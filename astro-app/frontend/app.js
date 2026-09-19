@@ -904,22 +904,22 @@ function updateAstroInstruments(data) {
   const s = data.spots[0];  // erster Standort als Primär-Anzeige
   // Mond-Höhe: Nadel von -90 bis +90 -> 0..180 Grad
   const alt = s.moon?.max_alt ?? 0;
-  document.getElementById("moon-alt")?.textContent =
-    `${alt.toFixed(0)}\u00b0`;
+  const _el_moon_alt = document.getElementById("moon-alt");
+  if (_el_moon_alt) _el_moon_alt.textContent = `${alt.toFixed(0)}\u00b0`;
   const moonNeedle = document.getElementById("moon-needle");
   if (moonNeedle) moonNeedle.setAttribute("transform",
     `rotate(${(alt / 90) * 90} 50 46)`);
   // Seeing: 0-5" -> -90 bis +90 Grad
   const seeing = s.seeing ?? 2;
-  document.getElementById("seeing-val")?.textContent =
-    seeing ? `${seeing.toFixed(1)}"` : "--";
+  const _el_seeing_val = document.getElementById("seeing-val");
+  if (_el_seeing_val) _el_seeing_val.textContent = seeing ? `${seeing.toFixed(1)}"` : "--";
   const sn = document.getElementById("seeing-needle");
   if (sn) sn.setAttribute("transform",
     `rotate(${(-90 + (Math.min(seeing, 5) / 5) * 180)} 50 46)`);
   // Taupunkt-Spread: 0-15K -> -90 bis +90 Grad
   const tau = s.dewpoint_spread ?? 5;
-  document.getElementById("tau-val")?.textContent =
-    tau != null ? `${tau.toFixed(1)}K` : "--";
+  const _el_tau_val = document.getElementById("tau-val");
+  if (_el_tau_val) _el_tau_val.textContent = tau != null ? `${tau.toFixed(1)}K` : "--";
   const tn = document.getElementById("tau-needle");
   if (tn) tn.setAttribute("transform",
     `rotate(${(-90 + (Math.min(Math.max(tau, 0), 15) / 15) * 180)} 50 46)`);
