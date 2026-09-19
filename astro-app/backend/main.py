@@ -556,15 +556,24 @@ def api_deployment(id: str, home: str = "mannheim_hbf",
 
     plan = deployment_window(gws_dt, gwe_dt, home, obs, transit,
                              setup_minutes)
+    note = None
+    if not plan.latest_departure:
+        note = ("Keine OePNV-Verbindung fuer dieses Zeitfenster gefunden "
+                "(Spaet-/Nachtzeit ohne Bedienung). Auto/Taxi einplanen.")
+    elif not plan.extraction:
+        note = ("Keine Rueckverbindung per OePNV nach Fensterende. "
+                "Rueckfahrt per Auto/Taxi organisieren.")
     return {
         "destination": plan.destination,
         "golden_window": f"{plan.golden_window_start}-{plan.golden_window_end}",
+        "golden_window_night": gw.get("night"),
         "latest_departure": plan.latest_departure,
         "extraction": plan.extraction,
         "extraction_warning_ts": plan.extraction_warning_ts,
         "setup_buffer_min": plan.setup_buffer_min,
         "transit_source": plan.transit_source,
         "home": home.get("name", "?"),
+        **({"note": note} if note else {}),
     }
 
 
