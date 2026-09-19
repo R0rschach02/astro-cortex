@@ -308,17 +308,20 @@ class GTFSStaticSource:
     # ---------- synchrone Basis ----------
     def connections(self, start_lat, start_lon, dest_lat, dest_lon,
                     arrival_before) -> list:
-        """Verbindungen, die VOR arrival_before ankommen; fensterbegrenzt
-        auf die letzten 4 Stunden vor dem Zieltermin."""
+        """Verbindungen, die VOR arrival_before ankommen. Fenster: bis zu
+        12 Stunden (Spaetfenster wie 02:00 brauchen die Abendbusse)."""
         starts = self.next_stops(start_lat, start_lon)
         goals = self.next_stops(dest_lat, dest_lon)
         if not starts or not goals:
             return []
         base = arrival_before.replace(hour=0, minute=0, second=0,
                                       microsecond=0)
+        dep_from = arrival_before - timedelta(hours=12)
+        if dep_from.date() != arrival_before.date():
+            dep_from = arrival_before.replace(hour=0, minute=0, second=0)
         legs_list = self._search(
             {s[1] for s in starts}, {g[1] for g in goals},
-            arrival_before - timedelta(hours=4), arrival_before)
+            dep_from, arrival_before)
         out = []
         for legs in legs_list:
             c = self._connection(legs, base,
