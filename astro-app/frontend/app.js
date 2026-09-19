@@ -44,12 +44,12 @@ function initMap() {
   map = L.map("map", { zoomControl: false, tap: true })
         .setView([49.54, 8.63], 10);
 
-  // Basiskarten: direkt OSM (CARTO verlangt seit 2026 einen API-Key -
-  // siehe LESSONS.md Fall 8). Dezent entsaettigt via CSS (className),
-  // Rotlicht-Dimming greift ueber die bestehende body.night-Kachelregel.
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 18, subdomains: "abc", className: "basemap-tile",
-    attribution: '&copy; OpenStreetMap-Mitwirkende',
+  // Basiskarte: CARTO Dark Matter - taktisch dunkel, live geprueft
+  // 2026-09-17 ohne API-Key erreichbar (LESSONS Fall 8 bleibt beobachtet;
+  // Fallback waere OSM + dark-CSS-Filter).
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    maxZoom: 18, subdomains: "abc",
+    attribution: '&copy; OpenStreetMap-Mitwirkende, &copy; CARTO',
   }).addTo(map);
 
   // Lichtverschmutzung (Lorenz-Atlas via Backend-Proxy, Disk-Cache dort).
