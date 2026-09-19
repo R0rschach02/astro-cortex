@@ -545,9 +545,12 @@ def api_deployment(id: str, home: str = "mannheim_hbf",
     if gws_dt < now - _td(hours=2):
         gws_dt = now
 
+    # Service-Datum = Tag der Hinreise (Golden-Window-Abend)
+    service_day = gws_dt.date()
     try:
         transit = GTFSStaticSource("/home/enigma/gtfs",
-                                   bbox=_TRANSIT_BBOX)
+                                   bbox=_TRANSIT_BBOX,
+                                   service_date=service_day)
     except GTFSNotAvailableError as e:
         raise HTTPException(503, str(e))
 
