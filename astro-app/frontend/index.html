@@ -70,7 +70,48 @@
         </div>
         <div id="iw-body"></div>
       </div>
-      <div class="panel-hdr" style="margin-top:8px">COMMS&nbsp;FEED</div>
+      <div class="panel-hdr" style="margin-top:8px">ASTRO&nbsp;INSTR</div>
+      <div id="astro-instruments">
+        <div class="gauge-row">
+          <div class="gauge-wrap">
+            <svg viewBox="0 0 100 80" class="gauge" id="gauge-moon">
+              <circle cx="50" cy="46" r="36" class="gauge-body"/>
+              <circle cx="50" cy="46" r="36" class="gauge-ring"/>
+              <line x1="50" y1="46" x2="50" y2="12" class="gauge-needle" id="moon-needle" transform="rotate(0 50 46)"/>
+              <circle cx="50" cy="46" r="3" class="gauge-hub"/>
+              <text x="50" y="74" text-anchor="middle" class="gauge-label">MOON&nbsp;ALT</text>
+              <text x="50" y="62" text-anchor="middle" class="gauge-val" id="moon-alt">--&deg;</text>
+            </svg>
+          </div>
+          <div class="gauge-wrap">
+            <svg viewBox="0 0 100 80" class="gauge" id="gauge-seeing">
+              <circle cx="50" cy="46" r="36" class="gauge-body"/>
+              <circle cx="50" cy="46" r="36" class="gauge-ring"/>
+              <line x1="50" y1="46" x2="50" y2="12" class="gauge-needle needle-amber" id="seeing-needle" transform="rotate(-90 50 46)"/>
+              <circle cx="50" cy="46" r="3" class="gauge-hub"/>
+              <text x="50" y="74" text-anchor="middle" class="gauge-label">SEEING</text>
+              <text x="50" y="62" text-anchor="middle" class="gauge-val" id="seeing-val">--"</text>
+            </svg>
+          </div>
+          <div class="gauge-wrap">
+            <svg viewBox="0 0 100 80" class="gauge" id="gauge-tau">
+              <circle cx="50" cy="46" r="36" class="gauge-body"/>
+              <circle cx="50" cy="46" r="36" class="gauge-ring"/>
+              <line x1="50" y1="46" x2="50" y2="12" class="gauge-needle needle-cyan" id="tau-needle" transform="rotate(90 50 46)"/>
+              <circle cx="50" cy="46" r="3" class="gauge-hub"/>
+              <text x="50" y="74" text-anchor="middle" class="gauge-label">TAU&nbsp;DP</text>
+              <text x="50" y="62" text-anchor="middle" class="gauge-val" id="tau-val">--K</text>
+            </svg>
+          </div>
+        </div>
+        <div class="led-matrix" id="status-leds">
+          <span class="sq-led" id="led-vrn" title="VRN Transit Sync"></span>
+          <span class="sq-led" id="led-bias" title="Bias-Korrektur aktiv"></span>
+          <span class="sq-led" id="led-obs" title="Observation Mode"></span>
+          <span class="sq-led" id="led-uap" title="UAP DB Link (Vorbereitung)"></span>
+        </div>
+      </div>
+      <div class="panel-hdr" style="margin-top:6px">COMMS&nbsp;FEED</div>
       <div id="comms-terminal" class="mono" aria-live="polite"></div>
       <div id="master-switch-dock">
         <label class="guard-switch guard-master" title="Astro-Observation: schaltet proaktive Wetter-Alarme">

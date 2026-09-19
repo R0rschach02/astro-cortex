@@ -699,3 +699,38 @@ body.night .basemap-tile { filter: none; }
    selbst - Marker, Reticles und Overlays bleiben unberuehrt. */
 .leaflet-layer .basemap-tile { filter: invert(100%) hue-rotate(180deg) brightness(80%) contrast(120%); }
 .leaflet-layer .basemap-tile::-webkit-selection { filter: none; }
+
+/* ---- Astro-Instrumente (Gauges + LED-Matrix) ---- */
+#astro-instruments { padding: 4px 0; }
+.gauge-row { display: flex; gap: 4px; justify-content: space-around; }
+.gauge-wrap { flex: 1; max-width: 100px; }
+.gauge { width: 100%; height: auto; }
+.gauge-body { fill: #0a0d12; stroke: none; }
+.gauge-ring { fill: none; stroke: #2d3d4f; stroke-width: 2; }
+.gauge-needle { stroke: #3aff7c; stroke-width: 2.5; stroke-linecap: round;
+  filter: drop-shadow(0 0 3px rgba(58,255,124,.5));
+  transition: transform .8s ease-out; transform-origin: 50px 46px; }
+.needle-amber { stroke: #ffd24a; filter: drop-shadow(0 0 3px rgba(255,210,74,.5)); }
+.needle-cyan { stroke: #4db2ff; filter: drop-shadow(0 0 3px rgba(77,178,255,.5)); }
+.gauge-hub { fill: #1d2733; stroke: #3d4d5f; stroke-width: 1; }
+.gauge-label { fill: #5d7186; font-size: 7px; letter-spacing: 1px;
+  font-family: var(--mono); }
+.gauge-val { fill: #c9d6e2; font-size: 11px; font-weight: 700;
+  font-family: var(--mono); }
+
+/* LED-Matrix: quadratische Status-LEDs */
+.led-matrix { display: flex; gap: 6px; justify-content: center;
+  padding: 8px 0 2px; }
+.sq-led { width: 14px; height: 14px; background: #1a1f16;
+  border: 1px solid #2d3d4f; position: relative; cursor: help; }
+.sq-led::after { content: attr(title); position: absolute; bottom: 18px;
+  left: 50%; transform: translateX(-50%); white-space: nowrap;
+  font-size: 9px; font-family: var(--mono); color: var(--dim);
+  background: #0b0f14; padding: 2px 6px; border: 1px solid #2d3d4f;
+  opacity: 0; pointer-events: none; transition: opacity .15s; z-index: 10; }
+.sq-led:hover::after { opacity: 1; }
+.sq-led.on { background: #3aff7c; border-color: #2a8f4f;
+  box-shadow: 0 0 8px rgba(58,255,124,.6); }
+.sq-led.on.amber { background: #ffd24a; border-color: #8f7a2a;
+  box-shadow: 0 0 8px rgba(255,210,74,.6); }
+.sq-led.off { opacity: .3; }
