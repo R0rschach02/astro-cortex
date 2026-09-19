@@ -538,14 +538,18 @@ function rainBadgeHtml(spot, isNew) {
 function markerIcon(spot, rainNew) {
   const rating = spot.rating || "NA";
   const alertCls = (spot.radar_status || "").includes("Alert") ? " alert" : "";
+  // HUD-Reticle: eckige Zielklammern um ein Fadenkreuz, transparenter
+  // Hintergrund, nur die Linien leuchten. Farbe nach Ampel-Rating.
   return L.divIcon({
     className: "",
-    html: `<div class="spot-marker">
-             <div class="spot-dot rating-${esc(rating)}${alertCls}"></div>
+    html: `<div class="hud-reticle rating-${esc(rating)}${alertCls}">
+             <i class="hud-c hud-tl"></i><i class="hud-c hud-tr"></i>
+             <i class="hud-c hud-bl"></i><i class="hud-c hud-br"></i>
+             <span class="hud-cross"></span>
              ${rainBadgeHtml(spot, rainNew)}
              <div class="spot-label">${esc(spot.name)}</div>
            </div>`,
-    iconSize: [46, 46], iconAnchor: [23, 23],
+    iconSize: [52, 52], iconAnchor: [26, 26],
   });
 }
 
@@ -647,8 +651,11 @@ async function refresh() {
     // Comms-Feed: Rating-Wechsel melden (nur wenn vorher bekannt)
     for (const s of data.spots) {
       const before = prevRatings[s.name];
-      if (before && before !== s.rating)
-        commsLog(`${s.name.toUpperCase()} ${before} -> ${s.rating}`);
+      if (before && before !== s.rating) {
+        const toAlert = String(s.rating).includes("NO-GO");
+        commsLog(`${s.name.toUpperCase()} ${before} -> ${s.rating}`,
+                 toAlert ? "alert" : undefined);
+      }
     }
     // Warnungen nachladen (Layer nur, wenn aktiviert); Gewitter-Ringe
     // speichern wir zusaetzlich fuer die Blitz-Icons im Regen-Raster
@@ -656,7 +663,13 @@ async function refresh() {
       const warns = await api("/api/warnings");
       const nWarn = warns.features.length;
       if (nWarn !== (window._lastWarnN ?? -1)) {
-        commsLog(nWarn ? `DWD WARNUNGEN: ${nWarn} aktiv` : "DWD: keine Warnungen");
+        if (nWarn) {
+          const storms = warns.features.filter(f => f.properties.kind === "storm");
+          commsLog(`WARNING: DWD STORM CELL DETECTED (${storms.length} Gewitter, ` +
+                   `${nWarn} gesamt)`, "alert");
+        } else {
+          commsLog("DWD: keine Warnungen");
+        }
         window._lastWarnN = nWarn;
       }
       warnLayer.addData({ type: "FeatureCollection",
@@ -865,12 +878,12 @@ function initInfoWidget() {
 
 // Comms-Feed: Matrix-Terminal im rechten Panel. Neue Zeilen erscheinen
 // unten (Text laeuft nach oben), autoscroll, max 40 Zeilen.
-function commsLog(text) {
+function commsLog(text, severity) {
   const t = document.getElementById("comms-terminal");
   if (!t) return;
   const ts = new Date().toISOString().slice(11, 19);
   const div = document.createElement("div");
-  div.className = "ct-line";
+  div.className = "ct-line" + (severity === "alert" ? " comms-alert" : "");
   div.innerHTML = `<span class="ct-ts">${ts}</span> ${esc(String(text))}`;
   t.appendChild(div);
   while (t.children.length > 40) t.removeChild(t.firstChild);

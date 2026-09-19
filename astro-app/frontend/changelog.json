@@ -230,6 +230,13 @@
    "tag": "neu",
    "desc": "Die App ist jetzt eine echte Kommandozentrale: Die Karte ist die Windschutzscheibe im Zentrum, drumherum ein fester Cockpit-Rahmen. Links massive Hardware-Schalter fuer die Sensoren (Regen, Radar, Satellit, Warnungen, Lichtverschmutzung) mit Status-LEDs - kein Menue mehr. Rechts das Intel-Panel mit der Vorhersage-Zuverlaessigkeit, darunter ein Matrix-Terminal (COMMS FEED), das live Rating-Wechsel, Warnungen und System-Ereignisse als gruenen Text-Lauf mitzeigt. Ganz unten rechts der grosse ASTRO-OBSERVATION-Waffenschalter. Unten eine industrielle Zeitlinie fuer die 6-Stunden-Vorhersage. Oben: UTC-Uhr, GPS-Koordinaten, blinkender System-Status. Alles kantig, dunkel, Monospace.",
    "usage": "Direkt erkennbar: links Sensoren schalten, rechts Intel lesen, unten Zeit spulen, Schalter unten rechts legt die Alarme scharf"
+  },
+  {
+   "date": "2026-09-17",
+   "title": "Taktische Karte: dunkle Kacheln + Ziel-Erfassung",
+   "tag": "neu",
+   "desc": "Die Karte ist jetzt dunkel-grau taktisch statt hell-bunt - wie ein echtes Radar-Display. Die Standorte sind keine runden Pins mehr, sondern Ziel-Erfassungs-Fadenkreuze mit eckigen Klammmern: gruen fuer GO, gelb fuer MAYBE, rot fuer NO-GO; bei aktiver Gewitterwarnung blinkt das Fadenkreuz rot. Im COMMS-Feed blinken echte Wetter-Alarme jetzt hart rot (WARNING: DWD STORM CELL DETECTED), statt zwischen den gruenen System-Zeilen unterzugehen.",
+   "usage": "Karte: dunkel, Fadenkreuze statt Pins; rote Blink-Zeilen im Terminal = Gefahr"
   }
  ]
 }

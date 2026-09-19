@@ -611,3 +611,85 @@ body.night .hw-btn.active .hw-led { background: #ff5f54;
 .overlay, #comms-terminal, .iw-card, #info-widget {
   border-radius: 0 !important;
 }
+
+/* ===================== PHASE 2: HUD-RETICLE & COMMS-ALERT ===================== */
+
+/* HUD-Reticle: eckige Zielklammern [ + ] mit Fadenkreuz, transparent */
+.hud-reticle {
+  position: relative; width: 52px; height: 52px;
+  background: none; border: none;
+}
+.hud-reticle .hud-c {
+  position: absolute; width: 14px; height: 14px;
+  border: 2.5px solid #8fa1b3; background: none;
+}
+.hud-reticle .hud-tl { top: 0; left: 0; border-right: none; border-bottom: none; }
+.hud-reticle .hud-tr { top: 0; right: 0; border-left: none; border-bottom: none; }
+.hud-reticle .hud-bl { bottom: 0; left: 0; border-right: none; border-top: none; }
+.hud-reticle .hud-br { bottom: 0; right: 0; border-left: none; border-top: none; }
+.hud-reticle .hud-cross {
+  position: absolute; left: 50%; top: 50%; width: 22px; height: 22px;
+  transform: translate(-50%, -50%); background: none;
+}
+.hud-reticle .hud-cross::before,
+.hud-reticle .hud-cross::after {
+  content: ""; position: absolute; background: #8fa1b3;
+  box-shadow: 0 0 6px currentColor;
+}
+.hud-reticle .hud-cross::before {
+  left: 50%; top: 0; bottom: 0; width: 1.5px;
+  transform: translateX(-50%);
+  clip-path: polygon(0 0, 100% 0, 100% 32%, 0 32%, 0 68%, 100% 68%, 100% 100%, 0 100%);
+}
+.hud-reticle .hud-cross::after {
+  top: 50%; left: 0; right: 0; height: 1.5px;
+  transform: translateY(-50%);
+  clip-path: polygon(0 0, 32% 0, 32% 100%, 0 100%, 68% 0, 100% 0, 100% 100%, 68% 100%);
+}
+/* Rating-Farben: GO gruen, MAYBE amber, NO-GO rot */
+.hud-reticle.rating-GO { color: #35d07f; }
+.hud-reticle.rating-GO .hud-c { border-color: #35d07f; }
+.hud-reticle.rating-GO .hud-cross { color: #35d07f; }
+.hud-reticle.rating-GO .hud-cross::before,
+.hud-reticle.rating-GO .hud-cross::after { background: #35d07f; }
+.hud-reticle.rating-MAYBE { color: #f5c542; }
+.hud-reticle.rating-MAYBE .hud-c { border-color: #f5c542; }
+.hud-reticle.rating-MAYBE .hud-cross::before,
+.hud-reticle.rating-MAYBE .hud-cross::after { background: #f5c542; }
+.hud-reticle.rating-NO-GO, .hud-reticle.rating-NA { color: #ff5252; }
+.hud-reticle.rating-NO-GO .hud-c, .hud-reticle.rating-NA .hud-c { border-color: #ff5252; }
+.hud-reticle.rating-NO-GO .hud-cross::before,
+.hud-reticle.rating-NO-GO .hud-cross::after,
+.hud-reticle.rating-NA .hud-cross::before,
+.hud-reticle.rating-NA .hud-cross::after { background: #ff5252; }
+.hud-reticle.alert .hud-c {
+  border-color: #ff2a00; animation: hud-pulse 1s infinite;
+}
+@keyframes hud-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 4px #ff2a00; }
+  50% { opacity: .45; box-shadow: none; }
+}
+.hud-reticle .spot-label {
+  position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+  white-space: nowrap; font-size: 10.5px; font-weight: 600;
+  font-family: var(--mono); letter-spacing: .5px;
+  color: var(--txt); text-shadow: 0 1px 3px #000, 0 0 6px #000;
+  pointer-events: none;
+}
+/* Regen-Badge am Reticle (Position uebernehmen) */
+.hud-reticle .rain-badge { top: -8px; left: -6px; }
+
+/* Comms-Alert: hart rot blinkend im Matrix-Terminal */
+.comms-alert {
+  color: #ff3b30 !important; font-weight: 700;
+  text-shadow: 0 0 8px rgba(255,59,48,.7) !important;
+  animation: comms-blink 1s infinite;
+}
+@keyframes comms-blink {
+  0%, 100% { opacity: 1; background: rgba(255,59,48,.14); }
+  50% { opacity: .35; background: transparent; }
+}
+/* Dark Matter Tiles: leicht weiter abdunkeln + Rotlicht kompatibel */
+.leaflet-container { background: #0a0d12; }
+.basemap-tile { filter: none; }
+body.night .basemap-tile { filter: none; }
