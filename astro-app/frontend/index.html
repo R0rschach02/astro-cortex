@@ -45,6 +45,17 @@
         <button class="hw-btn hw-mini" id="zoom-out" title="Verkleinern">－</button>
         <button class="hw-btn hw-mini" id="left-panel-pin" title="Panel ein-/ausklappen">◄</button>
       </div>
+      <div class="panel-hdr" style="margin-top:12px">LUNAR&nbsp;HORIZON</div>
+      <div id="lunar-horizon">
+        <div id="lh-best-label">BEST&nbsp;SITE&nbsp;<b id="lh-best">--</b></div>
+        <div id="lh-box">
+          <div id="lh-sky"></div>
+          <div id="lh-hline"></div>
+          <div id="lh-moon">&#127765;</div>
+          <div id="lh-ground"></div>
+        </div>
+        <div id="lh-data"><span id="lh-alt">--</span> <span id="lh-illum">--</span></div>
+      </div>
     </aside>
 
     <!-- ============ ZENTRUM: WINDSCHUTZSCHEIBE ============ -->
@@ -73,16 +84,7 @@
       <div class="panel-hdr" style="margin-top:8px">ASTRO&nbsp;INSTR</div>
       <div id="astro-instruments">
         <div class="gauge-row">
-          <div class="gauge-wrap">
-            <svg viewBox="0 0 100 80" class="gauge" id="gauge-moon">
-              <circle cx="50" cy="46" r="36" class="gauge-body"/>
-              <circle cx="50" cy="46" r="36" class="gauge-ring"/>
-              <line x1="50" y1="46" x2="50" y2="12" class="gauge-needle" id="moon-needle" transform="rotate(0 50 46)"/>
-              <circle cx="50" cy="46" r="3" class="gauge-hub"/>
-              <text x="50" y="74" text-anchor="middle" class="gauge-label">MOON&nbsp;ALT</text>
-              <text x="50" y="62" text-anchor="middle" class="gauge-val" id="moon-alt">--&deg;</text>
-            </svg>
-          </div>
+          
           <div class="gauge-wrap">
             <svg viewBox="0 0 100 80" class="gauge" id="gauge-seeing">
               <circle cx="50" cy="46" r="36" class="gauge-body"/>

@@ -612,6 +612,8 @@ function panelHtml(s) {
     </div>
     <div class="grp mono"><b>Planeten &gt; 30°</b><span class="age">de421 · lokal</span></div>
     <div class="kv mono">${planetRows || row("Planeten", "keine Daten")}</div>
+    <button class="transit-btn" onclick="fetchTransitRoute('${esc(s.name)}', ${s.lat}, ${s.lon})" title="OePNV vom GPS-Standort hierher">&#128646; TRANSIT ROUTE</button>
+    <div id="transit-result" class="transit-result"></div>
     <div class="sub" style="margin-top:10px">
       Wolkenquelle: ${esc(s.clouds_source || "n/a")} &middot; ${isPlanet
         ? "Planetarisch: Seeing/Jetstream hart, Mond & Beschlag irrelevant"
@@ -650,6 +652,7 @@ async function refresh() {
       ? Object.fromEntries(lastSpatsCache(lastSpots)) : {};
     renderSpots(data);
     updateAstroInstruments(data);
+    updateLunarHorizon(data);
     // Comms-Feed: Rating-Wechsel melden (nur wenn vorher bekannt)
     for (const s of data.spots) {
       const before = prevRatings[s.name];
@@ -902,13 +905,6 @@ function setTpCoords(lat, lon) {
 function updateAstroInstruments(data) {
   if (!data || !data.spots || !data.spots.length) return;
   const s = data.spots[0];  // erster Standort als Primär-Anzeige
-  // Mond-Höhe: Nadel von -90 bis +90 -> 0..180 Grad
-  const alt = s.moon?.max_alt ?? 0;
-  const _el_moon_alt = document.getElementById("moon-alt");
-  if (_el_moon_alt) _el_moon_alt.textContent = `${alt.toFixed(0)}\u00b0`;
-  const moonNeedle = document.getElementById("moon-needle");
-  if (moonNeedle) moonNeedle.setAttribute("transform",
-    `rotate(${(alt / 90) * 90} 50 46)`);
   // Seeing: 0-5" -> -90 bis +90 Grad
   const seeing = s.seeing ?? 2;
   const _el_seeing_val = document.getElementById("seeing-val");
@@ -932,6 +928,71 @@ function updateAstroInstruments(data) {
   if (ledObs) ledObs.classList.add("off");
   const ledUap = document.getElementById("led-uap");
   if (ledUap) ledUap.classList.add("off");
+}
+
+function updateLunarHorizon(data) {
+  if (!data || !data.spots || !data.spots.length) return;
+  const best = data.spots.find(s => s.rating === "GO")
+    || data.spots.find(s => s.rating === "MAYBE") || data.spots[0];
+  const bestEl = document.getElementById("lh-best");
+  if (bestEl) bestEl.textContent = (best.name || "?").split(/[ (]/)[0].toUpperCase();
+  const alt = (best.moon || {}).max_alt || 0;
+  const illum = (best.moon || {}).illum || 0;
+  const moonIcon = document.getElementById("lh-moon");
+  const altText = document.getElementById("lh-alt");
+  const illumText = document.getElementById("lh-illum");
+  if (altText) altText.textContent = "ALT " + alt.toFixed(0) + "\u00b0";
+  if (illumText) illumText.textContent = "ILLUM " + illum.toFixed(0) + "%";
+  if (moonIcon) {
+    const pos = 50 - (alt / 90) * 42;
+    moonIcon.style.top = Math.max(5, Math.min(95, pos)) + "%";
+    moonIcon.style.opacity = alt > 0 ? 1 : 0.2;
+  }
+  const hl = document.getElementById("lh-hline");
+  if (hl) hl.style.borderColor = alt > 0 ? "#ffd24a" : "#455262";
+}
+
+async function fetchTransitRoute(name, lat, lon) {
+  const resultEl = document.getElementById("transit-result");
+  if (!resultEl) return;
+  resultEl.innerHTML = "<div class='transit-loading'>\u23F3 VRN-Fahrplan...</div>";
+  let homeLat = 49.4793, homeLon = 8.4689;
+  try {
+    const pos = await new Promise((res, rej) => {
+      navigator.geolocation.getCurrentPosition(res, rej, {timeout: 5000});
+    });
+    homeLat = pos.coords.latitude; homeLon = pos.coords.longitude;
+    setTpCoords(homeLat, homeLon);
+  } catch (e) { console.debug("GPS nicht verfuegbar, nutze Hbf"); }
+  try {
+    const d = await api("/api/deployment?name=" + encodeURIComponent(name)
+      + "&setup_minutes=30");
+    let html = "";
+    if (d.latest_departure) {
+      const ld = d.latest_departure;
+      html += "<div class='transit-conn'><b>\u27A1 Hin:</b> " + ld.time
+        + " ab " + esc(ld.from) + " (" + esc(ld.lines.join(", "))
+        + ", " + ld.changes + "x) \u2192 " + ld.arrival
+        + " (+" + ld.walking_min.toFixed(0) + "min)</div>";
+    } else if (d.note) {
+      html += "<div class='transit-none'>\u26A0 " + esc(d.note) + "</div>";
+    }
+    if (d.extraction) {
+      const ex = d.extraction;
+      html += "<div class='transit-conn'><b>\u2B05 Rueck:</b> "
+        + ex.earliest_return + " (" + esc(ex.lines.join(", "))
+        + ") \u2192 " + ex.arrival_home
+        + " | Abbau " + d.extraction_warning_ts + "</div>";
+    } else if (!d.latest_departure) {
+      html += "<div class='transit-none'>Keine Rueckverbindung.</div>";
+    }
+    html += "<div class='transit-src'>" + esc(d.transit_source)
+      + " | " + esc(d.golden_window) + "</div>";
+    resultEl.innerHTML = html;
+  } catch (e) {
+    resultEl.innerHTML = "<div class='transit-none'>\u274C "
+      + esc(e.message || "Fehler") + "</div>";
+  }
 }
 
 function initCockpitStatus() {

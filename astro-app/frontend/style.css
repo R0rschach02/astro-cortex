@@ -734,3 +734,89 @@ body.night .basemap-tile { filter: none; }
 .sq-led.on.amber { background: #ffd24a; border-color: #8f7a2a;
   box-shadow: 0 0 8px rgba(255,210,74,.6); }
 .sq-led.off { opacity: .3; }
+
+/* ---- P1: Spot-Dots (Rollback von Reticles) ---- */
+.spot-marker { position: relative; width: 46px; height: 46px; cursor: pointer; }
+.spot-dot {
+  position: absolute; inset: 9px; border-radius: 50%;
+  border: 3px solid rgba(0,0,0,.55);
+  box-shadow: 0 0 10px 1px currentColor;
+}
+.spot-dot.rating-GO     { background: #35d07f; color: #35d07f; }
+.spot-dot.rating-MAYBE  { background: #f5c542; color: #f5c542; }
+.spot-dot.rating-NO-GO  { background: #ff5252; color: #ff5252; }
+.spot-dot.rating-NA     { background: #5d7186; color: #5d7186; }
+.spot-dot.alert::after {
+  content: "!"; position: absolute; top: -7px; right: -7px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #ff2a00; color: #fff; font: bold 13px/18px sans-serif;
+  text-align: center;
+}
+.spot-marker .spot-label {
+  position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+  white-space: nowrap; font-size: 11px; font-weight: 600;
+  color: var(--txt); text-shadow: 0 1px 3px #000, 0 0 6px #000;
+  pointer-events: none;
+}
+.spot-marker .rain-badge { top: -4px; left: -4px; }
+
+/* ---- P2: Gauge-Needles korrekt zentriert (SVG-Transform) ---- */
+.gauge-needle { transform-box: fill-box; transform-origin: 50% 100%; }
+/* SVG-spezifisch: die rotate-Transform am <line>-Element rotiert um
+   den Endpunkt (50,46 = Gauge-Zentrum). transform-origin nur CSS-seitig. */
+
+/* ---- P3: Lunar Horizon Widget ---- */
+#lunar-horizon { padding: 2px 0 8px; }
+#lh-best-label {
+  font: 700 10px var(--mono); color: var(--amber2); letter-spacing: 1.5px;
+  text-align: center; margin-bottom: 6px;
+}
+#lh-best-label b { color: var(--grn); }
+#lh-box {
+  position: relative; height: 120px; overflow: hidden;
+  background: linear-gradient(180deg, #0a0e15 0%, #0d1420 50%, #111827 50%, #1a1f16 100%);
+  border: 1px solid var(--line-hi); border-radius: 0;
+}
+#lh-hline {
+  position: absolute; left: 0; right: 0; top: 50%;
+  border-top: 1.5px solid var(--amber2); opacity: .7;
+  transition: border-color .3s;
+}
+#lh-moon {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  font-size: 22px; top: 50%; transition: top 1s ease-in-out, opacity .5s;
+  filter: drop-shadow(0 0 6px rgba(255,210,74,.6));
+  z-index: 2;
+}
+#lh-sky, #lh-ground { position: absolute; left: 0; right: 0; }
+#lh-sky { top: 0; height: 50%; }
+#lh-ground { top: 50%; bottom: 0; background:
+  repeating-linear-gradient(0deg, #1a1f16 0 3px, transparent 3px 6px); }
+#lh-data {
+  display: flex; justify-content: space-around;
+  font: 700 10px var(--mono); color: var(--dim); margin-top: 4px;
+}
+#lh-alt { color: var(--amber2); }
+#lh-illum { color: var(--dim); }
+
+/* ---- P4: Transit-Route Button & Result ---- */
+.transit-btn {
+  display: block; width: 100%; padding: 10px;
+  margin: 8px 0 4px; border-radius: 0 !important;
+  background: linear-gradient(180deg, #1d2a3c, #121a28);
+  border: 2px solid #2d4a6f; color: #4db2ff;
+  font: 700 13px var(--mono); letter-spacing: 2px;
+  cursor: pointer; text-align: center;
+  box-shadow: inset 0 1px 0 #3a5a7f, 0 2px 4px rgba(0,0,0,.5);
+}
+.transit-btn:active { transform: translateY(1px); }
+.transit-btn:hover { border-color: #4db2ff; box-shadow: 0 0 12px rgba(77,178,255,.3); }
+.transit-result { margin: 6px 0; }
+.transit-conn, .transit-none, .transit-src, .transit-loading {
+  font: 11px var(--mono); padding: 4px 8px; margin: 2px 0;
+  border-left: 3px solid var(--line-hi); background: rgba(0,0,0,.2);
+}
+.transit-conn { border-left-color: #35d07f; color: var(--txt); }
+.transit-none { border-left-color: #ff5252; color: #ff8c80; }
+.transit-src { color: var(--dim); font-size: 9.5px; border-left-color: var(--line); }
+.transit-loading { color: var(--amber2); }

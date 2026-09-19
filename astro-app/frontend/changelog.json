@@ -244,6 +244,13 @@
    "tag": "neu",
    "desc": "Drei grosse Updates: (1) Die Karte ist jetzt tiefschwarz taktisch (die hellen Kacheln waren nur ein Zwischenschritt). (2) Bahnanbindung ist live: Fuer jeden Standort kann ab sofort abgefragt werden, wann die letzte Bahn hingehen muesste und wann die erste zurueckfaehrt - komplett offline aus dem VRN-Fahrplan berechnet. Neue API: /api/deployment. (3) Astro-Instrumente im Cockpit: Mond-Radar (Hohe/Azimut), Seeing- und Taupunkt-Anzeigen als analoge Rundinstrumente, Status-LED-Matrix fuer Missions-Faktoren.",
    "usage": "Karte: dunkel; API: /api/deployment?id=ellerstadt_east; Instrumente im rechten Panel"
+  },
+  {
+   "date": "2026-09-19",
+   "title": "Frontend-Politur: Marker, Instrumente, Bahnanbindung",
+   "tag": "neu",
+   "desc": "Vier Verbesserungen auf einen Schlag: (1) Die Standort-Marker sind wieder grosse, gut sichtbare farbige Punkte mit Glow - auf jeder Karte lesbar. (2) Die Messinstrumente (Seeing, Taupunkt) sind jetzt korrekt zentriert - die Nadeln rotieren sauber im Kreis. (3) Neues Mond-Horizont-Display im linken Panel: zeigt den besten Standort der Nacht und darueber, wo der Mond gerade am Himmel steht. (4) Jeder Standort hat jetzt einen TRANSIT-ROUTE-Button: Ein Klick zeigt die Bahnanbindung von deinem GPS-Standort dorthin - mit letzter Hin- und fruehester Rueckfahrt.",
+   "usage": "Standort anklicken -> TRANSIT ROUTE klicken; linkes Panel zeigt den Mond-Horizont"
   }
  ]
 }
