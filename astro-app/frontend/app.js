@@ -539,18 +539,14 @@ function rainBadgeHtml(spot, isNew) {
 function markerIcon(spot, rainNew) {
   const rating = spot.rating || "NA";
   const alertCls = (spot.radar_status || "").includes("Alert") ? " alert" : "";
-  // HUD-Reticle: eckige Zielklammern um ein Fadenkreuz, transparenter
-  // Hintergrund, nur die Linien leuchten. Farbe nach Ampel-Rating.
   return L.divIcon({
     className: "",
-    html: `<div class="hud-reticle rating-${esc(rating)}${alertCls}">
-             <i class="hud-c hud-tl"></i><i class="hud-c hud-tr"></i>
-             <i class="hud-c hud-bl"></i><i class="hud-c hud-br"></i>
-             <span class="hud-cross"></span>
+    html: `<div class="spot-marker">
+             <div class="spot-dot rating-${esc(rating)}${alertCls}"></div>
              ${rainBadgeHtml(spot, rainNew)}
              <div class="spot-label">${esc(spot.name)}</div>
            </div>`,
-    iconSize: [52, 52], iconAnchor: [26, 26],
+    iconSize: [46, 46], iconAnchor: [23, 23],
   });
 }
 
