@@ -71,7 +71,8 @@ def _spot_state(loc: dict, profile: str = "dso") -> dict:
     - Mond/Dunkelheit/Planeten aus dem Tages-Cache (skyfield)
     Rating wird mit dem aktiven Beobachtungsprofil (dso|planet) berechnet.
     """
-    out = {"name": loc["name"], "lat": loc["lat"], "lon": loc["lon"],
+    out = {"name": loc["name"], "id": loc.get("id", ""),
+           "lat": loc["lat"], "lon": loc["lon"],
            "is_live": loc["name"].startswith("Live "), "age_min": None}
     conn = _db()
     try:
