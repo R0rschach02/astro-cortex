@@ -414,7 +414,7 @@ body.night .iw-toggle-row { border-color: #3a2020; }
   position: fixed; inset: 0; display: grid;
   grid-template-areas: "top top top" "left map right" "bottom bottom bottom";
   grid-template-rows: 48px 1fr 52px;
-  grid-template-columns: 168px 1fr 340px;
+  grid-template-columns: minmax(168px, max-content) 1fr 340px;
   background: var(--void); gap: 2px;
 }
 #topbar { grid-area: top; }
@@ -424,7 +424,7 @@ body.night .iw-toggle-row { border-color: #3a2020; }
 #bottom-panel { grid-area: bottom; }
 #map { position: absolute; inset: 0; background: #0a0d12; }
 #cockpit.collapse-left { grid-template-columns: 0 1fr 340px; }
-#cockpit.collapse-right { grid-template-columns: 168px 1fr 0; }
+#cockpit.collapse-right { grid-template-columns: minmax(168px, max-content) 1fr 0; }
 #cockpit.collapse-left.collapse-right { grid-template-columns: 0 1fr 0; }
 #cockpit.collapse-left #left-panel,
 #cockpit.collapse-right #right-panel { overflow: hidden; border: none; }

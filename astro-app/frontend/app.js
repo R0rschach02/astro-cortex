@@ -608,7 +608,7 @@ function panelHtml(s) {
     </div>
     <div class="grp mono"><b>Planeten &gt; 30°</b><span class="age">de421 · lokal</span></div>
     <div class="kv mono">${planetRows || row("Planeten", "keine Daten")}</div>
-    <button class="transit-btn" onclick="fetchTransitRoute('${esc(s.name)}', ${s.lat}, ${s.lon})" title="OePNV vom GPS-Standort hierher">&#128646; TRANSIT ROUTE</button>
+    <button class="transit-btn" onclick="fetchTransitRoute('${esc(s.id || s.name)}', ${s.lat}, ${s.lon})" title="OePNV vom GPS-Standort hierher">&#128646; TRANSIT ROUTE</button>
     <div id="transit-result" class="transit-result"></div>
     <div class="sub" style="margin-top:10px">
       Wolkenquelle: ${esc(s.clouds_source || "n/a")} &middot; ${isPlanet
@@ -961,7 +961,7 @@ async function fetchTransitRoute(name, lat, lon) {
     setTpCoords(homeLat, homeLon);
   } catch (e) { console.debug("GPS nicht verfuegbar, nutze Hbf"); }
   try {
-    const d = await api("/api/deployment?name=" + encodeURIComponent(name)
+    const d = await api("/api/deployment?id=" + encodeURIComponent(name
       + "&setup_minutes=30");
     let html = "";
     if (d.latest_departure) {
