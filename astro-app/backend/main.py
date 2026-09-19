@@ -514,7 +514,8 @@ def api_deployment(id: str, home: str = "mannheim_hbf",
         log.warning("[API] Standort-Lookup fehlgeschlagen: %s",
                     type(e).__name__)
         locs = []
-    obs = next((l for l in locs if l.get("id") == id), None)
+    obs = next((l for l in locs if l.get("id") == id
+                or l.get("name") == id), None)
     if obs is None:
         raise HTTPException(404, f"Kein Standort mit id '{id}'")
     home = next((l for l in locs
