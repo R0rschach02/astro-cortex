@@ -44,12 +44,13 @@ function initMap() {
   map = L.map("map", { zoomControl: false, tap: true })
         .setView([49.54, 8.63], 10);
 
-  // Basiskarte: CARTO Dark Matter - taktisch dunkel, live geprueft
-  // 2026-09-17 ohne API-Key erreichbar (LESSONS Fall 8 bleibt beobachtet;
-  // Fallback waere OSM + dark-CSS-Filter).
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-    maxZoom: 18, subdomains: "abc",
-    attribution: '&copy; OpenStreetMap-Mitwirkende, &copy; CARTO',
+  // Basiskarte: OSM + CSS-Invert-Filter = tiefschwarz taktisch (LESSONS
+  // Fall 8: CARTODark lieferte in der Praxis doch "API KEY REQUIRED"-
+  // Wasserzeichen obwohl Einzelkacheln 200 lieferten - Live-Beweis immer
+  // gegen die GERENDERTE Karte fahren, nicht gegen Einzelrequests).
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 18, subdomains: "abc", className: "basemap-tile",
+    attribution: '&copy; OpenStreetMap-Mitwirkende',
   }).addTo(map);
 
   // Lichtverschmutzung (Lorenz-Atlas via Backend-Proxy, Disk-Cache dort).

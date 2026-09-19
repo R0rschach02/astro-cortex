@@ -237,6 +237,13 @@
    "tag": "neu",
    "desc": "Die Karte ist jetzt dunkel-grau taktisch statt hell-bunt - wie ein echtes Radar-Display. Die Standorte sind keine runden Pins mehr, sondern Ziel-Erfassungs-Fadenkreuze mit eckigen Klammmern: gruen fuer GO, gelb fuer MAYBE, rot fuer NO-GO; bei aktiver Gewitterwarnung blinkt das Fadenkreuz rot. Im COMMS-Feed blinken echte Wetter-Alarme jetzt hart rot (WARNING: DWD STORM CELL DETECTED), statt zwischen den gruenen System-Zeilen unterzugehen.",
    "usage": "Karte: dunkel, Fadenkreuze statt Pins; rote Blink-Zeilen im Terminal = Gefahr"
+  },
+  {
+   "date": "2026-09-17",
+   "title": "Bahnanbindung live + dunkle Karte + Astro-Instrumente",
+   "tag": "neu",
+   "desc": "Drei grosse Updates: (1) Die Karte ist jetzt tiefschwarz taktisch (die hellen Kacheln waren nur ein Zwischenschritt). (2) Bahnanbindung ist live: Fuer jeden Standort kann ab sofort abgefragt werden, wann die letzte Bahn hingehen muesste und wann die erste zurueckfaehrt - komplett offline aus dem VRN-Fahrplan berechnet. Neue API: /api/deployment. (3) Astro-Instrumente im Cockpit: Mond-Radar (Hohe/Azimut), Seeing- und Taupunkt-Anzeigen als analoge Rundinstrumente, Status-LED-Matrix fuer Missions-Faktoren.",
+   "usage": "Karte: dunkel; API: /api/deployment?id=ellerstadt_east; Instrumente im rechten Panel"
   }
  ]
 }

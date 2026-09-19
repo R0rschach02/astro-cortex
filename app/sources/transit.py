@@ -149,6 +149,12 @@ class GTFSStaticSource:
         for t in self._trip_times.values():
             t.sort(key=lambda e: e[1])
         self._apply_service_calendar()
+        # Stop->Trips-Index: Router sucht pro Haltestelle nur die bedienenden
+        # Fahrten statt ueber ALLE zu iterieren (VRN-Feed: 70k Trips).
+        self._stop_trips = {}
+        for tid, seq in self._trip_times.items():
+            for sid, _sq, _dep, _arr in seq:
+                self._stop_trips.setdefault(sid, set()).add(tid)
 
     def _apply_service_calendar(self):
         cal = list(self._rows("calendar.txt"))
@@ -172,6 +178,10 @@ class GTFSStaticSource:
         self._trip_times = {
             tid: seq for tid, seq in self._trip_times.items()
             if self._trip_service.get(tid) in active}
+        self._stop_trips = {}
+        for tid, seq in self._trip_times.items():
+            for sid, _sq, _dep, _arr in seq:
+                self._stop_trips.setdefault(sid, set()).add(tid)
 
     # ---------- Haltestellen ----------
     def next_stops(self, lat: float, lon: float,
@@ -194,40 +204,76 @@ class GTFSStaticSource:
         return self._routes.get(self._trip_route.get(trip_id, ""), "?")
 
     # ---------- Router (deterministische Breitensuche) ----------
+    HUB_MIN_ROUTES = 2   # >=2 Routen = Umstiegskandidat (Hub)
+
+    def _hub_stops(self) -> set:
+        """Stops, an denen Mind. HUB_MIN_ROUTES verschiedene Routen halten
+        - nur diese sind praktikable Umstiegspunkte (sonst BFS-Explosion)."""
+        if hasattr(self, "_hub_cache"):
+            return self._hub_cache
+        stop_routes = {}
+        for tid, seq in self._trip_times.items():
+            route = self._trip_route.get(tid, "")
+            for sid, _sq, _d, _a in seq:
+                stop_routes.setdefault(sid, set()).add(route)
+        self._hub_cache = {sid for sid, routes in stop_routes.items()
+                           if len(routes) >= self.HUB_MIN_ROUTES}
+        return self._hub_cache
+
     def _search(self, start_ids: set, goal_ids: set, dep_after: datetime,
                 arrive_before: datetime) -> list:
-        """Fahrtenketten von start_ids nach goal_ids. Rueckgabe:
-        [(legs)] mit leg = (trip_id, i_start, i_ziel, ankunft_timedelta);
-        dep_after/arrive_before als Zeitdelta zum Bezugsdatum 00:00."""
+        """Two-Pass-Suche statt BFS (deterministisch, schnell):
+        Pass 1: alle vom Start erreichbaren Stops mit fruehester Ankunft
+        Pass 2: von jedem Umstiegs-Stop (Hub) erreichbare Ziel-Verbindungen.
+        Rueckgabe: [(legs)] mit leg = (trip_id, i_start, i_ziel, ankunft_td)."""
         base = dep_after.replace(hour=0, minute=0, second=0, microsecond=0)
         min_dep = (dep_after - base)
         max_arr = (arrive_before - base)
-        results = []
-        queue = deque([([], frozenset(start_ids), frozenset())])
-        while queue:
-            legs, cur_stops, used = queue.popleft()
-            for tid in sorted(self._trip_times):
-                if tid in used:
+
+        # Pass 1: erreichbare Stops vom Start (mit boarding-Position im Trip)
+        transfers = {}  # stop_id -> (arrival_td, trip_id, i_board, i_transfer)
+        for tid in sorted(self._trip_times):
+            seq = self._trip_times[tid]
+            for i, (sid, _sq, dep, _sa) in enumerate(seq):
+                if sid not in start_ids or dep < min_dep:
                     continue
-                seq = self._trip_times[tid]
-                for i, (sid, _sq, dep, _sa) in enumerate(seq):
-                    if sid not in cur_stops:
+                for j in range(i + 1, len(seq)):
+                    sid2, _sq2, _sd2, arr2 = seq[j]
+                    if arr2 > max_arr:
+                        break
+                    if sid2 not in transfers or arr2 < transfers[sid2][0]:
+                        transfers[sid2] = (arr2, tid, i, j)
+
+        # Direktverbindungen (Start -> Ziel in derselben Fahrt)
+        results = []
+        for sid2, (arr2, tid, i, j) in transfers.items():
+            if sid2 in goal_ids:
+                results.append([(tid, i, j, arr2)])
+
+        # Pass 2: von Transfer-Stops zum Ziel (1 Umstieg)
+        hubs = self._hub_stops()
+        MIN_TRANSFER = timedelta(minutes=MIN_TRANSFER_MIN)
+        for tstop, (arr_transfer, tid1, i1, j1) in sorted(
+                transfers.items(), key=lambda x: x[1][0]):
+            if tstop not in hubs or tstop in goal_ids:
+                continue
+            ttrips = self._stop_trips.get(tstop, set())
+            for tid2 in sorted(ttrips):
+                if tid2 == tid1:
+                    continue
+                seq2 = self._trip_times[tid2]
+                for i2, (sid, _sq, dep, _sa) in enumerate(seq2):
+                    if sid != tstop or dep < arr_transfer + MIN_TRANSFER:
                         continue
-                    floor = min_dep if not legs else \
-                        legs[-1][3] + timedelta(minutes=MIN_TRANSFER_MIN)
-                    if dep < floor:
-                        continue
-                    for j in range(i + 1, len(seq)):
-                        sid2, _sq2, _sd2, arr2 = seq[j]
+                    for j2 in range(i2 + 1, len(seq2)):
+                        sid2, _sq2, _sd2, arr2 = seq2[j2]
                         if arr2 > max_arr:
-                            continue
+                            break
                         if sid2 in goal_ids:
                             results.append(
-                                legs + [(tid, i, j, arr2)])
-                        elif len(legs) + 1 <= MAX_CHANGES:
-                            queue.append(
-                                (legs + [(tid, i, j, arr2)],
-                                 frozenset({sid2}), used | {tid}))
+                                [(tid1, i1, j1, arr_transfer),
+                                 (tid2, i2, j2, arr2)])
+                    break
         return results
 
     def _connection(self, legs, base: datetime, walk_start_min: float,

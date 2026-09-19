@@ -490,6 +490,81 @@ def api_bias_history(days: int = Query(30, ge=1, le=365)):
              "n_7d": r[5] if len(r) > 5 else None} for r in rows]
 
 
+_TRANSIT_BBOX = (48.8, 7.8, 50.2, 9.5)  # VRN-Gebiet um Mannheim/Pfalz
+
+
+@app.get("/api/deployment")
+def api_deployment(id: str, home: str = "mannheim_hbf",
+                   setup_minutes: int = 30):
+    """OePNV-Deployment-Plan fuer einen Standort: letzte Bahn hin (um
+    rechtzeitig vor dem Golden Window + Aufbau-Puffer da zu sein),
+    frueheste Bahn zurueck + Abbau-Warnung. Primaerquelle VRN-GTFS-Static
+    (lokal ~/gtfs), DELFI-Fallback dokumentiert."""
+    import sys as _sys
+    _sys.path.insert(0, "/home/enigma")
+    from app.engine.deployment import deployment_window
+    from app.sources.transit import (GTFSNotAvailableError,
+                                     GTFSStaticSource)
+    from datetime import datetime as _dt, timedelta as _td
+
+    try:
+        locs = ac.active_locations(ac.DEFAULT_LOCATIONS) \
+            + ac.load_watchlist()
+    except Exception as e:  # noqa: BLE001 - sichtbar geloggt
+        log.warning("[API] Standort-Lookup fehlgeschlagen: %s",
+                    type(e).__name__)
+        locs = []
+    obs = next((l for l in locs if l.get("id") == id), None)
+    if obs is None:
+        raise HTTPException(404, f"Kein Standort mit id '{id}'")
+    home = next((l for l in locs
+                 if l.get("id") == home or l.get("name") == home), None)
+    if home is None:
+        # Fallback: Mannheim Hbf als festen Heimatknoten
+        home = {"id": "mannheim_hbf", "name": "Mannheim Hbf",
+                "lat": 49.4793, "lon": 8.4689}
+
+    # Golden Window aus dem Forecast (naechstes Fenster)
+    try:
+        with open(ac.FORECAST_PATH, "r", encoding="utf-8") as f:
+            fc = json.load(f)
+        entry = fc.get(obs["name"]) or {}
+    except (OSError, ValueError):
+        entry = {}
+    gws = entry.get("golden_windows") or []
+    gw = gws[0] if gws else None
+    if not gw:
+        raise HTTPException(404, f"Kein Golden Window fuer '{obs['name']}' "
+                                 f"- naechster Heavy-Tick liefert nach")
+
+    now = _dt.now()
+    night = _dt.fromisoformat(gw["night"])
+    gws_dt = _dt.combine(night, _dt.strptime(gw["start"], "%H:%M").time())
+    gwe_dt = gws_dt + _td(hours=max(1, gw.get("hours", 1)))
+    # Wenn Start schon vorbei (Fenster laeuft), heute ab jetzt
+    if gws_dt < now - _td(hours=2):
+        gws_dt = now
+
+    try:
+        transit = GTFSStaticSource("/home/enigma/gtfs",
+                                   bbox=_TRANSIT_BBOX)
+    except GTFSNotAvailableError as e:
+        raise HTTPException(503, str(e))
+
+    plan = deployment_window(gws_dt, gwe_dt, home, obs, transit,
+                             setup_minutes)
+    return {
+        "destination": plan.destination,
+        "golden_window": f"{plan.golden_window_start}-{plan.golden_window_end}",
+        "latest_departure": plan.latest_departure,
+        "extraction": plan.extraction,
+        "extraction_warning_ts": plan.extraction_warning_ts,
+        "setup_buffer_min": plan.setup_buffer_min,
+        "transit_source": plan.transit_source,
+        "home": home.get("name", "?"),
+    }
+
+
 class ObsModeBody(BaseModel):
     active: bool
 
