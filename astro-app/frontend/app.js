@@ -1095,7 +1095,7 @@ function updateAstroInstruments(data) {
   if (ledObs) ledObs.classList.add("off");
   const ledUap = document.getElementById("led-uap");
   if (ledUap) ledUap.classList.add("off");
-}}
+}
 
 function updateLunarHorizon(data) {
   if (!data || !data.spots || !data.spots.length) return;

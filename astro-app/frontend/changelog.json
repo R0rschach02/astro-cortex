@@ -306,6 +306,12 @@
       "title": "Hotfix: Syntaxfehler nach Flightstick-Einbau",
       "detail": "Beim Entfernen des alten Threat-Blocks ging die schliessende Klammer von updateLunarHorizon mit - app.js war komplett unparsebar (Unexpected token). Klammer restauriert.",
       "usage": "-"
+    },
+    {
+      "date": "2026-09-21",
+      "title": "Hotfix 2: doppelte schliessende Klammer",
+      "detail": "Nach dem Klammer-Restaurant doppelt geendet: das Replacementsende und der Index-Schnitt brachten je eine schliessende Klammer mit. Korrigiert; Syntax jetzt browser-verifiziert vor dem Deploy.",
+      "usage": "-"
     }
   ]
 }
