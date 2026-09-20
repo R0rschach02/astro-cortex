@@ -711,7 +711,7 @@ body.night .basemap-tile { filter: none; }
   filter: drop-shadow(0 0 3px rgba(58,255,124,.5)); }
 .needle-amber { stroke: #ffd24a; filter: drop-shadow(0 0 3px rgba(255,210,74,.5)); }
 .needle-cyan { stroke: #4db2ff; filter: drop-shadow(0 0 3px rgba(77,178,255,.5)); }
-.gauge-hub { fill: #1d2733; stroke: #3d4d5f; stroke-width: 1; }
+.gauge-hub { fill: #2a3542; stroke: #4a5a6f; stroke-width: 1.5; }
 .gauge-label { fill: #5d7186; font-size: 7px; letter-spacing: 1px;
   font-family: var(--mono); }
 .gauge-val { fill: #c9d6e2; font-size: 11px; font-weight: 700;
@@ -887,3 +887,8 @@ body.night .basemap-tile { filter: none; }
   font-size: 9.5px; min-height: 14px;
 }
 #lh-best-label b { display: inline; }
+
+/* Tick-Ring: dezente innere Skala fuer die Rundinstrumente */
+.gauge-ticks { fill: none; stroke: #1d2733; stroke-width: 1;
+  stroke-dasharray: 2 4; }
+.gauge-hub { fill: #2a3542; stroke: #4a5a6f; stroke-width: 1.5; }

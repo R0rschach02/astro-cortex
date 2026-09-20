@@ -915,14 +915,14 @@ function updateAstroInstruments(data) {
   if (_el_seeing_val) _el_seeing_val.textContent = seeing ? `${seeing.toFixed(1)}"` : "--";
   const sn = document.getElementById("seeing-needle");
   if (sn) sn.setAttribute("transform",
-    `rotate(${(-90 + (Math.min(seeing, 5) / 5) * 180)} 50 46)`);
+    `rotate(${(-90 + (Math.min(seeing, 5) / 5) * 180)} 50 45)`);
   // Taupunkt-Spread: 0-15K -> -90 bis +90 Grad
   const tau = s.dewpoint_spread ?? 5;
   const _el_tau_val = document.getElementById("tau-val");
   if (_el_tau_val) _el_tau_val.textContent = tau != null ? `${tau.toFixed(1)}K` : "--";
   const tn = document.getElementById("tau-needle");
   if (tn) tn.setAttribute("transform",
-    `rotate(${(-90 + (Math.min(Math.max(tau, 0), 15) / 15) * 180)} 50 46)`);
+    `rotate(${(-90 + (Math.min(Math.max(tau, 0), 15) / 15) * 180)} 50 45)`);
   // LEDs
   const ledVrn = document.getElementById("led-vrn");
   if (ledVrn) ledVrn.classList.add("on");
