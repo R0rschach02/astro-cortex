@@ -251,6 +251,13 @@
    "tag": "neu",
    "desc": "Vier Verbesserungen auf einen Schlag: (1) Die Standort-Marker sind wieder grosse, gut sichtbare farbige Punkte mit Glow - auf jeder Karte lesbar. (2) Die Messinstrumente (Seeing, Taupunkt) sind jetzt korrekt zentriert - die Nadeln rotieren sauber im Kreis. (3) Neues Mond-Horizont-Display im linken Panel: zeigt den besten Standort der Nacht und darueber, wo der Mond gerade am Himmel steht. (4) Jeder Standort hat jetzt einen TRANSIT-ROUTE-Button: Ein Klick zeigt die Bahnanbindung von deinem GPS-Standort dorthin - mit letzter Hin- und fruehester Rueckfahrt.",
    "usage": "Standort anklicken -> TRANSIT ROUTE klicken; linkes Panel zeigt den Mond-Horizont"
+  },
+  {
+   "date": "2026-09-20",
+   "title": "Zielerfassung & Gefahren-Anzeige (Cockpit-Phase 3)",
+   "tag": "neu",
+   "desc": "Zwei neue Cockpit-Instrumente: (1) LUNAR TARGET LOCK im linken Panel unter dem Mond-Horizont - zeigt ob der Mond als Beobachtungsziel erfasst ist ([LOCKED] gruen wenn hoeher als 30 Grad) oder ausser Reichweite ([OUT OF RANGE] rot). Der beste Planet wird als [SECONDARY] in grau darunter angezeigt. (2) THREAT ASSESSMENT im rechten Panel - zwei vertikale Balkenanzeigen wie Tankanzeigen: WIND SHEAR (Wind/Böen, ab 20 km/h gelb, ab 30 rot) und DEW RISK (Taupunkt-Abstand, je kleiner desto gefaehrlicher - unter 1.5 K leuchtet FROST RISK rot fuer den ungeschuetzten Fangspiegel).",
+   "usage": "Linkes Panel: [LOCKED]/[OUT OF RANGE] Status; rechtes Panel: Wind- und Tau-Balken"
   }
  ]
 }

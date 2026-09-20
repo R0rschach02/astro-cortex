@@ -56,6 +56,11 @@
         </div>
         <div id="lh-data"><span id="lh-alt">--</span> <span id="lh-illum">--</span></div>
       </div>
+      <div class="panel-hdr" style="margin-top:12px">TARGET&nbsp;LOCK</div>
+      <div id="target-lock" class="mono">
+        <div id="tl-moon" class="tl-line tl-pending">[STANDBY] MOON | ALT: --</div>
+        <div id="tl-secondary" class="tl-secondary mono"></div>
+      </div>
     </aside>
 
     <!-- ============ ZENTRUM: WINDSCHUTZSCHEIBE ============ -->
@@ -83,6 +88,20 @@
       </div>
       <div class="panel-hdr" style="margin-top:8px">ASTRO&nbsp;INSTR</div>
       <div id="astro-instruments">
+        <div class="threat-row">
+          <div class="threat-bar" id="tb-wind">
+            <div class="tb-label mono">WIND<br>SHEAR</div>
+            <div class="tb-track"><div class="tb-fill" id="tb-wind-fill"></div></div>
+            <div class="tb-scale mono"><span>0</span><span>20</span><span>40</span></div>
+            <div class="tb-val mono" id="tb-wind-val">-- km/h</div>
+          </div>
+          <div class="threat-bar" id="tb-dew">
+            <div class="tb-label mono">DEW<br>RISK</div>
+            <div class="tb-track"><div class="tb-fill" id="tb-dew-fill"></div></div>
+            <div class="tb-scale mono"><span>10K</span><span>3K</span><span>0K</span></div>
+            <div class="tb-val mono" id="tb-dew-val">-- K</div>
+          </div>
+        </div>
         <div class="gauge-row">
           
           <div class="gauge-wrap">

@@ -954,6 +954,73 @@ function updateLunarHorizon(data) {
   }
   const hl = document.getElementById("lh-hline");
   if (hl) hl.style.borderColor = alt > 0 ? "#ffd24a" : "#455262";
+
+  // === LUNAR TARGET LOCK ===
+  const tl = document.getElementById("tl-moon");
+  if (tl) {
+    if (alt > 30) {
+      tl.textContent = "[LOCKED] MOON | ILLUM: " + illum.toFixed(0)
+        + "% | ALT: " + alt.toFixed(0) + "\u00b0";
+      tl.className = "tl-line tl-locked";
+    } else if (alt > 0) {
+      tl.textContent = "[OUT OF RANGE] MOON | ALT: " + alt.toFixed(0)
+        + "\u00b0 (<30\u00b0 Atmosph\u00e4re)";
+      tl.className = "tl-line tl-out-of-range";
+    } else {
+      tl.textContent = "[OUT OF RANGE] MOON | UNTER HORIZONT";
+      tl.className = "tl-line tl-out-of-range";
+    }
+  }
+  // SECONDARY: hellster Planet mit Fenster
+  const sec = document.getElementById("tl-secondary");
+  if (sec) {
+    const planets = best.planets || {};
+    const entries = Object.entries(planets)
+      .filter(([, p]) => p && p.window && p.max_alt > 30)
+      .sort((a, b) => b[1].max_alt - a[1].max_alt);
+    if (entries.length) {
+      const [name, p] = entries[0];
+      sec.textContent = "[SECONDARY] " + name.toUpperCase()
+        + " | ALT: " + (p.max_alt || 0).toFixed(0) + "\u00b0"
+        + " | " + (p.window || "n/a");
+    } else {
+      sec.textContent = "";
+    }
+  }
+
+  // === THREAT ASSESSMENT: Wind + Dew Balken ===
+  // Wind Shear: 0-40 km/h (Böen als Worst Case)
+  const gusts = best.wind_gusts || best.wind_speed || 0;
+  const windFill = document.getElementById("tb-wind-fill");
+  const windVal = document.getElementById("tb-wind-val");
+  if (windFill) {
+    windFill.style.height = Math.min(100, (gusts / 40) * 100) + "%";
+    windFill.className = "tb-fill " + (gusts > 30 ? "level-danger"
+      : gusts > 20 ? "level-warn" : "level-safe");
+  }
+  if (windVal) {
+    windVal.textContent = gusts.toFixed(0) + " km/h";
+    windVal.className = "tb-val mono " + (gusts > 30 ? "level-danger"
+      : gusts > 20 ? "level-warn" : "");
+  }
+  // Dew Risk: INVERS - Balken fuellt sich wenn Spread gegen 0 faellt
+  // Spread 10K = leer/safe, 3K = safe-Grenze, 1.5K = FROST RISK
+  const tau = best.dewpoint_spread;
+  const dewFill = document.getElementById("tb-dew-fill");
+  const dewVal = document.getElementById("tb-dew-val");
+  if (dewFill && tau != null) {
+    // Fuellung: 0% bei 10K (sicher), 100% bei 0K (Beschlag)
+    const fillPct = Math.max(0, Math.min(100, (10 - tau) / 10 * 100));
+    dewFill.style.height = fillPct + "%";
+    dewFill.className = "tb-fill " + (tau < 1.5 ? "level-danger"
+      : tau < 3 ? "level-warn" : "level-safe");
+  }
+  if (dewVal) {
+    dewVal.textContent = tau != null ? tau.toFixed(1) + " K" : "--";
+    dewVal.className = "tb-val mono " + (tau != null && tau < 1.5
+      ? "level-danger" : tau != null && tau < 3 ? "level-warn" : "");
+    if (tau != null && tau < 1.5) dewVal.textContent += " FROST RISK";
+  }
 }
 
 async function fetchTransitRoute(name, lat, lon) {
