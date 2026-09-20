@@ -939,7 +939,7 @@ function updateLunarHorizon(data) {
   const best = data.spots.find(s => s.rating === "GO")
     || data.spots.find(s => s.rating === "MAYBE") || data.spots[0];
   const bestEl = document.getElementById("lh-best");
-  if (bestEl) bestEl.textContent = (best.name || "?").split(/[ (]/)[0].toUpperCase();
+  if (bestEl) bestEl.textContent = (best.name || "?").toUpperCase();
   const alt = (best.moon || {}).max_alt || 0;
   const illum = (best.moon || {}).illum || 0;
   const moonIcon = document.getElementById("lh-moon");

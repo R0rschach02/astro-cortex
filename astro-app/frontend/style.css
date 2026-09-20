@@ -708,8 +708,7 @@ body.night .basemap-tile { filter: none; }
 .gauge-body { fill: #0a0d12; stroke: none; }
 .gauge-ring { fill: none; stroke: #2d3d4f; stroke-width: 2; }
 .gauge-needle { stroke: #3aff7c; stroke-width: 2.5; stroke-linecap: round;
-  filter: drop-shadow(0 0 3px rgba(58,255,124,.5));
-  transition: transform .8s ease-out; transform-origin: 50px 46px; }
+  filter: drop-shadow(0 0 3px rgba(58,255,124,.5)); }
 .needle-amber { stroke: #ffd24a; filter: drop-shadow(0 0 3px rgba(255,210,74,.5)); }
 .needle-cyan { stroke: #4db2ff; filter: drop-shadow(0 0 3px rgba(77,178,255,.5)); }
 .gauge-hub { fill: #1d2733; stroke: #3d4d5f; stroke-width: 1; }
@@ -761,9 +760,9 @@ body.night .basemap-tile { filter: none; }
 .spot-marker .rain-badge { top: -4px; left: -4px; }
 
 /* ---- P2: Gauge-Needles korrekt zentriert (SVG-Transform) ---- */
-.gauge-needle { transform-box: fill-box; transform-origin: 50% 100%; }
-/* SVG-spezifisch: die rotate-Transform am <line>-Element rotiert um
-   den Endpunkt (50,46 = Gauge-Zentrum). transform-origin nur CSS-seitig. */
+/* Gauge-Nadeln: SVG-Attribut-Transform (rotate(W 50 46)) regelt die
+   Rotation alleine. CSS-transform WUERDE die SVG-Transform ueberschreiben
+   und die Nadel dezentrieren - deshalb hier bewusst KEINE CSS-transform. */
 
 /* ---- P3: Lunar Horizon Widget ---- */
 #lunar-horizon { padding: 2px 0 8px; }
@@ -881,3 +880,10 @@ body.night .basemap-tile { filter: none; }
 .tb-val { font-size: 10px; font-weight: 700; color: var(--txt); }
 .tb-val.level-warn { color: #ffd24a; }
 .tb-val.level-danger { color: #ff3b30; }
+
+/* BEST SITE: volle Standortnamen erlauben (wrap bei langen Namen) */
+#lh-best-label {
+  white-space: normal; word-wrap: break-word; line-height: 1.3;
+  font-size: 9.5px; min-height: 14px;
+}
+#lh-best-label b { display: inline; }
