@@ -570,13 +570,18 @@ def api_deployment(id: str, home: str = "Ilvesheim HQ",
     if gws_dt < now - _td(hours=2):
         gws_dt = now
 
-    # Service-Datum = Tag der Hinreise (Golden-Window-Abend)
-    service_day = gws_dt.date()
+    # Service-Datum = Abend des Golden Windows (night), nicht der
+    # Kalendertag einer evtl. nach Mitternacht liegenden Abfrage:
+    # Spaetfahrten 24:xx/25:xx gehoeren zum Vorabend-Service.
+    service_day = night.date()
     try:
         transit = _transit_source(service_day)
     except GTFSNotAvailableError as e:
         raise HTTPException(503, str(e))
 
+    log.info("[API] deployment %s: night=%s gw=%s-%s service_day=%s "
+             "home=%s", id, night.date(), gws_dt.strftime("%H:%M"),
+             gwe_dt.strftime("%H:%M"), service_day, home_loc.get("name"))
     plan = deployment_window(gws_dt, gwe_dt, home_loc, obs, transit,
                              setup_minutes)
     note = None

@@ -47,6 +47,13 @@ def deployment_window(golden_window_start: datetime,
         setup_buffer_min=setup_minutes)
 
     arrive_by = golden_window_start - timedelta(minutes=setup_minutes)
+    if golden_window_start <= datetime.now():
+        # Fenster laeuft bereits: Der Setup-Puffer ist nicht mehr
+        # einhaltbar - stattdessen jede Fahrt erlauben, die noch
+        # WAEHREND des Fensters ankommt (kein stumpfes Leeres-Ergebnis).
+        arrive_by = golden_window_end
+        print(f"[DEPLOY] Fenster laeuft bereits: Ankunft-Deadline "
+              f"auf Fensterende {arrive_by:%H:%M} erweitert", flush=True)
     conns = transit_source.connections(
         home_location["lat"], home_location["lon"],
         obs_location["lat"], obs_location["lon"], arrive_by)

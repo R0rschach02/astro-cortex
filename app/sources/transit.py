@@ -8,8 +8,9 @@ kann die Datei ersetzen, ohne die Schnittstelle zu aendern.
 V1-Grenzen (bewusst, kein Bug):
 - Kein GTFS-Realtime; Sollfahrplan reicht fuer die Planung.
 - Router: Direktfahrt + bis zu 2 Umstiege, Umstieg an derselben
-  Haltestelle (stop_id); Fusswege <= 1 km nur an Start und Ziel
-  (walking_minutes_total). Kein transfers.txt-Fussweg-Graph.
+  Haltestelle (stop_id) oder per Fussweg <= WALK_TRANSFER_M an den
+  Nachbarn-Halt; Fusswege <= 1 km an Start und Ziel
+  (walking_minutes_total rechnet alle Fusswege mit).
 - Service-Kalender: weekday-Filter (calendar.txt) + Ausnahmen
   (calendar_dates.txt) fuer das Tagesdatum.
 - Determinismus: identischer Feed + identische Parameter -> identische
@@ -22,11 +23,12 @@ import math
 import os
 from collections import deque
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time as _dt_time, timedelta
 from typing import Optional
 
 GTFS_DIR = os.path.expanduser("~/gtfs")
 WALK_RADIUS_M = 1000.0
+WALK_TRANSFER_M = 600.0     # Fussweg-Umstieg zwischen Haltestellen
 WALK_SPEED_M_PER_MIN = 80.0
 MIN_TRANSFER_MIN = 3
 MAX_CHANGES = 2
@@ -220,60 +222,153 @@ class GTFSStaticSource:
                            if len(routes) >= self.HUB_MIN_ROUTES}
         return self._hub_cache
 
+    def _walk_neighbors(self, sid) -> list:
+        """[(stop_id, gehmin)] fuer Fussweg-Umstieg <= WALK_TRANSFER_M.
+        Realer Fall: 625 endet an 'Feudenheim Bstg 2', die RNV 7 Richtung
+        Ziel haelt 20 m weiter an 'Bstg 1' - ohne diesen Fussweg-Umstieg
+        waere das Netz dort unzugaenglich. Nachbarsuche ueber ein grobes
+        Zellgitter (~550m Zellen), damit sie O(1) pro Stop bleibt."""
+        if not hasattr(self, "_walk_grid"):
+            grid = {}
+            for s2, (_n, la, lo) in self._stops.items():
+                grid.setdefault((round(la / 0.005), round(lo / 0.007)),
+                                []).append(s2)
+            self._walk_grid = grid
+            self._walk_adj = {}
+        if sid in self._walk_adj:
+            return self._walk_adj[sid]
+        _n, la, lo = self._stops[sid]
+        out = []
+        clat, clon = round(la / 0.005), round(lo / 0.007)
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                for s2 in self._walk_grid.get((clat + dy, clon + dx), ()):
+                    if s2 == sid:
+                        continue
+                    _n2, la2, lo2 = self._stops[s2]
+                    d = _haversine_m(la, lo, la2, lo2)
+                    if d <= WALK_TRANSFER_M:
+                        out.append((s2, timedelta(
+                            minutes=d / WALK_SPEED_M_PER_MIN)))
+        out.sort(key=lambda e: e[1])
+        self._walk_adj[sid] = out
+        return out
+
     def _search(self, start_ids: set, goal_ids: set, dep_after: datetime,
                 arrive_before: datetime) -> list:
-        """Two-Pass-Suche statt BFS (deterministisch, schnell):
-        Pass 1: alle vom Start erreichbaren Stops mit fruehester Ankunft
-        Pass 2: von jedem Umstiegs-Stop (Hub) erreichbare Ziel-Verbindungen.
-        Rueckgabe: [(legs)] mit leg = (trip_id, i_start, i_ziel, ankunft_td)."""
-        base = dep_after.replace(hour=0, minute=0, second=0, microsecond=0)
-        min_dep = (dep_after - base)
-        max_arr = (arrive_before - base)
+        """Runden-basierte Suche (deterministisch, max. 2 Umstiege):
+        Runde 1 = Direktfahrt ab Start, Runde 2/3 = Weiterfahrt ab Hub-
+        Stops (>= HUB_MIN_ROUTES Linien), direkt oder per Fussweg-Umstieg.
 
-        # Pass 1: erreichbare Stops vom Start (mit boarding-Position im Trip)
-        transfers = {}  # stop_id -> (arrival_td, trip_id, i_board, i_transfer)
+        Pro Stop werden PARETO-OPTIONEN (frueheste Ankunft, spaeteste
+        Erstabfahrt, Pfad) gefuehrt - nicht nur die frueheste Ankunft:
+        fuer "letzte Bahn hin" muss beim Umstieg die Anfahrt mit der
+        SPAETESTEN Erstabfahrt gewaehlt werden, die den Anschluss noch
+        erreicht (die frueheste Ankunft wuerde Morgentrips als Anfahrt
+        eines Abend-Anschlusses kombinieren).
+
+        Alle Zeitvergleiche laufen als GTFS-Offsets zum SERVICE-Tag
+        (self.service_date), NICHT zum Kalendertag der Abfrage: Fahrten
+        nach Mitternacht sind im Feed als 24:xx/25:xx kodiert und
+        gehoeren zum Vorabend-Service.
+        Rueckgabe: [legs] mit leg = (trip_id, i_start, i_ziel, ankunft_td)."""
+        base = datetime.combine(self.service_date, _dt_time.min)
+        min_dep = dep_after - base
+        max_arr = arrive_before - base
+        MT = timedelta(minutes=MIN_TRANSFER_MIN)
+        hubs = self._hub_stops()
+
+        results = []   # jede gefundene Verbindung zu einem Ziel-Stop
+        seen = set()   # Duplikat-Schutz (identischer Pfad)
+
+        def _goal_candidate(arr, path):
+            key = tuple(path)
+            if key in seen:
+                return
+            seen.add(key)
+            results.append([(t, i, j, arr if k == len(path) - 1 else None)
+                            for k, (t, i, j) in enumerate(path)])
+
+        def _pareto_add(stop_opts, arr, dep_first, path) -> None:
+            """Option eintragen, dominierte Eintraege entfernen. Optionen
+            sind nach Ankunft aufsteigend sortiert - und damit auch nach
+            Erstabfahrt aufsteigend (sonst waeren sie dominiert)."""
+            for a2, d2, _p in stop_opts:
+                if a2 <= arr and d2 >= dep_first:
+                    return                      # dominiert
+            stop_opts[:] = [e for e in stop_opts
+                            if not (e[0] >= arr and e[1] <= dep_first)]
+            stop_opts.append((arr, dep_first, path))
+            stop_opts.sort(key=lambda e: e[0])
+
+        def _ride(board: dict) -> dict:
+            """board: stop -> [(ankunft, erste_abfahrt, pfad)] (Pareto).
+            Eine Runde weiterfahren: pro Boarding die Option mit der
+            spaetesten Erstabfahrt nehmen, die den Umstieg noch schafft."""
+            out = {}
+            for tid in sorted(self._trip_times):
+                seq = self._trip_times[tid]
+                for i, (sid, _sq, dep, _sa) in enumerate(seq):
+                    opts = board.get(sid)
+                    if not opts:
+                        continue
+                    best = None
+                    for a, d, p in opts:
+                        if a + MT <= dep:
+                            best = (d, p)       # letzte passende Option
+                    if best is None:
+                        continue
+                    d, p = best
+                    for j in range(i + 1, len(seq)):
+                        sid2, _s2, _d2, arr2 = seq[j]
+                        if arr2 > max_arr:
+                            break
+                        np = p + [(tid, i, j)]
+                        if sid2 in goal_ids:
+                            _goal_candidate(arr2, np)
+                        _pareto_add(out.setdefault(sid2, []), arr2, d, np)
+            return out
+
+        def _board_set(reach: dict) -> dict:
+            """Boarding-Optionen nach einer Runde: direkt am erreichten
+            Hub-Stop plus Fussweg-Umstieg (<= WALK_TRANSFER_M) zu
+            Nachbar-Hubs (Optionen um die Gehzeit verschoben)."""
+            board = {}
+            for s, opts in reach.items():
+                for a, d, p in opts:
+                    if s in hubs and s not in start_ids:
+                        _pareto_add(board.setdefault(s, []), a, d, p)
+                    for s2, walk in self._walk_neighbors(s):
+                        if s2 not in hubs or s2 in start_ids:
+                            continue
+                        _pareto_add(board.setdefault(s2, []),
+                                    a + walk, d, p)
+            return board
+
+        # Runde 1: Direktfahrten ab Start - jede Abfahrt eine eigene Option
+        r1 = {}
         for tid in sorted(self._trip_times):
             seq = self._trip_times[tid]
             for i, (sid, _sq, dep, _sa) in enumerate(seq):
                 if sid not in start_ids or dep < min_dep:
                     continue
                 for j in range(i + 1, len(seq)):
-                    sid2, _sq2, _sd2, arr2 = seq[j]
+                    sid2, _s2, _d2, arr2 = seq[j]
                     if arr2 > max_arr:
                         break
-                    if sid2 not in transfers or arr2 < transfers[sid2][0]:
-                        transfers[sid2] = (arr2, tid, i, j)
+                    path = [(tid, i, j)]
+                    if sid2 in goal_ids:
+                        _goal_candidate(arr2, path)
+                    _pareto_add(r1.setdefault(sid2, []), arr2, dep, path)
 
-        # Direktverbindungen (Start -> Ziel in derselben Fahrt)
-        results = []
-        for sid2, (arr2, tid, i, j) in transfers.items():
-            if sid2 in goal_ids:
-                results.append([(tid, i, j, arr2)])
+        # Runde 2 (1 Umstieg) und Runde 3 (2 Umstiege)
+        r2 = _ride(_board_set(r1))
+        _ride(_board_set(r2))
 
-        # Pass 2: von Transfer-Stops zum Ziel (1 Umstieg)
-        hubs = self._hub_stops()
-        MIN_TRANSFER = timedelta(minutes=MIN_TRANSFER_MIN)
-        for tstop, (arr_transfer, tid1, i1, j1) in sorted(
-                transfers.items(), key=lambda x: x[1][0]):
-            if tstop not in hubs or tstop in goal_ids:
-                continue
-            ttrips = self._stop_trips.get(tstop, set())
-            for tid2 in sorted(ttrips):
-                if tid2 == tid1:
-                    continue
-                seq2 = self._trip_times[tid2]
-                for i2, (sid, _sq, dep, _sa) in enumerate(seq2):
-                    if sid != tstop or dep < arr_transfer + MIN_TRANSFER:
-                        continue
-                    for j2 in range(i2 + 1, len(seq2)):
-                        sid2, _sq2, _sd2, arr2 = seq2[j2]
-                        if arr2 > max_arr:
-                            break
-                        if sid2 in goal_ids:
-                            results.append(
-                                [(tid1, i1, j1, arr_transfer),
-                                 (tid2, i2, j2, arr2)])
-                    break
+        print(f"[GTFS] suche service_day={self.service_date} "
+              f"min_dep={min_dep} max_arr={max_arr}: "
+              f"{len(results)} verbindungen (r1_stops={len(r1)}, "
+              f"r2_stops={len(r2)})", flush=True)
         return results
 
     def _connection(self, legs, base: datetime, walk_start_min: float,
@@ -282,6 +377,16 @@ class GTFSStaticSource:
         seq_last = self._trip_times[legs[-1][0]]
         start_sid = seq0[legs[0][1]][0]
         dest_sid = seq_last[legs[-1][2]][0]
+        # Fusswege zwischen Umstieg-Stops (leg-Ende != naechster leg-Start)
+        walk_transfer_min = 0.0
+        for k in range(len(legs) - 1):
+            s_a = self._trip_times[legs[k][0]][legs[k][2]][0]
+            s_b = self._trip_times[legs[k + 1][0]][legs[k + 1][1]][0]
+            if s_a != s_b:
+                _n1, la1, lo1 = self._stops[s_a]
+                _n2, la2, lo2 = self._stops[s_b]
+                walk_transfer_min += _haversine_m(
+                    la1, lo1, la2, lo2) / WALK_SPEED_M_PER_MIN
         return Connection(
             start_halt=self._stops.get(start_sid, ("?",))[0],
             dest_halt=self._stops.get(dest_sid, ("?",))[0],
@@ -289,7 +394,8 @@ class GTFSStaticSource:
             arrival_ts=base + legs[-1][3],
             changes_count=len(legs) - 1,
             line_names=[self._line(t) for t, *_ in legs],
-            walking_minutes_total=round(walk_start_min + walk_dest_min, 1))
+            walking_minutes_total=round(walk_start_min + walk_dest_min
+                                        + walk_transfer_min, 1))
 
     # ---------- oeffentliche async-Schnittstelle (Spec) ----------
     async def fetch_connections(self, start_lat: float, start_lon: float,
@@ -309,39 +415,59 @@ class GTFSStaticSource:
     def connections(self, start_lat, start_lon, dest_lat, dest_lon,
                     arrival_before) -> list:
         """Verbindungen, die VOR arrival_before ankommen. Fenster: bis zu
-        12 Stunden (Spaetfenster wie 02:00 brauchen die Abendbusse)."""
+        12 Stunden (Spaetfenster wie 02:00 brauchen die Abendbusse).
+        Alle Offsets auf den Service-Tag (siehe _search)."""
         starts = self.next_stops(start_lat, start_lon)
         goals = self.next_stops(dest_lat, dest_lon)
         if not starts or not goals:
             return []
-        base = arrival_before.replace(hour=0, minute=0, second=0,
-                                      microsecond=0)
-        dep_from = arrival_before - timedelta(hours=12)
-        if dep_from.date() != arrival_before.date():
-            dep_from = arrival_before.replace(hour=0, minute=0, second=0)
+        base = datetime.combine(self.service_date, _dt_time.min)
+        dep_from = max(arrival_before - timedelta(hours=12), base)
+        print(f"[GTFS] hin {starts[0][2]} -> {goals[0][2]}: "
+              f"ankunft_bis={arrival_before} service_base={base}",
+              flush=True)
         legs_list = self._search(
             {s[1] for s in starts}, {g[1] for g in goals},
             dep_from, arrival_before)
         out = []
+        seen_conns = set()
         for legs in legs_list:
             c = self._connection(legs, base,
                                  starts[0][0] / WALK_SPEED_M_PER_MIN,
                                  goals[0][0] / WALK_SPEED_M_PER_MIN)
-            if c.arrival_ts <= arrival_before:
-                out.append(c)
+            if c.arrival_ts > arrival_before:
+                continue
+            # Plausibilitaet: 11-Stunden-Um-die-Häuser-Touren (fruehe
+            # Abfahrt + stundenlange Regional-Legs) sind keine Option.
+            if c.arrival_ts - c.departure_ts > timedelta(hours=3):
+                continue
+            key = (c.departure_ts, c.arrival_ts, tuple(c.line_names),
+                   c.dest_halt)
+            if key in seen_conns:
+                continue
+            seen_conns.add(key)
+            out.append(c)
+        # Späteste Abfahrt zuerst: der Deployment-Fall will die LETZTE
+        # Bahn, die noch rechtzeitig ankommt (fruehe zuerst wuerde das
+        # [:-Slicing] genau die letzte verlieren).
         out.sort(key=lambda c: (c.departure_ts, c.arrival_ts,
-                                c.changes_count))
+                                c.changes_count), reverse=True)
         return out[:20]
 
     def return_connections(self, from_lat, from_lon, home_lat, home_lon,
                            departure_after) -> list:
-        """Frueehste Rueckverbindungen ab departure_after."""
+        """Frueehste Rueckverbindungen ab departure_after. Base ist der
+        SERVICE-Tag: eine Rueckfahrt um 01:00 (nach Mitternacht) ist im
+        Feed als 25:00 des Vorabend-Services kodiert - genau so wird sie
+        hier gesucht, statt stumpf 01:00 gegen den falschen Tag zu joinen."""
         starts = self.next_stops(from_lat, from_lon)
         goals = self.next_stops(home_lat, home_lon)
         if not starts or not goals:
             return []
-        base = (departure_after - timedelta(days=1)).replace(
-            hour=0, minute=0, second=0, microsecond=0)
+        base = datetime.combine(self.service_date, _dt_time.min)
+        print(f"[GTFS] rueck {starts[0][2]} -> {goals[0][2]}: "
+              f"abfahrt_ab={departure_after} service_base={base} "
+              f"min_dep_offset={departure_after - base}", flush=True)
         legs_list = self._search(
             {s[1] for s in starts}, {g[1] for g in goals},
             departure_after, departure_after + timedelta(hours=8))

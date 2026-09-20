@@ -1033,7 +1033,7 @@ function drawRouteLine(destLat, destLon, destName) {
   if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
   const line = L.polyline(
     [[HQ.lat, HQ.lon], [destLat, destLon]],
-    { color: "#ffb300", weight: 3, opacity: 0.8, dashArray: "5, 10" });
+    { color: "#ff3b30", weight: 5, opacity: 0.95, dashArray: "10, 15" });
   const hqIcon = L.divIcon({
     className: "hq-pin",
     html: "<div class='hq-dot'></div><div class='hq-tag'>HQ</div>",
@@ -1042,7 +1042,6 @@ function drawRouteLine(destLat, destLon, destName) {
     L.marker([HQ.lat, HQ.lon], { icon: hqIcon, interactive: false }),
     line,
   ]).addTo(map);
-  // Target Tracking: Start und Ziel gemeinsam in der Mitte zentrieren
   map.fitBounds(line.getBounds(), { padding: [50, 50] });
   commsLog("EINSATZWEG EINGEZEICHNET: " + HQ.name + " \u2192 "
     + String(destName || "?").toUpperCase());

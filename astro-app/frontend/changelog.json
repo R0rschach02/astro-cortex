@@ -264,6 +264,12 @@
       "title": "TRANSIT ROUTE: Einsatzweg vom HQ Ilvesheim auf dem Radar",
       "detail": "Klick auf TRANSIT ROUTE fragt jetzt mit festem HQ-Startpunkt (Equipment-Depot Ilvesheim, 49.4784/8.5663) statt dynamischem Nutzer-GPS ab. Bei HTTP 200 zeichnet Leaflet eine gestrichelte Amber-Linie (dashArray 5,10) vom HQ-Pin zum Zielstandort auf die Karte, vorherige Routen werden entfernt und die Karte zoomt per fitBounds automatisch auf Start+Ziel (Target Tracking). Das Text-Panel beginnt mit der Header-Zeile [ROUTE: ILVESHEIM HQ -> STANDORTNAME]. Backend /api/deployment nutzt HQ-Default (home_lat/home_lon Parameter). Tote Duplikat-Funktion fetchTransitRoute entfernt.",
       "usage": "Standort anklicken > TRANSIT ROUTE: Einsatzweg erscheint auf der Karte, Zoom zentriert HQ+Ziel"
+    },
+    {
+      "date": "2026-09-19",
+      "title": "GTFS-Router: Mitternachts-Fix, Fussweg-Umstiege, 2 Umstiege, taktisch rote Einsatzweg-Linie",
+      "detail": "Drei Root-Causes behoben, warum urbane Standorte (z.B. Spinelli Park) keine Verbindungen lieferten: (1) MIDNIGHT WRAP-AROUND: Alle Zeitvergleiche laufen jetzt als GTFS-Offsets zum SERVICE-Tag (Nacht des Golden Windows) statt zum Kalendertag der Abfrage - Rueckfahrten um 01:00 werden als 25:00 des Vorabend-Services gesucht und gefunden, statt stur 01:00 gegen den falschen Tag zu joinen. (2) FUSSWEG-UMSTIEGE: Der Router kann an Umstiegspunkten bis 600m zur Nachbarhaltestelle laufen (Zellgitter-Index) - reale Faelle wie 625-Terminus 'Feudenheim Bstg 2' zu RNV 50/7 an 'Bstg 1' (20m) waren vorher unueberwindbar. (3) PARETO-OPTIONEN: Pro Stop werden frueheste Ankunft UND spaeteste Erstabfahrt gefuehrt - vorher kombinierte 'letzte Bahn' die frueheste (morgendliche) Anfahrt mit dem Abend-Anschluss. Ausserdem: bis zu 2 Umstiege (vorher 1), laufendes Golden Window erlaubt Ankunft bis Fensterende, Monsterverbindungen >3h gefiltert, Sortierung 'spaeteste Abfahrt zuerst'. Einsatzweg-Linie auf Taktik-Rot #ff3b30, weight 5, dashArray 10,15.",
+      "usage": "TRANSIT ROUTE bei Spinelli Park: letzte Bahn 20:26 ab Ilvesheim (625+RNV50+RNV54) statt 'keine Verbindung'"
     }
   ]
 }

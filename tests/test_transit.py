@@ -124,7 +124,11 @@ def test_async_schnittstelle_wie_spec(gtfs_dir):
     conns = asyncio.run(src.fetch_connections(
         HOME[0], HOME[1], GOAL[0], GOAL[1],
         datetime(2026, 9, 14, 23, 50)))
-    assert conns and conns[0].line_names == ["S1", "Bus 421"]
+    # Sortierung ist "spaeteste Abfahrt zuerst" (Deployment-Fall):
+    # RE 4 (23:30) liegt vor S1+Bus 421 (23:00)
+    assert conns and conns[0].line_names == ["RE 4"]
+    assert {tuple(c.line_names) for c in conns} == {
+        ("RE 4",), ("S1", "Bus 421")}
     rets = asyncio.run(src.fetch_return_connections(
         HOME[0], HOME[1], GOAL[0], GOAL[1],
         datetime(2026, 9, 14, 23, 50)))
