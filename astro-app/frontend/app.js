@@ -85,6 +85,11 @@ function initMap() {
   // top-left (data-cached, offline-faehig via localStorage).
   initInfoWidget();
   initCockpitStatus();
+  // Grid-Layout mit minmax kann die Map-Groesse nach dem ersten Render
+  // aendern - Leaflet muss den Container neu vermessen
+  setTimeout(() => map.invalidateSize(), 100);
+  setTimeout(() => map.invalidateSize(), 500);
+  window.addEventListener("resize", () => map.invalidateSize());
 
   // Zeitregler sitzt statisch im unteren Cockpit-Panel (Timeline):
   // nur Listener, kein dynamisches Element mehr.
@@ -647,8 +652,11 @@ async function refresh() {
     const prevRatings = (lastSpots && lastSpots.spots)
       ? Object.fromEntries(lastSpatsCache(lastSpots)) : {};
     renderSpots(data);
-    updateAstroInstruments(data);
-    updateLunarHorizon(data);
+    // Instrumente: einzeln try/catch - ein Crash darf die Map nicht toeten
+    try { updateAstroInstruments(data); } catch (e) {
+      console.error("UI Render Error (instruments):", e); }
+    try { updateLunarHorizon(data); } catch (e) {
+      console.error("UI Render Error (lunar):", e); }
     // Comms-Feed: Rating-Wechsel melden (nur wenn vorher bekannt)
     for (const s of data.spots) {
       const before = prevRatings[s.name];
@@ -961,7 +969,7 @@ async function fetchTransitRoute(name, lat, lon) {
     setTpCoords(homeLat, homeLon);
   } catch (e) { console.debug("GPS nicht verfuegbar, nutze Hbf"); }
   try {
-    const d = await api("/api/deployment?id=" + encodeURIComponent(name
+    const d = await api("/api/deployment?id=" + encodeURIComponent(name)
       + "&setup_minutes=30");
     let html = "";
     if (d.latest_departure) {
