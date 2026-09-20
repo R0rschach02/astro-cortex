@@ -1150,9 +1150,7 @@ function updateLunarHorizon(data) {
       sec.textContent = "";
     }
   }
-
-
-
+}
 
 /* ============================================================
    FLIGHTSTICK: physisches Targeting unten links auf der Karte.
