@@ -348,6 +348,12 @@
       "title": "Final-Sitz: 0px Luft zum T-Track",
       "detail": "bottom 52px statt 54px - der Bezel des Sticks beruehrt die Track-Leiste jetzt lueckenlos (gemessen: 0px).",
       "usage": "-"
+    },
+    {
+      "date": "2026-09-21",
+      "title": "UI-Revision: Brackets zurueck, volle LINK-Namen, Lunar mittig, BAT-Kippschalter",
+      "detail": "(1) ROLLBACK: Die roten eckigen Zielklammern (.target-locked ::before/::after, pulsierend) sind zurueck - der Flightstick navigiert nicht mehr blind. (2) LINK-Feld ohne Ellipsis-Kappung: Namen wie UNTERER LUISENPARK werden voll ausgeschrieben; Platz durch kompaktere Top-Bar (gap 10) und 110px-Gauges, Instrumentengruppe ueber Auto-Margins balanciert. (3) LUNAR HORIZON: Instrument und ALT/ILLUM-Werte jetzt flexbox-zentriert im linken Panel. (4) HYPER-REALISMUS: Astro-Observation-Toggle als mechanischer Flugzeug-Kippschalter - Metallbasisplatte mit Sechskantmutter und Lagerbohrung, verchromter Hebel mit 3D-Gradienten und Hartlicht-Kante; SAFE = Hebel zeigt physisch nach unten (178deg), ARMED kippt mit Snap-Animation nach oben (2deg); Drop-Shadows wechseln mit der Stellung, ARMED/SAFE-Labels leuchten zustandsabhaengig.",
+      "usage": "Toggle rechts unten kippt den Hebel; Karte zeigt Zielklammern; volle Ortsnamen im LINK"
     }
   ]
 }

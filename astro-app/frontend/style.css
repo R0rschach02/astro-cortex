@@ -431,7 +431,7 @@ body.night .iw-toggle-row { border-color: #3a2020; }
 
 /* ---------- Oberes Panel ---------- */
 #topbar {
-  display: flex; align-items: center; gap: 14px; padding: 0 12px;
+  display: flex; align-items: center; gap: 10px; padding: 0 10px;
   background: linear-gradient(180deg, #141a22, #0d1218);
   border-bottom: 1px solid var(--line-hi);
   padding-top: 0; border-radius: 0;
@@ -724,7 +724,7 @@ body.night .basemap-tile { filter: none; }
    der Nadeln unveraendert (SVG-Attribute, kein CSS-transform) */
 .glareshield-gauges { margin-left: 0; margin-right: auto;
   flex: 0 1 auto; display: flex; align-items: center; }
-.glareshield-gauges .gauge-wrap { flex: 0 1 auto; width: clamp(72px, 7.6vw, 116px); }
+.glareshield-gauges .gauge-wrap { flex: 0 1 auto; width: clamp(70px, 7.2vw, 110px); }
 .gauge { width: 100%; height: auto; }
 .gauge-body { fill: #0a0d12; stroke: none; }
 .gauge-ring { fill: none; stroke: #2d3d4f; stroke-width: 2; }
@@ -916,7 +916,6 @@ body.night .basemap-tile { filter: none; }
 .telemetry-link { margin-left: auto; color: #3aff7c;
   font-size: 11px; font-weight: 700;
   letter-spacing: .08em; padding: 3px 9px; white-space: nowrap;
-  max-width: 150px; overflow: hidden; text-overflow: ellipsis;
   border: 1px solid rgba(58,255,124,.35); background: rgba(58,255,124,.06);
   text-shadow: 0 0 8px rgba(58,255,124,.55);
   box-shadow: 0 0 10px rgba(58,255,124,.12), inset 0 0 8px rgba(58,255,124,.07); }
@@ -961,3 +960,61 @@ body.night .basemap-tile { filter: none; }
 
 /* Top-Bar-Entlastung: Freshness weicht (Alters-Info lebt im Status-LED) */
 #topbar > #freshness { display: none; }
+
+/* HUD Target Brackets (Zuruecknahme der Entfernung): eckige rote
+   Klammern links/rechts um den Marker des aktiven LINK-Ziels. */
+.spot-marker.target-locked::before,
+.spot-marker.target-locked::after {
+  content: ""; position: absolute; top: 50%;
+  transform: translateY(-50%);
+  width: 13px; height: 40px; border: 3px solid #ff5c50;
+  filter: drop-shadow(0 0 4px rgba(255,92,80,.7));
+  animation: tl-bracket 1.2s ease-in-out infinite; }
+.spot-marker.target-locked::before { left: -9px;
+  border-right: none; border-radius: 4px 0 0 4px; }
+.spot-marker.target-locked::after { right: -9px;
+  border-left: none; border-radius: 0 4px 4px 0; }
+@keyframes tl-bracket {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .45; } }
+
+/* LUNAR HORIZON: Instrument + Werte exakt mittig im linken Panel */
+#lunar-horizon { display: flex; flex-direction: column;
+  align-items: center; text-align: center; }
+#lunar-horizon #lh-best-label,
+#lunar-horizon #lh-data { width: 100%;
+  display: flex; justify-content: center; }
+
+/* Mechanischer Kippschalter ASTRO OBSERVATION: Metallplatte mit
+   Sechskantmutter, verchromter Hebel kippt SAFE (unten) -> ARMED (oben).
+   Schattenwurf wechselt mit der Hebelstellung. */
+.guard-master { cursor: pointer; display: flex; align-items: center;
+  gap: 12px; }
+.guard-master input { position: absolute; opacity: 0; width: 1px;
+  height: 1px; }
+.bat-switch { width: 56px; height: 84px; display: block;
+  filter: drop-shadow(0 3px 5px rgba(0,0,0,.7)); }
+.bat-lever { transform-origin: 30px 46px;
+  transform: rotate(178deg);
+  transition: transform .22s cubic-bezier(.5, 1.6, .5, 1);
+  filter: drop-shadow(-3px 4px 3px rgba(0,0,0,.75)); }
+.guard-master input:checked ~ .guard-frame .bat-lever {
+  transform: rotate(2deg);
+  filter: drop-shadow(3px 5px 3px rgba(0,0,0,.75))
+    drop-shadow(0 0 6px rgba(255,210,74,.35)); }
+.guard-frame { display: flex; align-items: center; gap: 10px;
+  border: none; background: none; padding: 0; position: relative; }
+.guard-frame .guard-on, .guard-frame .guard-off {
+  font: 700 11px var(--mono); letter-spacing: 2px; }
+.guard-frame .guard-on { color: #ff5c50; }
+.guard-frame .guard-off { color: #5d7186; }
+.guard-frame .guard-cover { display: none; }
+
+.guard-master input:checked ~ .guard-frame .guard-on {
+  color: #ff5c50; text-shadow: 0 0 8px rgba(255,92,80,.8); }
+.guard-master input:not(:checked) ~ .guard-frame .guard-on {
+  color: #4a3f3c; }
+.guard-master input:not(:checked) ~ .guard-frame .guard-off {
+  color: #9fb0c0; text-shadow: 0 0 6px rgba(159,176,192,.5); }
+.guard-master input:checked ~ .guard-frame .guard-off {
+  color: #44505c; }

@@ -102,8 +102,54 @@ als Pitch - die Horizontlinie sinkt, je hoeher der Mond steht"></div>
         <label class="guard-switch guard-master" title="Astro-Observation: schaltet proaktive Wetter-Alarme">
           <input type="checkbox" id="obs-mode-sw">
           <span class="guard-frame">
-            <span class="guard-on">ARMED</span><span class="guard-off">SAFE</span>
-            <span class="guard-cover"></span>
+            <span class="guard-on">ARMED</span>
+            <!-- Mechanischer Kippschalter: Metallplatte, Sechskantmutter,
+                 verchromter Hebel - SAFE zeigt physisch nach unten -->
+            <svg class="bat-switch" viewBox="0 0 60 90">
+              <defs>
+                <linearGradient id="bat-plate" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stop-color="#3a4147"/>
+                  <stop offset=".5" stop-color="#565f68"/>
+                  <stop offset="1" stop-color="#2a3036"/>
+                </linearGradient>
+                <linearGradient id="bat-nut" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#79838e"/>
+                  <stop offset=".5" stop-color="#4a525a"/>
+                  <stop offset="1" stop-color="#5d666f"/>
+                </linearGradient>
+                <linearGradient id="bat-chrome" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stop-color="#f2f5f8"/>
+                  <stop offset=".35" stop-color="#c3ccd4"/>
+                  <stop offset=".55" stop-color="#8b959e"/>
+                  <stop offset=".8" stop-color="#d8dee4"/>
+                  <stop offset="1" stop-color="#6d7680"/>
+                </linearGradient>
+              </defs>
+              <rect x="5" y="4" width="50" height="82" rx="4"
+                fill="url(#bat-plate)" stroke="#14181c" stroke-width="1.5"/>
+              <rect x="9" y="8" width="42" height="74" rx="3" fill="none"
+                stroke="#1d2227" stroke-width="1"/>
+              <!-- Sechskantmutter um den Hebel-Pivot (30,46) -->
+              <polygon points="30,32 42,39 42,53 30,60 18,53 18,39"
+                fill="url(#bat-nut)" stroke="#0d1013" stroke-width="1.2"/>
+              <polygon points="30,36 38.5,41 38.5,51 30,56 21.5,51 21.5,41"
+                fill="none" stroke="#8f99a3" stroke-width=".7" opacity=".6"/>
+              <!-- Lagerbohrung -->
+              <circle cx="30" cy="46" r="6" fill="#0a0d11"
+                stroke="#2c3136" stroke-width="1"/>
+              <!-- Hebel (kippt um 30,46) -->
+              <g class="bat-lever">
+                <rect x="26.6" y="15" width="6.8" height="34" rx="3.4"
+                  fill="url(#bat-chrome)" stroke="#3d444b" stroke-width=".8"/>
+                <circle cx="30" cy="13.5" r="5.6" fill="url(#bat-chrome)"
+                  stroke="#3d444b" stroke-width=".8"/>
+                <circle cx="28.4" cy="12" r="1.6" fill="#ffffff"
+                  opacity=".75"/>
+                <line x1="28.2" y1="20" x2="28.2" y2="44"
+                  stroke="#ffffff" stroke-width="1" opacity=".55"/>
+              </g>
+            </svg>
+            <span class="guard-off">SAFE</span>
           </span>
         </label>
         <div class="guard-caption mono">ASTRO&nbsp;OBSERVATION<br>
