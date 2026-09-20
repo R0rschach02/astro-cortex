@@ -84,6 +84,7 @@ function initMap() {
   // Vorhersage-Zuverlaessigkeit + Bot-Befehle: einklappbares Widget
   // top-left (data-cached, offline-faehig via localStorage).
   buildGauges();
+  buildLunar();
   initFlightstick();
   initInfoWidget();
   initCockpitStatus();
@@ -637,9 +638,11 @@ function renderSpots(data) {
       showTab("now");
       fetchBortle(s);
     });
+    mk.__spot = s;
     markersLayer.addLayer(mk);
     lastRainMm[s.name] = mm;
   }
+  updateTargetLock();
 }
 
 /* ---------- Daten + Aktualitaet ---------- */
@@ -976,6 +979,54 @@ function gaugeSvg(o) {
   </svg>`;
 }
 
+/* Kuenstlicher LUNAR-HORIZONT als Rundinstrument: gleicher Bezel und
+   dieselben 4 Schrauben wie die Glareshield-Gauges. Innen Himmel/Erde,
+   die Horizontlinie verschiebt sich mit der Mond-Elevation (Pitch),
+   der Mond sitzt fix auf der Achse wie das Flugzeug-Symbol. */
+function buildLunar() {
+  const mount = document.getElementById("lh-mount");
+  if (!mount) return;
+  mount.innerHTML = `
+  <svg viewBox="0 0 100 100" id="lh-svg">
+    <defs>
+      <clipPath id="lh-clip"><circle cx="50" cy="50" r="39"/></clipPath>
+      <radialGradient id="lh-moon-grad" cx=".38" cy=".34" r="1">
+        <stop offset="0" stop-color="#fff8e0"/>
+        <stop offset=".7" stop-color="#e8d9a8"/>
+        <stop offset="1" stop-color="#b8a878"/>
+      </radialGradient>
+    </defs>
+    <circle cx="50" cy="50" r="46" fill="none" stroke="#2c3136"
+      stroke-width="7" class="gauge-bezel"/>
+    <circle cx="50" cy="50" r="42" fill="#0b0f14" stroke="#1e252d"
+      stroke-width="1"/>
+    ${_gaugeScrews()}
+    <g clip-path="url(#lh-clip)">
+      <g id="lh-horizong" transform="translate(0 0)">
+        <rect x="8" y="-40" width="84" height="90" fill="#0e2236"/>
+        <rect x="8" y="50" width="84" height="100" fill="#191008"/>
+        <line x1="8" y1="50" x2="92" y2="50" stroke="#ffd24a"
+          stroke-width="1.8"/>
+        <line x1="30" y1="38" x2="70" y2="38" stroke="#3d5a77"
+          stroke-width="1" stroke-dasharray="4 3"/>
+        <line x1="34" y1="62" x2="66" y2="62" stroke="#4a3428"
+          stroke-width="1" stroke-dasharray="4 3"/>
+      </g>
+    </g>
+    <circle cx="50" cy="50" r="39" fill="none" stroke="#2c3642"
+      stroke-width="1.5"/>
+    <!-- Mond fix auf der Pitch-Achse -->
+    <g id="lh-moonicon-wrap">
+      <circle cx="50" cy="50" r="11" fill="rgba(255,236,170,.12)"/>
+      <circle id="lh-moonicon" cx="50" cy="50" r="7" fill="url(#lh-moon-grad)"
+        stroke="#8f8260" stroke-width="0.7"/>
+      <circle cx="47.8" cy="48" r="1.4" fill="#c9b98c" opacity=".8"/>
+      <circle cx="52" cy="52.4" r="1.05" fill="#c9b98c" opacity=".65"/>
+      <circle cx="51.8" cy="47.6" r="0.7" fill="#c9b98c" opacity=".5"/>
+    </g>
+  </svg>`;
+}
+
 function buildGauges() {
   const row = document.getElementById("gauge-row");
   if (!row) return;
@@ -1018,12 +1069,26 @@ function telemetrySpot(data) {
     || data.spots[0];
 }
 
+/* HUD-Target-Brackets: der Marker des aktiven LINK-Ziels bekommt
+   eckige Waffencomputer-Klammern (CSS ::before/::after). */
+function updateTargetLock() {
+  if (typeof markersLayer === "undefined" || !markersLayer) return;
+  markersLayer.eachLayer(mk => {
+    const el = mk._icon;
+    if (!el) return;
+    el.classList.remove("target-locked");
+    const spot = mk.__spot;
+    if (spot && spot.name === telemetryTarget) el.classList.add("target-locked");
+  });
+}
+
 function setTelemetry(name, silent) {
   telemetryTarget = name;
   localStorage.setItem("astro_telemetry", name);
   const el = document.getElementById("telemetry-link");
   if (el) el.textContent = "[LINK: " + String(name || "?").toUpperCase() + "]";
   if (!silent && lastSpots) updateAstroInstruments(lastSpots);
+  updateTargetLock();
 }
 
 /* Bortle-Klasse -> approx. Zenith-SQM (mag/arcsec^2) */
@@ -1105,18 +1170,20 @@ function updateLunarHorizon(data) {
   if (bestEl) bestEl.textContent = (best.name || "?").toUpperCase();
   const alt = (best.moon || {}).max_alt || 0;
   const illum = (best.moon || {}).illum || 0;
-  const moonIcon = document.getElementById("lh-moon");
   const altText = document.getElementById("lh-alt");
   const illumText = document.getElementById("lh-illum");
   if (altText) altText.textContent = "ALT " + alt.toFixed(0) + "\u00b0";
   if (illumText) illumText.textContent = "ILLUM " + illum.toFixed(0) + "%";
-  if (moonIcon) {
-    const pos = 50 - (alt / 90) * 42;
-    moonIcon.style.top = Math.max(5, Math.min(95, pos)) + "%";
-    moonIcon.style.opacity = alt > 0 ? 1 : 0.2;
+  /* Attitude-Logik: Mond steigt = Pitch hoch = Horizontlinie sinkt.
+     Mond-Symbol bleibt fix im Zentrum (wie das Flugzeug-Symbol). */
+  const hg = document.getElementById("lh-horizong");
+  if (hg) hg.setAttribute("transform",
+    `translate(0 ${((alt / 90) * 24).toFixed(1)})`);
+  const mi = document.getElementById("lh-moonicon");
+  if (mi) {
+    mi.style.opacity = alt > 0 ? 1 : 0.22;
+    mi.setAttribute("r", (5.5 + (illum / 100) * 2.5).toFixed(1));
   }
-  const hl = document.getElementById("lh-hline");
-  if (hl) hl.style.borderColor = alt > 0 ? "#ffd24a" : "#455262";
 
   // === LUNAR TARGET LOCK ===
   const tl = document.getElementById("tl-moon");
@@ -1167,23 +1234,69 @@ function _bearingDeg(lat1, lon1, lat2, lon2) {
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
-function _fsHighlight(spot) {
-  markersLayer.eachLayer(mk => {
-    const el = mk._icon;
-    if (!el) return;
-    el.classList.remove("fs-target");
-    const ll = mk.getLatLng();
-    if (spot && Math.abs(ll.lat - spot.lat) < 1e-4
-        && Math.abs(ll.lng - spot.lon) < 1e-4) {
-      el.classList.add("fs-target");
-    }
-  });
-}
-
 function initFlightstick() {
   const fs = document.getElementById("flightstick");
   if (!fs) return;
-  const knob = document.getElementById("fs-knob");
+  /* 3D-HOTAS: Bezel + Schrauben wie bei den Gauges, Faltenbalg-Basis,
+     ergonomischer Griff mit Hartlicht-Kanten und rotem Feuerknopf.
+     #fs-grip neigt sich beim Drag um den Pivot (50,80). */
+  fs.insertAdjacentHTML("afterbegin", `
+  <svg viewBox="0 0 100 100" id="fs-svg">
+    <defs>
+      <linearGradient id="fs-grip-grad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#454d55"/>
+        <stop offset=".45" stop-color="#2b3238"/>
+        <stop offset="1" stop-color="#171c21"/>
+      </linearGradient>
+      <radialGradient id="fs-fire-grad" cx=".35" cy=".3" r="1">
+        <stop offset="0" stop-color="#ff8a72"/>
+        <stop offset=".55" stop-color="#e8352a"/>
+        <stop offset="1" stop-color="#7a0e08"/>
+      </radialGradient>
+    </defs>
+    <circle cx="50" cy="50" r="46" fill="none" stroke="#2c3136"
+      stroke-width="7" class="gauge-bezel"/>
+    <circle cx="50" cy="50" r="42" fill="#0b0f14" stroke="#1e252d"
+      stroke-width="1"/>
+    ${_gaugeScrews()}
+    <circle cx="50" cy="50" r="30" fill="none" stroke="#2c3642"
+      stroke-width="1" stroke-dasharray="3 4"/>
+    <line x1="50" y1="12" x2="50" y2="24" stroke="#4a5a6f" stroke-width="1.6"/>
+    <line x1="50" y1="76" x2="50" y2="88" stroke="#4a5a6f" stroke-width="1.6"/>
+    <line x1="12" y1="50" x2="24" y2="50" stroke="#4a5a6f" stroke-width="1.6"/>
+    <line x1="76" y1="50" x2="88" y2="50" stroke="#4a5a6f" stroke-width="1.6"/>
+    <!-- Faltenbalg-Basis (gerippte Gummi) -->
+    <g>
+      <rect x="36" y="84" width="28" height="5" rx="2.5" fill="#23282e"
+        stroke="#111519" stroke-width="0.8"/>
+      <rect x="38" y="79" width="24" height="5" rx="2.5" fill="#2b3138"
+        stroke="#111519" stroke-width="0.8"/>
+      <rect x="40" y="74" width="20" height="5" rx="2.5" fill="#23282e"
+        stroke="#111519" stroke-width="0.8"/>
+    </g>
+    <!-- Griff: ergonomisch gebogen, Pivot am Faltenbalg (50,80) -->
+    <g id="fs-grip" transform="translate(0 0)">
+      <path d="M45 76 C42.5 62 43 50 46.5 37
+               C47.2 34.4 50.8 33.4 52.6 35.6
+               C56.4 40.2 57.4 48 56.6 56
+               C56 62 56.2 69 57 76 Z"
+        fill="url(#fs-grip-grad)" stroke="#0d1013" stroke-width="1"/>
+      <path d="M46.8 74 C45 61 45.4 49 48 38.4" fill="none"
+        stroke="#9fb2c4" stroke-width="1.1" opacity=".6"/>
+      <path d="M53.8 41 C55.6 46 56.2 52 55.9 58" fill="none"
+        stroke="#6c7d8e" stroke-width="0.8" opacity=".45"/>
+      <ellipse cx="51.4" cy="45.5" rx="2.4" ry="4.2" fill="#14181c"
+        stroke="#3a444e" stroke-width="0.7"/>
+      <circle cx="51.4" cy="45.5" r="1.1" fill="#5d6d7d"/>
+      <!-- Feuer-/Trim-Knopf an der Griffspitze -->
+      <circle cx="51" cy="34.5" r="4.6" fill="url(#fs-fire-grad)"
+        stroke="#4a0a05" stroke-width="1"/>
+      <circle cx="49.8" cy="33.2" r="1.3" fill="#ffc2ae" opacity=".85"/>
+      <circle cx="51" cy="34.5" r="7" fill="none"
+        stroke="rgba(255,80,60,.35)" stroke-width="1.5"/>
+    </g>
+  </svg>`);
+  const grip = () => document.getElementById("fs-grip");
   const degEl = document.getElementById("fs-deg");
   let dragging = false;
 
@@ -1196,10 +1309,7 @@ function initFlightstick() {
       const diff = Math.abs(((b - deg + 540) % 360) - 180);
       if (diff < bestDiff) { bestDiff = diff; bestS = s; }
     }
-    if (bestS) {
-      _fsHighlight(bestS);
-      setTelemetry(bestS.name);
-    }
+    if (bestS) setTelemetry(bestS.name);
   };
 
   const move = (e) => {
@@ -1211,14 +1321,18 @@ function initFlightstick() {
     const deg = (Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360;
     const ux = len * Math.sin(deg * Math.PI / 180);
     const uy = -len * Math.cos(deg * Math.PI / 180);
-    knob.style.transform = `translate(${ux.toFixed(1)}px, ${uy.toFixed(1)}px)`;
+    const g = grip();
+    if (g) g.setAttribute("transform",
+      `translate(${(ux * 0.38).toFixed(1)} ${(uy * 0.38).toFixed(1)}) `
+      + `rotate(${(deg * 0.22 - (deg > 180 ? 79.2 : 0)).toFixed(1)} 50 80)`);
     if (degEl) degEl.textContent = deg.toFixed(0).padStart(3, "0") + "\u00b0";
     fs.classList.add("fs-active");
     pick(deg);
   };
   const release = () => {
     dragging = false;
-    knob.style.transform = "translate(0px, 0px)";
+    const g = grip();
+    if (g) g.setAttribute("transform", "translate(0 0) rotate(0 50 80)");
     fs.classList.remove("fs-active");
   };
   fs.addEventListener("pointerdown", e => {
