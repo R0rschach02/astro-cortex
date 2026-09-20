@@ -595,6 +595,7 @@ body.night .iw-toggle-row { border-color: #3a2020; }
   #topbar { flex-wrap: wrap; row-gap: 4px; }
   #topbar .glareshield-gauges { order: 10; width: 100%;
     margin-left: 0; margin-right: 0; }
+  #topbar .telemetry-link { margin-left: 0; }
   #topbar .glareshield-gauges .gauge-wrap { width: 17vw; }
   #topbar .glareshield-gauges .gauge-row { gap: 3vw; }
   #right-panel { max-width: 300px; }
@@ -912,7 +913,8 @@ body.night .basemap-tile { filter: none; }
 .iw-ax { fill: #7d8fa1; font: 8.5px var(--mono); }
 
 /* ---- Glareshield: Telemetry-Link + Jet-Gauge-Aesthetik ---- */
-.telemetry-link { color: #3aff7c; font-size: 11px; font-weight: 700;
+.telemetry-link { margin-left: auto; color: #3aff7c;
+  font-size: 11px; font-weight: 700;
   letter-spacing: .08em; padding: 3px 9px; white-space: nowrap;
   border: 1px solid rgba(58,255,124,.35); background: rgba(58,255,124,.06);
   text-shadow: 0 0 8px rgba(58,255,124,.55);
@@ -925,42 +927,28 @@ body.night .basemap-tile { filter: none; }
   letter-spacing: 1.5px; text-shadow: 0 0 5px rgba(124,232,124,.6); }
 
 /* ---- Flightstick: physisches Targeting unten links ---- */
-#flightstick { position: absolute; left: 14px; bottom: 14px; width: 96px;
-  height: 96px; border-radius: 50%; touch-action: none; cursor: grab;
-  user-select: none; z-index: 1250;   /* ueber dem Panel-Bottom-Sheet */
+#flightstick { position: absolute; left: 50%; bottom: -2px;
+  transform: translateX(-50%);
+  width: 115px; height: 115px; border-radius: 50%;
+  touch-action: none; cursor: grab; user-select: none;
+  z-index: 1250;   /* ueber dem Panel-Bottom-Sheet */
   background: radial-gradient(circle at 50% 38%, #1a2129, #0b0f14 72%);
   border: 2px solid #333e4a;
   box-shadow: 0 4px 14px rgba(0,0,0,.65), inset 0 2px 10px rgba(0,0,0,.85); }
 #flightstick.fs-active { cursor: grabbing;
   box-shadow: 0 0 16px rgba(255,210,74,.25), inset 0 2px 10px rgba(0,0,0,.85); }
-.fs-active .fs-deg { position: absolute; bottom: -18px; width: 100%; text-align: center;
+.fs-active .fs-deg { position: absolute; bottom: 5px; left: 50%;
+  transform: translateX(-50%);
   color: #ffd24a; font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
   text-shadow: 0 0 8px rgba(255,210,74,.8);
-  background: rgba(10,13,18,.85); border: 1px solid rgba(255,210,74,.35);
-  border-radius: 3px; padding: 1px 4px; box-sizing: border-box; }
+  background: rgba(10,13,18,.88); border: 1px solid rgba(255,210,74,.35);
+  border-radius: 3px; padding: 1px 5px; box-sizing: border-box;
+  pointer-events: none; }
 /* anvisierter Marker: taktisches Amber-Reticle */
-.spot-marker.fs-target .spot-dot {
-  box-shadow: 0 0 0 3px rgba(255,210,74,.85), 0 0 20px 6px rgba(255,210,74,.55);
-  animation: fs-pulse .9s infinite; }
-@keyframes fs-pulse { 50% { box-shadow: 0 0 0 3px rgba(255,210,74,.4),
-  0 0 26px 8px rgba(255,210,74,.75); } }
+ }
 
 /* HUD Target Brackets: eckige Waffencomputer-Klammern links/rechts
    um den Marker des aktiven LINK-Ziels (pulsierend). */
-.spot-marker.target-locked::before,
-.spot-marker.target-locked::after {
-  content: ""; position: absolute; top: 50%;
-  transform: translateY(-50%);
-  width: 13px; height: 40px; border: 3px solid #ff5c50;
-  filter: drop-shadow(0 0 4px rgba(255,92,80,.7));
-  animation: tl-bracket 1.2s ease-in-out infinite; }
-.spot-marker.target-locked::before { left: -9px;
-  border-right: none; border-radius: 4px 0 0 4px; }
-.spot-marker.target-locked::after { right: -9px;
-  border-left: none; border-radius: 0 4px 4px 0; }
-@keyframes tl-bracket {
-  0%, 100% { opacity: 1; }
-  50% { opacity: .45; } }
 
 /* Kuenstlicher Lunar-Horizont: Rundinstrument im linken Panel */
 #lh-mount { display: flex; justify-content: center; padding: 4px 0; }

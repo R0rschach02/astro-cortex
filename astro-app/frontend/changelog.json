@@ -330,6 +330,12 @@
       "title": "Jet-Politur nach VLM-Abnahme",
       "detail": "Faltenbalg des HOTAS mit helleren Rippenkanten und groesserer Basis, Grad-Readout als leuchtendes Chip mit Rahmen. Mond im Lunar-Horizont waermer/weisser mit zweistufigem Glow, Horizontlinie als weisse Hauptlinie (2.2px) mit Amber-Schimmer wie im echten Attitude Indicator, Pitch-Striche kontraststarker.",
       "usage": "-"
+    },
+    {
+      "date": "2026-09-21",
+      "title": "Ergonomie-Layout: zentraler HOTAS, reines Radar-Bild, zentrierte Instrumente",
+      "detail": "(1) Flightstick um 20% vergroessert (115px), zentriert in der unteren Bildmitte (left 50%, translateX(-50%)) und sitzt ohne Luecke direkt auf der T-Track-Leiste auf (bottom -2px ueberbrueckt den Grid-Gap); Grad-Chip wanderte in den Stick-Fuss. (2) HUD-Target-Brackets vollstaendig entfernt (inkl. toter fs-pulse-Regeln) - die Karte zeigt wieder das reine Radar-Bild, einzige Ziel-Indikation ist [LINK: ...] in der Top-Bar. (3) Top-Bar-Alignment: [LINK]+Gauges jetzt symmetrisch zentriert zwischen linker Gruppe und Aktions-Buttons (margin-left:auto am LINK, margin-right:auto an den Gauges - der Freiraum teilt sich auf beide Seiten).",
+      "usage": "Stick in Bildmitte unten; Karte ohne Klammern; Instrumentengruppe mittig"
     }
   ]
 }
