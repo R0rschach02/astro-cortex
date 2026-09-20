@@ -1,8 +1,8 @@
 /* Service Worker v31 - RainViewer Radar/Satellit-Layer mit Animation. */
 "use strict";
 
-const SHELL_CACHE = "astro-shell-v39";
-const API_CACHE = "astro-api-v39";
+const SHELL_CACHE = "astro-shell-v40";
+const API_CACHE = "astro-api-v40";
 const SHELL = [
   ".", "index.html", "app.js", "style.css", "manifest.webmanifest",
   "vendor/leaflet.js", "vendor/leaflet.css",

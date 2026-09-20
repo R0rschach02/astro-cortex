@@ -991,9 +991,9 @@ function buildLunar() {
     <defs>
       <clipPath id="lh-clip"><circle cx="50" cy="50" r="39"/></clipPath>
       <radialGradient id="lh-moon-grad" cx=".38" cy=".34" r="1">
-        <stop offset="0" stop-color="#fff8e0"/>
-        <stop offset=".7" stop-color="#e8d9a8"/>
-        <stop offset="1" stop-color="#b8a878"/>
+        <stop offset="0" stop-color="#fffdf2"/>
+        <stop offset=".55" stop-color="#ffefc0"/>
+        <stop offset="1" stop-color="#e3c98a"/>
       </radialGradient>
     </defs>
     <circle cx="50" cy="50" r="46" fill="none" stroke="#2c3136"
@@ -1005,19 +1005,22 @@ function buildLunar() {
       <g id="lh-horizong" transform="translate(0 0)">
         <rect x="8" y="-40" width="84" height="90" fill="#0e2236"/>
         <rect x="8" y="50" width="84" height="100" fill="#191008"/>
+        <line x1="8" y1="50" x2="92" y2="50" stroke="#f2f6fa"
+          stroke-width="2.2"/>
         <line x1="8" y1="50" x2="92" y2="50" stroke="#ffd24a"
-          stroke-width="1.8"/>
-        <line x1="30" y1="38" x2="70" y2="38" stroke="#3d5a77"
-          stroke-width="1" stroke-dasharray="4 3"/>
-        <line x1="34" y1="62" x2="66" y2="62" stroke="#4a3428"
-          stroke-width="1" stroke-dasharray="4 3"/>
+          stroke-width="0.8" opacity=".7"/>
+        <line x1="30" y1="38" x2="70" y2="38" stroke="#5d7a99"
+          stroke-width="1.1" stroke-dasharray="4 3"/>
+        <line x1="34" y1="62" x2="66" y2="62" stroke="#6a5236"
+          stroke-width="1.1" stroke-dasharray="4 3"/>
       </g>
     </g>
     <circle cx="50" cy="50" r="39" fill="none" stroke="#2c3642"
       stroke-width="1.5"/>
     <!-- Mond fix auf der Pitch-Achse -->
     <g id="lh-moonicon-wrap">
-      <circle cx="50" cy="50" r="11" fill="rgba(255,236,170,.12)"/>
+      <circle cx="50" cy="50" r="14" fill="rgba(255,240,190,.10)"/>
+      <circle cx="50" cy="50" r="10.5" fill="rgba(255,240,190,.14)"/>
       <circle id="lh-moonicon" cx="50" cy="50" r="7" fill="url(#lh-moon-grad)"
         stroke="#8f8260" stroke-width="0.7"/>
       <circle cx="47.8" cy="48" r="1.4" fill="#c9b98c" opacity=".8"/>
@@ -1265,14 +1268,18 @@ function initFlightstick() {
     <line x1="50" y1="76" x2="50" y2="88" stroke="#4a5a6f" stroke-width="1.6"/>
     <line x1="12" y1="50" x2="24" y2="50" stroke="#4a5a6f" stroke-width="1.6"/>
     <line x1="76" y1="50" x2="88" y2="50" stroke="#4a5a6f" stroke-width="1.6"/>
-    <!-- Faltenbalg-Basis (gerippte Gummi) -->
+    <!-- Faltenbalg-Basis (gerippte Gummi, harte Kanten fuer 3D) -->
     <g>
-      <rect x="36" y="84" width="28" height="5" rx="2.5" fill="#23282e"
-        stroke="#111519" stroke-width="0.8"/>
-      <rect x="38" y="79" width="24" height="5" rx="2.5" fill="#2b3138"
-        stroke="#111519" stroke-width="0.8"/>
-      <rect x="40" y="74" width="20" height="5" rx="2.5" fill="#23282e"
-        stroke="#111519" stroke-width="0.8"/>
+      <rect x="35" y="84" width="30" height="5.5" rx="2.7" fill="#262c33"
+        stroke="#0d1013" stroke-width="0.9"/>
+      <rect x="37" y="78.5" width="26" height="5.5" rx="2.7" fill="#303841"
+        stroke="#0d1013" stroke-width="0.9"/>
+      <rect x="39" y="73" width="22" height="5.5" rx="2.7" fill="#262c33"
+        stroke="#0d1013" stroke-width="0.9"/>
+      <line x1="37" y1="81.2" x2="63" y2="81.2" stroke="#55606c"
+        stroke-width="0.9" opacity=".8"/>
+      <line x1="39" y1="75.7" x2="61" y2="75.7" stroke="#55606c"
+        stroke-width="0.9" opacity=".8"/>
     </g>
     <!-- Griff: ergonomisch gebogen, Pivot am Faltenbalg (50,80) -->
     <g id="fs-grip" transform="translate(0 0)">

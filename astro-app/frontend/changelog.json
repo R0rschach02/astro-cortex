@@ -324,6 +324,12 @@
       "title": "Jet-Aesthetik Phase 2: HOTAS-SVG, Target-Brackets, Lunar-Attitude, Layout-Balance",
       "detail": "(1) LAYOUT: Gauge-Cluster rueckt mit margin-right:auto an den [LINK:]-Text, Aktions-Buttons rechts - Leiste wirkt zentriert. (2) 3D-HOTAS: Flightstick als Inline-SVG im Gauge-Design (Bezel+Schrauben) - gerippte Faltenbalg-Gummibasis, ergonomisch gebogener Griff mit Gradient+Hartlicht-Kanten, roter Feuerknopf mit Glow an der Spitze; der Griff neigt sich beim Drag um den Faltenbalg-Pivot (translate+rotate). (3) HUD TARGET BRACKETS: Der Marker des aktiven Telemetrie-Ziels traegt persistente rote eckige Klammern (::before/::after, links+rechts, pulsierend) - gesetzt bei Flightstick-Zug UND Marker-Klick, ueberlebt auch Daten-Refreshs. (4) KUENSTLICHER LUNAR-HORIZONT: Rechteck-Box ersetzt durch Rundinstrument im identischen Bezel/Stil - innen Himmel (dunkelblau) und Erde (schwarz-braun) mit Pitch-Skalenstrichen, die Horizontlinie sinkt mit steigender Mond-Elevation (alt/90*24), Mond fix auf der Achse wie das Flugzeug-Symbol (Radius waechst mit Beleuchtungsgrad).",
       "usage": "Flightstick-Zug: Ziel mit roten Klammern; Mond-Hoehe am linken Attitude-Instrument ablesbar"
+    },
+    {
+      "date": "2026-09-21",
+      "title": "Jet-Politur nach VLM-Abnahme",
+      "detail": "Faltenbalg des HOTAS mit helleren Rippenkanten und groesserer Basis, Grad-Readout als leuchtendes Chip mit Rahmen. Mond im Lunar-Horizont waermer/weisser mit zweistufigem Glow, Horizontlinie als weisse Hauptlinie (2.2px) mit Amber-Schimmer wie im echten Attitude Indicator, Pitch-Striche kontraststarker.",
+      "usage": "-"
     }
   ]
 }
