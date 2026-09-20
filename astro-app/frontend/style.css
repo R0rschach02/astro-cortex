@@ -916,6 +916,7 @@ body.night .basemap-tile { filter: none; }
 .telemetry-link { margin-left: auto; color: #3aff7c;
   font-size: 11px; font-weight: 700;
   letter-spacing: .08em; padding: 3px 9px; white-space: nowrap;
+  max-width: 150px; overflow: hidden; text-overflow: ellipsis;
   border: 1px solid rgba(58,255,124,.35); background: rgba(58,255,124,.06);
   text-shadow: 0 0 8px rgba(58,255,124,.55);
   box-shadow: 0 0 10px rgba(58,255,124,.12), inset 0 0 8px rgba(58,255,124,.07); }
@@ -927,7 +928,7 @@ body.night .basemap-tile { filter: none; }
   letter-spacing: 1.5px; text-shadow: 0 0 5px rgba(124,232,124,.6); }
 
 /* ---- Flightstick: physisches Targeting unten links ---- */
-#flightstick { position: absolute; left: 50%; bottom: -2px;
+#flightstick { position: absolute; left: 50%; bottom: 54px;
   transform: translateX(-50%);
   width: 115px; height: 115px; border-radius: 50%;
   touch-action: none; cursor: grab; user-select: none;
@@ -957,3 +958,6 @@ body.night .basemap-tile { filter: none; }
 /* HOTAS-Flightstick: SVG fuellt den Stick, Degree-Readout darunter */
 #flightstick svg { width: 100%; height: 100%; display: block; }
 #flightstick #fs-grip { transition: transform .06s linear; }
+
+/* Top-Bar-Entlastung: Freshness weicht (Alters-Info lebt im Status-LED) */
+#topbar > #freshness { display: none; }
