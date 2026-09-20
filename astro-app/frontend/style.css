@@ -413,7 +413,7 @@ body.night .iw-toggle-row { border-color: #3a2020; }
 #cockpit {
   position: fixed; inset: 0; display: grid;
   grid-template-areas: "top top top" "left map right" "bottom bottom bottom";
-  grid-template-rows: 48px 1fr 52px;
+  grid-template-rows: auto 1fr 52px;
   grid-template-columns: minmax(168px, max-content) 1fr 340px;
   background: var(--void); gap: 2px;
 }
@@ -511,7 +511,8 @@ body.night .iw-toggle-row { border-color: #3a2020; }
 @keyframes ct-in { from { opacity: 0; transform: translateY(4px); } }
 .ct-ts { color: #1d8a4a; margin-right: 4px; }
 #right-panel { display: flex; flex-direction: column; }
-#bias-slot { flex: none; }
+#bias-slot { flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column; }
 #master-switch-dock {
   margin-top: auto; padding-top: 10px; border-top: 2px solid #3a2f1a;
   background: repeating-linear-gradient(-45deg, rgba(255,210,74,.07) 0 10px,
@@ -592,9 +593,9 @@ body.night .iw-toggle-row { border-color: #3a2020; }
   .tp-sub { display: none; }
   /* Glareshield bricht auf eigene Zeile um, Instrumente bleiben gross */
   #topbar { flex-wrap: wrap; row-gap: 4px; }
-  .glareshield-gauges { order: 10; width: 100%; margin-left: 0; }
-  .glareshield-gauges .gauge-wrap { width: 21vw; }
-  .glareshield-gauges .gauge-row { gap: 3vw; }
+  #topbar .glareshield-gauges { order: 10; width: 100%; margin-left: 0; }
+  #topbar .glareshield-gauges .gauge-wrap { width: 21vw; }
+  #topbar .glareshield-gauges .gauge-row { gap: 3vw; }
   #right-panel { max-width: 300px; }
   /* Glareshield-LEDs bleiben auch mobil sichtbar; Freshness-Text weicht */
   #freshness { display: none; }

@@ -288,6 +288,12 @@
       "title": "Glareshield-Instrumentierung: Gauges als Primaer-Fluginstrumente in der Top-Bar",
       "detail": "(1) DEAD WEIGHT: GPS-Koordinaten- und UTC-Uhr-Display inkl. ihrer Update-Loops (1s-Clock-Interval, setTpCoords) entfernt - der Live-Spot-Button funktioniert weiterhin. (2) Die vier Rundinstrumente (SEEING, TAU DP, WIND, DEW) sind aus dem rechten Panel in die Top-Bar gewandert und dort streng horizontal angeordnet (flex-direction row, gap 2vw), rechts vor den Aktions-Buttons. (3) MASSIVE SKALIERUNG: Instrumente bis 122px breit (clamp 78px-8.5vw-122px), digitale Werte von 11 auf 17 Einheiten und Labels von 7 auf 10 Einheiten vergroessert - auf den ersten Blick ablesbar. (4) RECHTES PANEL: keine leeren Container; Bias-Liniendiagramm (flex:1 statt 40vh-Deckel) und Comms-Feed (min 140px) teilen sich die volle Spaltenhoehe. Mobile: Instrumente brechen auf eine eigene Zeile um (21vw je Gauge), die versehentlich den Status-Block treffende nth-child(2)-Regel ist korrigiert.",
       "usage": "Alle vier Instrumente direkt unter der Augenbraue im Glareshield; rechts nur noch Bias + Comms"
+    },
+    {
+      "date": "2026-09-19",
+      "title": "Glareshield-Feinschliff: dynamische Top-Bar-Hoehe, Mobile-Fix, Panel-Flex",
+      "detail": "Drei Layout-Fixes nach dem Glareshield-Umbau: (1) Die Cockpit-Grid-Top-Zeile war auf 48px fixiert und hat die 110px-Gauges abgeschnitten - jetzt auto. (2) Die mobilen Override-Regeln (21vw-Gauges, eigene Zeile) verloren gegen die spaeter im Dateifluss stehenden Basis-Regeln gleicher Spezifitaet - jetzt mit ID-Selektor (#topbar ...) priorisiert. (3) #bias-slot war flex:none und blockierte die Hoehenverteilung - jetzt flexibler Spalten-Container, das Bias-Diagramm scrollt intern und der Comms-Feed bekommt garantierte 140px.",
+      "usage": "Gauges vollstaendig sichtbar, mobil in eigener Zeile, rechts ohne Leerraum"
     }
   ]
 }
