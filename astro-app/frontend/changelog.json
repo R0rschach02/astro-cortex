@@ -342,6 +342,12 @@
       "title": "Hotfix-Präzision: Stick in echter Bildmitte, Top-Bar-Freiraum",
       "detail": "Der Stick hing an #map-wrap (Mitte der Kartenzelle, nicht des Bildschirms) - jetzt Kind von #cockpit mit left:50% = exakte Bildschirmmitte, bottom 54px setzt ihn lueckenlos auf die T-Track-Leiste. Die Top-Bar war randvoll (1572/1600px, LINK allein 244px wegen Langname) - die Auto-Margins fanden keinen Freiraum: LINK kappt jetzt bei 150px mit Ellipsis (voller Name im Tooltip), Freshness weicht - damit zentriert sich die Instrumentengruppe symmetrisch.",
       "usage": "-"
+    },
+    {
+      "date": "2026-09-21",
+      "title": "Final-Sitz: 0px Luft zum T-Track",
+      "detail": "bottom 52px statt 54px - der Bezel des Sticks beruehrt die Track-Leiste jetzt lueckenlos (gemessen: 0px).",
+      "usage": "-"
     }
   ]
 }

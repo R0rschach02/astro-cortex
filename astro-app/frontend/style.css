@@ -928,7 +928,7 @@ body.night .basemap-tile { filter: none; }
   letter-spacing: 1.5px; text-shadow: 0 0 5px rgba(124,232,124,.6); }
 
 /* ---- Flightstick: physisches Targeting unten links ---- */
-#flightstick { position: absolute; left: 50%; bottom: 54px;
+#flightstick { position: absolute; left: 50%; bottom: 52px;
   transform: translateX(-50%);
   width: 115px; height: 115px; border-radius: 50%;
   touch-action: none; cursor: grab; user-select: none;
