@@ -276,6 +276,12 @@
       "title": "UX-Paket: Transit-Pills, Bias-Liniendiagramm, Dynamic Abort, Linien-Kontrast",
       "detail": "(1) EINSATZWEG-LINIE: Doppel-Linien-Trick - solide schwarze Kontur (weight 7) unter der taktisch rot gestrichelten Trajektorie (#ff3b30, weight 4, dash 10,15), beide in einem LayerGroup gruppiert und sauber entfernbar. (2) TRANSIT PILLS: Der OePNV-Plan wird als visuelle Pill-Kette gerendert ([Fussgaenger 8min] >> [625 20:26-20:31] >> [RNV 50 ...]) - Bus/Regional blau, Tram/Stadtbahn (RNV) amber, Walks mit Icon; Backend liefert steps[] mit Zeiten und Haltestellen pro Abschnitt. (3) BIAS-CHART: Root-Cause des 'nur unverbundene Punkte'-Bugs war ein SVG-Pfad, der mit L statt M begann (ungltig, wurde gar nicht gezeichnet). Neubau: gueltige Pfade, durchgehende Linie (7-Tage) + gestrichelte Referenz (gesamt), X-Achste nach echter Tagesdistanz dynamisch ueber die Historie, Y-Achse mit Labels, 5 Datumsticks. (4) DYNAMIC ABORT: Loeuft das Golden Window und die bias-korrigierte Prognose kippt in den kommenden Stunden auf NO-GO (Wolken/Seeing/Regen), wird die Rueckfahrt-Suche auf den Umschlagpunkt vorverlegt; Frontend warnt rot blinkend 'DYNAMIC ABORT: WETTERUMSCHLAG - NAECHSTE RUECKFAHRT ...' inkl. Comms-Terminal-Alert.",
       "usage": "TRANSIT ROUTE zeigt Pills statt Textwall; Bias-Tab zeigt Liniendiagramm; bei laufendem Fenster mit Wetterumschlag erscheint die Abort-Warnung"
+    },
+    {
+      "date": "2026-09-19",
+      "title": "Cockpit-Layout: Threat-Gauges + Glareshield-LEDs",
+      "detail": "(1) WIND SHEAR und DEW RISK sind keine vertikalen Balken mehr, sondern zwei analoge Rundinstrumente exakt im SVG-Stil der SEEING/TAU-Gauges (Zentrum 50/45, Nadel per SVG-Rotate-Attribut, perfekt zentriert). Wind-Skala 0-40 km/h, Nadel amber >20, rot >30. Taupunkt-Spread auf INVERSER Skala 10K (sicher, rechts) bis 0K (Beschlag, links), Nadel amber <3K, rot <1.5K mit Blinken. (2) Die LED-Statusmatrix (VRN Sync, Bias, OBS Mode, UAP) ist aus dem rechten Panel in die obere Statusleiste gewandert - horizontal neben dem SYSTEM-SECURE-Indikator angeordnet wie Warnlampen am Glareshield eines Jets. Freigewordener Platz right: Instrumente atmen, mobile Entlastung (Freshness-Text weicht unter 980px, LEDs bleiben).",
+      "usage": "Rechts nur noch Instrumente; Status-LEDs oben in der Top-Bar"
     }
   ]
 }

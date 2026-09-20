@@ -988,38 +988,40 @@ function updateLunarHorizon(data) {
     }
   }
 
-  // === THREAT ASSESSMENT: Wind + Dew Balken ===
-  // Wind Shear: 0-40 km/h (Böen als Worst Case)
+  // === THREAT ASSESSMENT: Wind + Dew als Rundinstrumente ===
+  // (gleiche SVG-Geometrie wie SEEING/TAU: Zentrum 50/45, Nadel-Start
+  // oben, Rotation als SVG-Attribut - KEIN CSS-transform!)
+  const setGauge = (needleId, valId, angle, cls, txt) => {
+    const n = document.getElementById(needleId);
+    if (n) {
+      n.setAttribute("transform", `rotate(${angle.toFixed(1)} 50 45)`);
+      n.setAttribute("class", "gauge-needle " + cls);
+    }
+    const v = document.getElementById(valId);
+    if (v) {
+      v.textContent = txt;
+      v.setAttribute("class", "gauge-val"
+        + (cls === "needle-red" ? " gv-danger"
+           : cls === "needle-amber" ? " gv-warn" : ""));
+    }
+  };
+  // Wind: 0-40 km/h, Böen als Worst Case. Amber > 20, rot > 30.
   const gusts = best.wind_gusts || best.wind_speed || 0;
-  const windFill = document.getElementById("tb-wind-fill");
-  const windVal = document.getElementById("tb-wind-val");
-  if (windFill) {
-    windFill.style.height = Math.min(100, (gusts / 40) * 100) + "%";
-    windFill.className = "tb-fill " + (gusts > 30 ? "level-danger"
-      : gusts > 20 ? "level-warn" : "level-safe");
-  }
-  if (windVal) {
-    windVal.textContent = gusts.toFixed(0) + " km/h";
-    windVal.className = "tb-val mono " + (gusts > 30 ? "level-danger"
-      : gusts > 20 ? "level-warn" : "");
-  }
-  // Dew Risk: INVERS - Balken fuellt sich wenn Spread gegen 0 faellt
-  // Spread 10K = leer/safe, 3K = safe-Grenze, 1.5K = FROST RISK
+  setGauge("wind-needle", "wind-val",
+    -90 + (Math.min(gusts, 40) / 40) * 180,
+    gusts > 30 ? "needle-red" : gusts > 20 ? "needle-amber" : "needle-cyan",
+    gusts.toFixed(0) + " km/h");
+  // Dew: INVERSE Skala 10K (sicher, Nadel rechts +90) bis 0K (Beschlag,
+  // links -90). Amber < 3K, rot < 1.5K (FROST RISK).
   const tau = best.dewpoint_spread;
-  const dewFill = document.getElementById("tb-dew-fill");
-  const dewVal = document.getElementById("tb-dew-val");
-  if (dewFill && tau != null) {
-    // Fuellung: 0% bei 10K (sicher), 100% bei 0K (Beschlag)
-    const fillPct = Math.max(0, Math.min(100, (10 - tau) / 10 * 100));
-    dewFill.style.height = fillPct + "%";
-    dewFill.className = "tb-fill " + (tau < 1.5 ? "level-danger"
-      : tau < 3 ? "level-warn" : "level-safe");
-  }
-  if (dewVal) {
-    dewVal.textContent = tau != null ? tau.toFixed(1) + " K" : "--";
-    dewVal.className = "tb-val mono " + (tau != null && tau < 1.5
-      ? "level-danger" : tau != null && tau < 3 ? "level-warn" : "");
-    if (tau != null && tau < 1.5) dewVal.textContent += " FROST RISK";
+  if (tau != null) {
+    const clamped = Math.min(Math.max(tau, 0), 10);
+    setGauge("dew-needle", "dew-val",
+      -90 + (clamped / 10) * 180,
+      tau < 1.5 ? "needle-red" : tau < 3 ? "needle-amber" : "needle-cyan",
+      tau.toFixed(1) + " K" + (tau < 1.5 ? " !" : ""));
+  } else {
+    setGauge("dew-needle", "dew-val", 90, "needle-cyan", "--");
   }
 }
 
