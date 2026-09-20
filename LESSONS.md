@@ -243,3 +243,13 @@ das Deploy-Gate gebrochen).
     explizit normalisieren; Mock-Tests duerfen nie als einziger Beweis
     fuer Netzwerkcode gelten. LESSONS-17-Klasse (broad except stielt den
     Fehler), verschchaerft um die Mock-Luecke.
+
+## Lesson 19: Abgeleitete Werte zweimal berechnung = divergence bug
+**Symptom:** GTFS-Rueckweg fand 51 Verbindungen, alle wurden danach weggefiltert ->
+leeres Ergebnis. **Ursache:** `return_connections()` rechnete base = Service-Tag,
+`_search()` rechnete base = Abfragetag NEU. Zwei Kodomänen für dieselbe Zeitrechnung
+driften auseinander (25:00 GTFS-Offset vs. 01:00 Kalenderzeit). **Regel:** Abgeleitete
+Werte (Basen, Einheiten, Normalisierungen) genau EINMAL definieren und als Parameter
+durchreichen - oder als Instanz-Zustand (self.service_date). Gilt auch fuer: Zeitzonen,
+Einheiten-Conversion, NFC-Normalisierung. **English:** Compute derived values once,
+pass them down; recomputing them independently invites silent divergence.
