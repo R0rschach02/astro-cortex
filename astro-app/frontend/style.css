@@ -594,7 +594,7 @@ body.night .iw-toggle-row { border-color: #3a2020; }
   /* Glareshield bricht auf eigene Zeile um, Instrumente bleiben gross */
   #topbar { flex-wrap: wrap; row-gap: 4px; }
   #topbar .glareshield-gauges { order: 10; width: 100%; margin-left: 0; }
-  #topbar .glareshield-gauges .gauge-wrap { width: 21vw; }
+  #topbar .glareshield-gauges .gauge-wrap { width: 17vw; }
   #topbar .glareshield-gauges .gauge-row { gap: 3vw; }
   #right-panel { max-width: 300px; }
   /* Glareshield-LEDs bleiben auch mobil sichtbar; Freshness-Text weicht */
@@ -722,7 +722,7 @@ body.night .basemap-tile { filter: none; }
    der Nadeln unveraendert (SVG-Attribute, kein CSS-transform) */
 .glareshield-gauges { margin-left: auto; flex: 0 1 auto;
   display: flex; align-items: center; }
-.glareshield-gauges .gauge-wrap { flex: 0 1 auto; width: clamp(78px, 8.5vw, 122px); }
+.glareshield-gauges .gauge-wrap { flex: 0 1 auto; width: clamp(72px, 7.6vw, 116px); }
 .gauge { width: 100%; height: auto; }
 .gauge-body { fill: #0a0d12; stroke: none; }
 .gauge-ring { fill: none; stroke: #2d3d4f; stroke-width: 2; }
@@ -733,7 +733,7 @@ body.night .basemap-tile { filter: none; }
 .gauge-hub { fill: #2a3542; stroke: #4a5a6f; stroke-width: 1.5; }
 .gauge-label { fill: #7d93a8; font-size: 10px; letter-spacing: 1.2px;
   font-family: var(--mono); }
-.gauge-val { fill: #e8f0f7; font-size: 17px; font-weight: 700;
+.gauge-val { fill: #e8f0f7; font-size: 14px; font-weight: 700;
   font-family: var(--mono); }
 
 /* LED-Matrix: quadratische Status-LEDs */
@@ -929,3 +929,51 @@ body.night .basemap-tile { filter: none; }
 
 /* Bias-Chart: Achsen-Labels */
 .iw-ax { fill: #7d8fa1; font: 8.5px var(--mono); }
+
+/* ---- Glareshield: Telemetry-Link + Jet-Gauge-Aesthetik ---- */
+.telemetry-link { color: #3aff7c; font-size: 11px; font-weight: 700;
+  letter-spacing: .08em; padding: 3px 9px; white-space: nowrap;
+  border: 1px solid rgba(58,255,124,.35); background: rgba(58,255,124,.06);
+  text-shadow: 0 0 8px rgba(58,255,124,.55);
+  box-shadow: 0 0 10px rgba(58,255,124,.12), inset 0 0 8px rgba(58,255,124,.07); }
+.gauge-bezel { stroke: #2c3136; }
+.gauge-ticknum { fill: #8fa1b3; font: 6.5px var(--mono); }
+.gauge-needle-fine { stroke-width: 1.4 !important; }
+.gauge-digital-box { fill: #04070b; stroke: #3d4d5f; stroke-width: 1; }
+.gauge-digital { fill: #7ce87c; font: 700 9px var(--mono);
+  letter-spacing: 1.5px; text-shadow: 0 0 5px rgba(124,232,124,.6); }
+
+/* ---- Flightstick: physisches Targeting unten links ---- */
+#flightstick { position: absolute; left: 14px; bottom: 14px; width: 96px;
+  height: 96px; border-radius: 50%; touch-action: none; cursor: grab;
+  user-select: none; z-index: 900;
+  background: radial-gradient(circle at 50% 38%, #1a2129, #0b0f14 72%);
+  border: 2px solid #333e4a;
+  box-shadow: 0 4px 14px rgba(0,0,0,.65), inset 0 2px 10px rgba(0,0,0,.85); }
+#flightstick.fs-active { cursor: grabbing;
+  box-shadow: 0 0 16px rgba(255,210,74,.25), inset 0 2px 10px rgba(0,0,0,.85); }
+.fs-ring-outer { position: absolute; inset: 7px; border-radius: 50%;
+  border: 1px dashed #3a4756; }
+.fs-ring-inner { position: absolute; inset: 23px; border-radius: 50%;
+  border: 1px solid #2c3642; background: rgba(10,13,18,.5); }
+.fs-cross { position: absolute; inset: 0; }
+.fs-cross::before, .fs-cross::after { content: ""; position: absolute;
+  background: #2c3642; }
+.fs-cross::before { left: 50%; top: 18%; bottom: 18%; width: 1px; }
+.fs-cross::after { top: 50%; left: 18%; right: 18%; height: 1px; }
+.fs-knob { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px;
+  margin: -11px 0 0 -11px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #ffd24a, #8f6a1a);
+  border: 1px solid #5a430f;
+  box-shadow: 0 2px 6px rgba(0,0,0,.7), 0 0 10px rgba(255,210,74,.3); }
+.fs-active .fs-knob { box-shadow: 0 2px 6px rgba(0,0,0,.7),
+  0 0 16px rgba(255,210,74,.7); }
+.fs-deg { position: absolute; bottom: -16px; width: 100%; text-align: center;
+  color: #ffd24a; font-size: 9px; letter-spacing: 1px;
+  text-shadow: 0 0 6px rgba(255,210,74,.5); }
+/* anvisierter Marker: taktisches Amber-Reticle */
+.spot-marker.fs-target .spot-dot {
+  box-shadow: 0 0 0 3px rgba(255,210,74,.85), 0 0 20px 6px rgba(255,210,74,.55);
+  animation: fs-pulse .9s infinite; }
+@keyframes fs-pulse { 50% { box-shadow: 0 0 0 3px rgba(255,210,74,.4),
+  0 0 26px 8px rgba(255,210,74,.75); } }

@@ -25,56 +25,13 @@
         <span class="sq-led" id="led-uap" title="UAP DB Link (Vorbereitung)"></span>
       </div>
       <div id="freshness" class="freshness mono">lade…</div>
-      <!-- Primaer-Fluginstrumente: die vier Rundinstrumente direkt am
-           Glareshield, streng horizontal -->
+      <!-- Telemetry-Link: Glareshield-Instrumente zeigen genau diesen Ort -->
+      <div class="telemetry-link mono" id="telemetry-link"
+        title="Telemetrie-Ziel - Gauge-Daten kommen ausschliesslich von hier (Flightstick/Marker setzt das Ziel)">[LINK:&nbsp;--]</div>
+      <!-- Primaer-Fluginstrumente: SVG-Markup wird von buildGauges()
+           generiert (Bezel, Schrauben, Ticks, Nadeln, Digital-Box) -->
       <div class="glareshield-gauges" id="astro-instruments">
-        <div class="gauge-row">
-          <div class="gauge-wrap">
-            <svg viewBox="0 0 100 90" class="gauge" id="gauge-seeing">
-              <circle cx="50" cy="45" r="35" class="gauge-body"/>
-              <circle cx="50" cy="45" r="35" class="gauge-ring"/>
-              <circle cx="50" cy="45" r="30" class="gauge-ticks"/>
-              <line x1="50" y1="45" x2="50" y2="15" class="gauge-needle needle-amber" id="seeing-needle" transform="rotate(-90 50 45)"/>
-              <circle cx="50" cy="45" r="4" class="gauge-hub"/>
-              <text x="50" y="65" text-anchor="middle" class="gauge-label">SEEING</text>
-              <text x="50" y="83" text-anchor="middle" class="gauge-val" id="seeing-val">--</text>
-            </svg>
-          </div>
-          <div class="gauge-wrap">
-            <svg viewBox="0 0 100 90" class="gauge" id="gauge-tau">
-              <circle cx="50" cy="45" r="35" class="gauge-body"/>
-              <circle cx="50" cy="45" r="35" class="gauge-ring"/>
-              <circle cx="50" cy="45" r="30" class="gauge-ticks"/>
-              <line x1="50" y1="45" x2="50" y2="15" class="gauge-needle needle-cyan" id="tau-needle" transform="rotate(90 50 45)"/>
-              <circle cx="50" cy="45" r="4" class="gauge-hub"/>
-              <text x="50" y="65" text-anchor="middle" class="gauge-label">TAU&nbsp;DP</text>
-              <text x="50" y="83" text-anchor="middle" class="gauge-val" id="tau-val">--</text>
-            </svg>
-          </div>
-          <div class="gauge-wrap">
-            <svg viewBox="0 0 100 90" class="gauge" id="gauge-wind">
-              <circle cx="50" cy="45" r="35" class="gauge-body"/>
-              <circle cx="50" cy="45" r="35" class="gauge-ring"/>
-              <circle cx="50" cy="45" r="30" class="gauge-ticks"/>
-              <line x1="50" y1="45" x2="50" y2="15" class="gauge-needle needle-cyan" id="wind-needle" transform="rotate(-90 50 45)"/>
-              <circle cx="50" cy="45" r="4" class="gauge-hub"/>
-              <text x="50" y="65" text-anchor="middle" class="gauge-label">WIND</text>
-              <text x="50" y="83" text-anchor="middle" class="gauge-val" id="wind-val">--</text>
-            </svg>
-          </div>
-          <div class="gauge-wrap">
-            <!-- inverse Skala: 10K (sicher) rechts, 0K (Beschlag) links -->
-            <svg viewBox="0 0 100 90" class="gauge" id="gauge-dew">
-              <circle cx="50" cy="45" r="35" class="gauge-body"/>
-              <circle cx="50" cy="45" r="35" class="gauge-ring"/>
-              <circle cx="50" cy="45" r="30" class="gauge-ticks"/>
-              <line x1="50" y1="45" x2="50" y2="15" class="gauge-needle needle-cyan" id="dew-needle" transform="rotate(90 50 45)"/>
-              <circle cx="50" cy="45" r="4" class="gauge-hub"/>
-              <text x="50" y="65" text-anchor="middle" class="gauge-label">DEW</text>
-              <text x="50" y="83" text-anchor="middle" class="gauge-val" id="dew-val">--</text>
-            </svg>
-          </div>
-        </div>
+        <div class="gauge-row" id="gauge-row"></div>
       </div>
       <div class="tp-actions">
         <button id="btn-mode" class="hbtn mode" title="Profil: DSO / Planetarisch">DSO</button>
@@ -120,7 +77,17 @@
     </aside>
 
     <!-- ============ ZENTRUM: WINDSCHUTZSCHEIBE ============ -->
-    <main id="map-wrap"><div id="map"></div></main>
+    <main id="map-wrap"><div id="map"></div>
+      <!-- Flightstick: physisches Targeting - ziehen richtet den Peil-
+           Vektor, der naechste Standort in dieser Richtung wird Ziel -->
+      <div id="flightstick" title="Flightstick: ziehen = Standort anvisieren">
+        <div class="fs-ring fs-ring-outer"></div>
+        <div class="fs-ring fs-ring-inner"></div>
+        <div class="fs-cross"></div>
+        <div class="fs-deg mono" id="fs-deg">---&deg;</div>
+        <div class="fs-knob" id="fs-knob"></div>
+      </div>
+    </main>
 
     <!-- Detail-Panel (Tap auf Marker) — als HUD-Overlay über der Karte -->
     <section id="panel" class="hidden">

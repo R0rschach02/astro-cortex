@@ -83,6 +83,8 @@ function initMap() {
 
   // Vorhersage-Zuverlaessigkeit + Bot-Befehle: einklappbares Widget
   // top-left (data-cached, offline-faehig via localStorage).
+  buildGauges();
+  initFlightstick();
   initInfoWidget();
   initCockpitStatus();
   // Grid-Layout mit minmax kann die Map-Groesse nach dem ersten Render
@@ -630,6 +632,7 @@ function renderSpots(data) {
     const mk = L.marker([s.lat, s.lon], { icon: markerIcon(s, rainNew) });
     mk.on("click", () => {
       currentSpot = s;
+      setTelemetry(s.name);
       $("panel").classList.remove("hidden");
       showTab("now");
       fetchBortle(s);
@@ -898,23 +901,191 @@ function commsLog(text, severity) {
   t.scrollTop = t.scrollHeight;
 }
 
+/* ============================================================
+   GLARESHIELD-INSTRUMENTE: Jet-Aesthetik per SVG-Generator.
+   Zentrum (50,50) im viewBox 0 0 100 100 - ALLE Nadel-Rotationen
+   laufen als SVG-Attribut rotate(WINKEL 50 50), niemals CSS-transform
+   (Lesson aus der dezentrierten Nadel).
+   ============================================================ */
+
+function _gaugeTicks(min, max, majorEvery) {
+  /* Major-Ticks alle majorEvery Einheiten (weiss, dick + Zahl),
+     dazwischen ein feiner grauer Minor-Strich. -90deg = min. */
+  let out = "";
+  const span = max - min;
+  const majors = Math.round(span / majorEvery);
+  for (let i = 0; i <= majors; i++) {
+    const v = min + i * majorEvery;
+    const a = -90 + (v - min) / span * 180;
+    const rad = a * Math.PI / 180;
+    const tick = (r1, r2, w, col) =>
+      `<line x1="${(50 + r1 * Math.sin(rad)).toFixed(1)}"
+             y1="${(50 - r1 * Math.cos(rad)).toFixed(1)}"
+             x2="${(50 + r2 * Math.sin(rad)).toFixed(1)}"
+             y2="${(50 - r2 * Math.cos(rad)).toFixed(1)}"
+             stroke="${col}" stroke-width="${w}"/>`;
+    out += tick(37.5, 31.5, 1.9, "#e6edf4");
+    if (i < majors) out += tick(37.5, 34.5, 0.7, "#5d6a78");
+    out += `<text x="${(50 + 26.5 * Math.sin(rad)).toFixed(1)}"
+              y="${(50 - 26.5 * Math.cos(rad) + 2.2).toFixed(1)}"
+              text-anchor="middle" class="gauge-ticknum">${v}</text>`;
+  }
+  return out;
+}
+
+function _gaugeScrews() {
+  /* Schlitzschrauben auf 45/135/225/315 Grad auf dem Bezel */
+  const slots = [28, 75, 118, 163];   // deterministische Schlitzwinkel
+  let out = "";
+  [45, 135, 225, 315].forEach((deg, i) => {
+    const rad = deg * Math.PI / 180;
+    const cx = +(50 + 45.5 * Math.sin(rad)).toFixed(1);
+    const cy = +(50 - 45.5 * Math.cos(rad)).toFixed(1);
+    out += `<g><circle cx="${cx}" cy="${cy}" r="3.1" fill="#454c54"
+              stroke="#14181c" stroke-width="0.9"/>
+      <line x1="${cx - 2}" y1="${cy}" x2="${cx + 2}" y2="${cy}"
+        stroke="#14181c" stroke-width="0.9"
+        transform="rotate(${slots[i]} ${cx} ${cy})"/></g>`;
+  });
+  return out;
+}
+
+function gaugeSvg(o) {
+  /* o = {id, label, valId, needleId, needleCls, min, max, majorEvery,
+          dual: {needleId, needleCls}, digital: {boxId}} */
+  return `<svg viewBox="0 0 100 100" class="gauge" id="${o.id}">
+    <circle cx="50" cy="50" r="46" fill="none" stroke="#2c3136"
+      stroke-width="7" class="gauge-bezel"/>
+    <circle cx="50" cy="50" r="42" fill="#0b0f14" stroke="#1e252d"
+      stroke-width="1"/>
+    ${_gaugeScrews()}
+    ${_gaugeTicks(o.min, o.max, o.majorEvery)}
+    ${o.dual ? `<line x1="50" y1="52" x2="50" y2="13"
+      class="gauge-needle ${o.dual.needleCls} gauge-needle-fine"
+      id="${o.dual.needleId}" transform="rotate(-90 50 50)"/>` : ""}
+    <line x1="50" y1="56" x2="50" y2="${o.dual ? 24 : 15}"
+      class="gauge-needle ${o.needleCls}" id="${o.needleId}"
+      transform="rotate(-90 50 50)"/>
+    <circle cx="50" cy="50" r="4.6" class="gauge-hub"/>
+    ${o.digital ? `<rect x="29" y="55" width="42" height="14" rx="1"
+        class="gauge-digital-box"/>
+      <text x="50" y="65.5" text-anchor="middle" class="gauge-digital"
+        id="${o.digital.boxId}">B?</text>` : ""}
+    <text x="50" y="80" text-anchor="middle" class="gauge-label">${o.label}</text>
+    <text x="50" y="93" text-anchor="middle" class="gauge-val" id="${o.valId}">--</text>
+  </svg>`;
+}
+
+function buildGauges() {
+  const row = document.getElementById("gauge-row");
+  if (!row) return;
+  const mount = (svg, title) =>
+    `<div class="gauge-wrap" title="${title}">${svg}</div>`;
+  row.innerHTML =
+    mount(gaugeSvg({id: "gauge-seeing", label: "SEEING", valId: "seeing-val",
+      needleId: "seeing-needle", needleCls: "needle-amber",
+      min: 0, max: 5, majorEvery: 1}),
+      "Seeing 0-5\u2033") +
+    mount(gaugeSvg({id: "gauge-shear", label: "SHEAR", valId: "wind-val",
+      needleId: "wind-needle", needleCls: "needle-cyan",
+      dual: {needleId: "jet-needle", needleCls: "needle-cyan"},
+      min: 0, max: 40, majorEvery: 10}),
+      "Bodenwind 0-40 km/h (dicke Nadel) \u00b7 Jetstream 0-60 m/s (feine Nadel)") +
+    mount(gaugeSvg({id: "gauge-tau", label: "TAU DP", valId: "tau-val",
+      needleId: "tau-needle", needleCls: "needle-cyan",
+      min: 0, max: 15, majorEvery: 5}),
+      "Taupunkt-Spread 0-15 K") +
+    mount(gaugeSvg({id: "gauge-dew", label: "DEW", valId: "dew-val",
+      needleId: "dew-needle", needleCls: "needle-cyan",
+      min: 0, max: 10, majorEvery: 5}),
+      "Beschlags-Reserve: 10K sicher bis 0K Frost (invers)") +
+    mount(gaugeSvg({id: "gauge-sqm", label: "SQM", valId: "sqm-val",
+      needleId: "sqm-needle", needleCls: "needle-amber",
+      min: 15, max: 22, majorEvery: 2,
+      digital: {boxId: "sqm-bortle"}}),
+      "Zenith-SQM 15-22 mag/arcsec\u00b2 \u00b7 Box: Bortle-Klasse");
+}
+
+/* ============================================================
+   TELEMETRY-LINK: Glareshield-Instrumente zeigen ausschliesslich
+   den gelockten Standort (Flightstick oder Marker-Klick setzt ihn).
+   ============================================================ */
+let telemetryTarget = localStorage.getItem("astro_telemetry") || null;
+
+function telemetrySpot(data) {
+  if (!data || !data.spots || !data.spots.length) return null;
+  return data.spots.find(s => s.name === telemetryTarget)
+    || data.spots[0];
+}
+
+function setTelemetry(name, silent) {
+  telemetryTarget = name;
+  localStorage.setItem("astro_telemetry", name);
+  const el = document.getElementById("telemetry-link");
+  if (el) el.textContent = "[LINK: " + String(name || "?").toUpperCase() + "]";
+  if (!silent && lastSpots) updateAstroInstruments(lastSpots);
+}
+
+/* Bortle-Klasse -> approx. Zenith-SQM (mag/arcsec^2) */
+const SQM_FROM_BORTLE = {1: 22.0, 2: 21.7, 3: 21.3, 4: 20.9, 5: 20.3,
+  6: 19.5, 7: 18.5, 8: 17.5, 9: 16.0};
+
+function setNeedle(id, angle, cls) {
+  const n = document.getElementById(id);
+  if (!n) return;
+  n.setAttribute("transform", `rotate(${angle.toFixed(1)} 50 50)`);
+  if (cls) n.setAttribute("class", "gauge-needle " + cls
+    + (id === "jet-needle" ? " gauge-needle-fine" : ""));
+}
+
+function setGaugeVal(id, txt, cls) {
+  const v = document.getElementById(id);
+  if (!v) return;
+  v.textContent = txt;
+  v.setAttribute("class", "gauge-val" + (cls ? " " + cls : ""));
+}
+
 function updateAstroInstruments(data) {
-  if (!data || !data.spots || !data.spots.length) return;
-  const s = data.spots[0];  // erster Standort als Primär-Anzeige
-  // Seeing: 0-5" -> -90 bis +90 Grad
+  const s = telemetrySpot(data);
+  if (!s) return;
+  setTelemetry(s.name, true);   // Link-Label synchron halten
+  // SEEING 0-5"
   const seeing = s.seeing ?? 2;
-  const _el_seeing_val = document.getElementById("seeing-val");
-  if (_el_seeing_val) _el_seeing_val.textContent = seeing ? `${seeing.toFixed(1)}"` : "--";
-  const sn = document.getElementById("seeing-needle");
-  if (sn) sn.setAttribute("transform",
-    `rotate(${(-90 + (Math.min(seeing, 5) / 5) * 180)} 50 45)`);
-  // Taupunkt-Spread: 0-15K -> -90 bis +90 Grad
-  const tau = s.dewpoint_spread ?? 5;
-  const _el_tau_val = document.getElementById("tau-val");
-  if (_el_tau_val) _el_tau_val.textContent = tau != null ? `${tau.toFixed(1)}K` : "--";
-  const tn = document.getElementById("tau-needle");
-  if (tn) tn.setAttribute("transform",
-    `rotate(${(-90 + (Math.min(Math.max(tau, 0), 15) / 15) * 180)} 50 45)`);
+  setGaugeVal("seeing-val", seeing ? seeing.toFixed(1) + "\u2033" : "--");
+  setNeedle("seeing-needle",
+    -90 + (Math.min(seeing, 5) / 5) * 180, "needle-amber");
+  // SHEAR: Bodenwind dick (0-40 km/h), Jetstream fein (0-60 m/s)
+  const gusts = s.wind_gusts || s.wind_speed || 0;
+  const jet = s.jetstream;
+  setGaugeVal("wind-val", gusts.toFixed(0) + "km/h"
+    + (jet != null ? " \u00b7J" + jet.toFixed(0) : ""),
+    gusts > 30 ? "gv-danger" : gusts > 20 ? "gv-warn" : "");
+  setNeedle("wind-needle", -90 + (Math.min(gusts, 40) / 40) * 180,
+    gusts > 30 ? "needle-red" : gusts > 20 ? "needle-amber" : "needle-cyan");
+  if (jet != null) setNeedle("jet-needle",
+    -90 + (Math.min(jet, 60) / 60) * 180,
+    jet > 45 ? "needle-red" : jet > 35 ? "needle-amber" : "needle-cyan");
+  // TAU DP 0-15 K
+  const tau = s.dewpoint_spread;
+  setGaugeVal("tau-val", tau != null ? tau.toFixed(1) + "K" : "--");
+  setNeedle("tau-needle",
+    -90 + (Math.min(Math.max(tau ?? 7.5, 0), 15) / 15) * 180, "needle-cyan");
+  // DEW: invers, 10K sicher (rechts) bis 0K Frost (links)
+  if (tau != null) {
+    const clamped = Math.min(Math.max(tau, 0), 10);
+    setGaugeVal("dew-val", tau.toFixed(1) + " K" + (tau < 1.5 ? " !" : ""),
+      tau < 1.5 ? "gv-danger" : tau < 3 ? "gv-warn" : "");
+    setNeedle("dew-needle", -90 + (clamped / 10) * 180,
+      tau < 1.5 ? "needle-red" : tau < 3 ? "needle-amber" : "needle-cyan");
+  }
+  // ZENITH SQM: Nadel 15-22 mag/arcsec^2, Box = Bortle-Klasse
+  const bortle = s.bortle_class;
+  const sqm = SQM_FROM_BORTLE[bortle] ?? null;
+  const box = document.getElementById("sqm-bortle");
+  if (box) box.textContent = bortle ? "B" + bortle : "B?";
+  setGaugeVal("sqm-val", sqm != null ? sqm.toFixed(1) : "--");
+  if (sqm != null) setNeedle("sqm-needle",
+    -90 + ((sqm - 15) / 7) * 180, "needle-amber");
   // LEDs
   const ledVrn = document.getElementById("led-vrn");
   if (ledVrn) ledVrn.classList.add("on");
@@ -924,7 +1095,7 @@ function updateAstroInstruments(data) {
   if (ledObs) ledObs.classList.add("off");
   const ledUap = document.getElementById("led-uap");
   if (ledUap) ledUap.classList.add("off");
-}
+}}
 
 function updateLunarHorizon(data) {
   if (!data || !data.spots || !data.spots.length) return;
@@ -980,142 +1151,86 @@ function updateLunarHorizon(data) {
     }
   }
 
-  // === THREAT ASSESSMENT: Wind + Dew als Rundinstrumente ===
-  // (gleiche SVG-Geometrie wie SEEING/TAU: Zentrum 50/45, Nadel-Start
-  // oben, Rotation als SVG-Attribut - KEIN CSS-transform!)
-  const setGauge = (needleId, valId, angle, cls, txt) => {
-    const n = document.getElementById(needleId);
-    if (n) {
-      n.setAttribute("transform", `rotate(${angle.toFixed(1)} 50 45)`);
-      n.setAttribute("class", "gauge-needle " + cls);
+
+
+
+/* ============================================================
+   FLIGHTSTICK: physisches Targeting unten links auf der Karte.
+   Ziehen des Knuppels definiert eine Peilung (0deg = Nord);
+   der Standort, der von der Kartenmitte aus am besten in dieser
+   Richtung liegt, wird Telemetry-Ziel (Live-Umschaltung der
+   Glareshield-Instrumente + Marker-Highlight).
+   ============================================================ */
+function _bearingDeg(lat1, lon1, lat2, lon2) {
+  const toR = d => d * Math.PI / 180;
+  const y = Math.sin(toR(lon2 - lon1)) * Math.cos(toR(lat2));
+  const x = Math.cos(toR(lat1)) * Math.sin(toR(lat2))
+    - Math.sin(toR(lat1)) * Math.cos(toR(lat2)) * Math.cos(toR(lon2 - lon1));
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+function _fsHighlight(spot) {
+  markersLayer.eachLayer(mk => {
+    const el = mk._icon;
+    if (!el) return;
+    el.classList.remove("fs-target");
+    const ll = mk.getLatLng();
+    if (spot && Math.abs(ll.lat - spot.lat) < 1e-4
+        && Math.abs(ll.lng - spot.lon) < 1e-4) {
+      el.classList.add("fs-target");
     }
-    const v = document.getElementById(valId);
-    if (v) {
-      v.textContent = txt;
-      v.setAttribute("class", "gauge-val"
-        + (cls === "needle-red" ? " gv-danger"
-           : cls === "needle-amber" ? " gv-warn" : ""));
+  });
+}
+
+function initFlightstick() {
+  const fs = document.getElementById("flightstick");
+  if (!fs) return;
+  const knob = document.getElementById("fs-knob");
+  const degEl = document.getElementById("fs-deg");
+  let dragging = false;
+
+  const pick = (deg) => {
+    if (!lastSpots || !lastSpots.spots) return;
+    const c = map.getCenter();
+    let bestS = null, bestDiff = 361;
+    for (const s of lastSpots.spots) {
+      const b = _bearingDeg(c.lat, c.lng, s.lat, s.lon);
+      const diff = Math.abs(((b - deg + 540) % 360) - 180);
+      if (diff < bestDiff) { bestDiff = diff; bestS = s; }
+    }
+    if (bestS) {
+      _fsHighlight(bestS);
+      setTelemetry(bestS.name);
     }
   };
-  // Wind: 0-40 km/h, Böen als Worst Case. Amber > 20, rot > 30.
-  const gusts = best.wind_gusts || best.wind_speed || 0;
-  setGauge("wind-needle", "wind-val",
-    -90 + (Math.min(gusts, 40) / 40) * 180,
-    gusts > 30 ? "needle-red" : gusts > 20 ? "needle-amber" : "needle-cyan",
-    gusts.toFixed(0) + " km/h");
-  // Dew: INVERSE Skala 10K (sicher, Nadel rechts +90) bis 0K (Beschlag,
-  // links -90). Amber < 3K, rot < 1.5K (FROST RISK).
-  const tau = best.dewpoint_spread;
-  if (tau != null) {
-    const clamped = Math.min(Math.max(tau, 0), 10);
-    setGauge("dew-needle", "dew-val",
-      -90 + (clamped / 10) * 180,
-      tau < 1.5 ? "needle-red" : tau < 3 ? "needle-amber" : "needle-cyan",
-      tau.toFixed(1) + " K" + (tau < 1.5 ? " !" : ""));
-  } else {
-    setGauge("dew-needle", "dew-val", 90, "needle-cyan", "--");
-  }
-}
 
-/* HQ: Equipment-Depot Ilvesheim (Teleskop & Crawler) - fester Startpunkt
-   aller Transit-Einsatzwege. Kein dynamisches Nutzer-GPS mehr. */
-const HQ = { name: "ILVESHEIM HQ", lat: 49.4783726, lon: 8.5662896 };
-let routeLayer = null;   // aktuelle Einsatzweg-Darstellung (HQ-Pin + Linie)
-
-function drawRouteLine(destLat, destLon, destName) {
-  // vorherige Route entfernen, bevor eine neue gezeichnet wird
-  if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
-  // Doppel-Linien-Trick: solide schwarze Kontur fuer Kontrast gegen
-  // die dunkle Kachelkarte, darueber die taktisch rote gestrichelte
-  // Trajektorie. Beide im selben LayerGroup -> Cleanup entfernt beide.
-  const casing = L.polyline(
-    [[HQ.lat, HQ.lon], [destLat, destLon]],
-    { color: "#000000", weight: 7, opacity: 1 });
-  const line = L.polyline(
-    [[HQ.lat, HQ.lon], [destLat, destLon]],
-    { color: "#ff3b30", weight: 4, opacity: 0.95, dashArray: "10, 15" });
-  const hqIcon = L.divIcon({
-    className: "hq-pin",
-    html: "<div class='hq-dot'></div><div class='hq-tag'>HQ</div>",
-    iconSize: [0, 0] });
-  routeLayer = L.layerGroup([
-    L.marker([HQ.lat, HQ.lon], { icon: hqIcon, interactive: false }),
-    casing,
-    line,
-  ]).addTo(map);
-  map.fitBounds(line.getBounds(), { padding: [50, 50] });
-  commsLog("EINSATZWEG EINGEZEICHNET: " + HQ.name + " \u2192 "
-    + String(destName || "?").toUpperCase());
-}
-
-/* Visueller Fahrplan: Verbindung als Pill-Kette rendern.
-   Walk = Fussgaenger-Icon + Minuten, Tram/Stadtbahn (RNV) = amber,
-   Bus/Regional = blau. Tooltip zeigt die Haltestellen. */
-function transitPills(steps) {
-  if (!steps || !steps.length) return "";
-  return "<div class='tp-row'>" + steps.map(s => {
-    if (s.kind === "walk")
-      return "<span class='tp-pill tp-walk'>\uD83D\uDEB6 " + s.min
-        + "\u2032</span>";
-    const tram = /^RNV/i.test(s.line || "");
-    return "<span class='tp-pill " + (tram ? "tp-tram" : "tp-bus")
-      + "' title='" + esc(s.from) + " \u2192 " + esc(s.to) + "'>"
-      + "<b>" + esc(s.line) + "</b> " + esc(s.dep) + "\u2013" + esc(s.arr)
-      + "</span>";
-  }).join("<span class='tp-arrow'>\u2799</span>") + "</div>";
-}
-
-async function fetchTransitRoute(name, lat, lon) {
-  const resultEl = document.getElementById("transit-result");
-  if (!resultEl) return;
-  resultEl.innerHTML =
-    "<div class='transit-loading'>\u23F3 VRN-Fahrplan ab HQ...</div>";
-  try {
-    const d = await api("/api/deployment?id=" + encodeURIComponent(name)
-      + "&home_lat=" + HQ.lat + "&home_lon=" + HQ.lon
-      + "&setup_minutes=30");
-    // HTTP 200: Einsatzweg auf dem Radar zeichnen (HQ -> Ziel)
-    drawRouteLine(lat, lon, name);
-    let html = "<div class='transit-head'>[ROUTE: " + HQ.name + " -> "
-      + esc(String(name).toUpperCase()) + "]</div>";
-    if (d.dynamic_abort) {
-      const ret = d.extraction ? d.extraction.earliest_return : "BERECHNET";
-      html += "<div class='transit-abort'>\u26A0 DYNAMIC ABORT: "
-        + "WETTERUMSCHLAG - N\u00C4CHSTE R\u00DCCKFAHRT " + esc(ret)
-        + " \u00b7 Umschlag " + esc(d.dynamic_abort.time)
-        + " (" + esc(d.dynamic_abort.reason || "?") + ")</div>";
-      commsLog("DYNAMIC ABORT: WETTERUMSCHLAG \u2192 R\u00DCCKFAHRT "
-        + ret + " AB " + d.dynamic_abort.time, "alert");
-    }
-    if (d.latest_departure) {
-      const ld = d.latest_departure;
-      html += "<div class='transit-conn'><b>\u27A1 HIN " + esc(ld.time)
-        + " \u2192 " + esc(ld.arrival) + " AN</b>"
-        + (ld.steps && ld.steps.length
-          ? transitPills(ld.steps)
-          : "<div class='tp-row'><span class='tp-pill tp-bus'><b>"
-            + esc(ld.lines.join(", ")) + "</b></span></div>")
-        + "</div>";
-    } else if (d.note) {
-      html += "<div class='transit-none'>\u26A0 " + esc(d.note) + "</div>";
-    }
-    if (d.extraction) {
-      const ex = d.extraction;
-      html += "<div class='transit-conn'><b>\u2B05 R\u00DCCK "
-        + esc(ex.earliest_return) + " \u2192 " + esc(ex.arrival_home)
-        + " AN</b> \u00b7 Abbau ab " + esc(d.extraction_warning_ts || "?")
-        + (ex.steps && ex.steps.length ? transitPills(ex.steps) : "")
-        + "</div>";
-    } else if (!d.latest_departure) {
-      html += "<div class='transit-none'>Keine Rueckverbindung.</div>";
-    }
-    html += "<div class='transit-src'>" + esc(d.transit_source)
-      + " | GW " + esc(d.golden_window) + "</div>";
-    resultEl.innerHTML = html;
-  } catch (e) {
-    resultEl.innerHTML = "<div class='transit-none'>\u274C "
-      + esc(e.message || "Fehler") + "</div>";
-  }
+  const move = (e) => {
+    const r = fs.getBoundingClientRect();
+    let dx = e.clientX - (r.left + r.width / 2);
+    let dy = e.clientY - (r.top + r.height / 2);
+    const max = r.width / 2 - 16;
+    const len = Math.min(Math.hypot(dx, dy), max);
+    const deg = (Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360;
+    const ux = len * Math.sin(deg * Math.PI / 180);
+    const uy = -len * Math.cos(deg * Math.PI / 180);
+    knob.style.transform = `translate(${ux.toFixed(1)}px, ${uy.toFixed(1)}px)`;
+    if (degEl) degEl.textContent = deg.toFixed(0).padStart(3, "0") + "\u00b0";
+    fs.classList.add("fs-active");
+    pick(deg);
+  };
+  const release = () => {
+    dragging = false;
+    knob.style.transform = "translate(0px, 0px)";
+    fs.classList.remove("fs-active");
+  };
+  fs.addEventListener("pointerdown", e => {
+    dragging = true;
+    fs.setPointerCapture(e.pointerId);
+    move(e);
+  });
+  fs.addEventListener("pointermove", e => { if (dragging) move(e); });
+  fs.addEventListener("pointerup", release);
+  fs.addEventListener("pointercancel", release);
 }
 
 function initCockpitStatus() {

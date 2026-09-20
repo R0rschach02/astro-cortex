@@ -73,7 +73,8 @@ def _spot_state(loc: dict, profile: str = "dso") -> dict:
     """
     out = {"name": loc["name"], "id": loc.get("id", ""),
            "lat": loc["lat"], "lon": loc["lon"],
-           "is_live": loc["name"].startswith("Live "), "age_min": None}
+           "is_live": loc["name"].startswith("Live "), "age_min": None,
+           "bortle_class": loc.get("bortle_class")}
     conn = _db()
     try:
         heavy = conn.execute(

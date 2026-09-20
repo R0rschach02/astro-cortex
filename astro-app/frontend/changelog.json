@@ -294,6 +294,12 @@
       "title": "Glareshield-Feinschliff: dynamische Top-Bar-Hoehe, Mobile-Fix, Panel-Flex",
       "detail": "Drei Layout-Fixes nach dem Glareshield-Umbau: (1) Die Cockpit-Grid-Top-Zeile war auf 48px fixiert und hat die 110px-Gauges abgeschnitten - jetzt auto. (2) Die mobilen Override-Regeln (21vw-Gauges, eigene Zeile) verloren gegen die spaeter im Dateifluss stehenden Basis-Regeln gleicher Spezifitaet - jetzt mit ID-Selektor (#topbar ...) priorisiert. (3) #bias-slot war flex:none und blockierte die Hoehenverteilung - jetzt flexibler Spalten-Container, das Bias-Diagramm scrollt intern und der Comms-Feed bekommt garantierte 140px.",
       "usage": "Gauges vollstaendig sichtbar, mobil in eigener Zeile, rechts ohne Leerraum"
+    },
+    {
+      "date": "2026-09-21",
+      "title": "Glareshield-Upgrade: Jet-Gauges, Telemetry-Link, Flightstick-Targeting",
+      "detail": "(1) HYPER-REALISMUS: Alle Instrumente werden per SVG-Generator (buildGauges) erzeugt - dunkelgrauer Bezel-Ring, 4 Schlitzschrauben auf 45/135/225/315 Grad, Major-Ticks mit Zahlen + feine Minor-Striche, Nadel mit Gegengewicht-Schaft. (2) NEUE INSTRUMENTE: Atmospheric Shear als Dual-Gauge (dicke kurze Nadel = Bodenwind 0-40 km/h, feine lange Nadel = Jetstream 0-60 m/s aus dem Spot-Payload) und Zenith SQM als Altimeter-Stil (Nadel 15-22 mag/arcsec^2, in der Dial-Mitte rechteckige Rollzaehlwerk-Box mit Bortle-Klasse; /api/spots liefert jetzt bortle_class). (3) TELEMETRY-LINK: Leuchtendes [LINK: ORT]-Feld links der Gauges - saemtliche Instrumente zeigen ausschliesslich diesen Standort (Persistenz via localStorage, Marker-Klick lockt ebenfalls). (4) FLIGHTSTICK: Physisches Steuerkreuz unten links auf der Karte (pointerdown/move/up, Knueppel folgt dem Finger, Gradanzeige). Der Peil-Vektor sucht den Standort, der von der Kartenmitte aus in dieser Richtung liegt, highlightet ihn mit Amber-Reticle und schwenkt die Telemetrie live um.",
+      "usage": "Flightstick ziehen = Ziel anvisieren; Gauges + [LINK:] folgen sofort"
     }
   ]
 }
