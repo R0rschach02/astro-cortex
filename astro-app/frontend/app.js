@@ -1031,20 +1031,44 @@ let routeLayer = null;   // aktuelle Einsatzweg-Darstellung (HQ-Pin + Linie)
 function drawRouteLine(destLat, destLon, destName) {
   // vorherige Route entfernen, bevor eine neue gezeichnet wird
   if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+  // Doppel-Linien-Trick: solide schwarze Kontur fuer Kontrast gegen
+  // die dunkle Kachelkarte, darueber die taktisch rote gestrichelte
+  // Trajektorie. Beide im selben LayerGroup -> Cleanup entfernt beide.
+  const casing = L.polyline(
+    [[HQ.lat, HQ.lon], [destLat, destLon]],
+    { color: "#000000", weight: 7, opacity: 1 });
   const line = L.polyline(
     [[HQ.lat, HQ.lon], [destLat, destLon]],
-    { color: "#ff3b30", weight: 5, opacity: 0.95, dashArray: "10, 15" });
+    { color: "#ff3b30", weight: 4, opacity: 0.95, dashArray: "10, 15" });
   const hqIcon = L.divIcon({
     className: "hq-pin",
     html: "<div class='hq-dot'></div><div class='hq-tag'>HQ</div>",
     iconSize: [0, 0] });
   routeLayer = L.layerGroup([
     L.marker([HQ.lat, HQ.lon], { icon: hqIcon, interactive: false }),
+    casing,
     line,
   ]).addTo(map);
   map.fitBounds(line.getBounds(), { padding: [50, 50] });
   commsLog("EINSATZWEG EINGEZEICHNET: " + HQ.name + " \u2192 "
     + String(destName || "?").toUpperCase());
+}
+
+/* Visueller Fahrplan: Verbindung als Pill-Kette rendern.
+   Walk = Fussgaenger-Icon + Minuten, Tram/Stadtbahn (RNV) = amber,
+   Bus/Regional = blau. Tooltip zeigt die Haltestellen. */
+function transitPills(steps) {
+  if (!steps || !steps.length) return "";
+  return "<div class='tp-row'>" + steps.map(s => {
+    if (s.kind === "walk")
+      return "<span class='tp-pill tp-walk'>\uD83D\uDEB6 " + s.min
+        + "\u2032</span>";
+    const tram = /^RNV/i.test(s.line || "");
+    return "<span class='tp-pill " + (tram ? "tp-tram" : "tp-bus")
+      + "' title='" + esc(s.from) + " \u2192 " + esc(s.to) + "'>"
+      + "<b>" + esc(s.line) + "</b> " + esc(s.dep) + "\u2013" + esc(s.arr)
+      + "</span>";
+  }).join("<span class='tp-arrow'>\u2799</span>") + "</div>";
 }
 
 async function fetchTransitRoute(name, lat, lon) {
@@ -1060,21 +1084,34 @@ async function fetchTransitRoute(name, lat, lon) {
     drawRouteLine(lat, lon, name);
     let html = "<div class='transit-head'>[ROUTE: " + HQ.name + " -> "
       + esc(String(name).toUpperCase()) + "]</div>";
+    if (d.dynamic_abort) {
+      const ret = d.extraction ? d.extraction.earliest_return : "BERECHNET";
+      html += "<div class='transit-abort'>\u26A0 DYNAMIC ABORT: "
+        + "WETTERUMSCHLAG - N\u00C4CHSTE R\u00DCCKFAHRT " + esc(ret)
+        + " \u00b7 Umschlag " + esc(d.dynamic_abort.time)
+        + " (" + esc(d.dynamic_abort.reason || "?") + ")</div>";
+      commsLog("DYNAMIC ABORT: WETTERUMSCHLAG \u2192 R\u00DCCKFAHRT "
+        + ret + " AB " + d.dynamic_abort.time, "alert");
+    }
     if (d.latest_departure) {
       const ld = d.latest_departure;
-      html += "<div class='transit-conn'><b>\u27A1 Hin:</b> " + ld.time
-        + " ab " + esc(ld.from) + " (" + esc(ld.lines.join(", "))
-        + ", " + ld.changes + "x) \u2192 " + ld.arrival
-        + " (+" + ld.walking_min.toFixed(0) + "min)</div>";
+      html += "<div class='transit-conn'><b>\u27A1 HIN " + esc(ld.time)
+        + " \u2192 " + esc(ld.arrival) + " AN</b>"
+        + (ld.steps && ld.steps.length
+          ? transitPills(ld.steps)
+          : "<div class='tp-row'><span class='tp-pill tp-bus'><b>"
+            + esc(ld.lines.join(", ")) + "</b></span></div>")
+        + "</div>";
     } else if (d.note) {
       html += "<div class='transit-none'>\u26A0 " + esc(d.note) + "</div>";
     }
     if (d.extraction) {
       const ex = d.extraction;
-      html += "<div class='transit-conn'><b>\u2B05 Rueck:</b> "
-        + ex.earliest_return + " (" + esc(ex.lines.join(", "))
-        + ") \u2192 " + ex.arrival_home
-        + " | Abbau " + d.extraction_warning_ts + "</div>";
+      html += "<div class='transit-conn'><b>\u2B05 R\u00DCCK "
+        + esc(ex.earliest_return) + " \u2192 " + esc(ex.arrival_home)
+        + " AN</b> \u00b7 Abbau ab " + esc(d.extraction_warning_ts || "?")
+        + (ex.steps && ex.steps.length ? transitPills(ex.steps) : "")
+        + "</div>";
     } else if (!d.latest_departure) {
       html += "<div class='transit-none'>Keine Rueckverbindung.</div>";
     }
@@ -1162,48 +1199,81 @@ function iwBiasHtml(stats, hist, offline) {
 }
 
 function iwChartSvg(hist) {
-  // Kleines Mehrfach-Liniendiagramm als Inline-SVG (keine externe Lib).
-  const W = 320, H = 120, PAD = 6;
+  // Liniendiagramm als Inline-SVG (keine externe Lib). Wichtig: Pfade
+  // starten MIT M und fuehren mit L weiter - ein fuehrendes L waere
+  // ungueltiges SVG und wuerde gar nicht gezeichnet (ursprung des
+  // "nur unverbundene Punkte"-Bugs).
+  const W = 320, H = 150, PL = 34, PR = 8, PT = 8, PB = 18;
   const buckets = Object.keys(BIAS_COLORS);
-  const points = {};
-  buckets.forEach(b => points[b] = []);
-  const dates = [...new Set(hist.map(h => h.computed_at.slice(0, 10)))].sort();
-  hist.forEach(h => (points[h.bucket] || []).push(h));
-  const vals = hist.filter(h => buckets.includes(h.bucket)).map(h => h.bias);
-  if (!vals.length || dates.length < 2)
+  // pro Bucket+Tag den LETZTEN Wert (Bias wird ggfs. mehrfach/Tag gerechnet)
+  const byDay = {};
+  (hist || []).forEach(h => {
+    if (!buckets.includes(h.bucket)) return;
+    const d = (h.computed_at || "").slice(0, 10);
+    if (!d) return;
+    byDay[d] = byDay[d] || {};
+    const prev = byDay[d][h.bucket];
+    if (!prev || String(prev.computed_at) <= String(h.computed_at))
+      byDay[d][h.bucket] = h;
+  });
+  const days = Object.keys(byDay).sort();
+  if (days.length < 2)
     return "<div class='iw-empty'>Zeitreihe entsteht \u2013 ab dem zweiten "
       + "Tag sehen Sie hier die Entwicklung.</div>";
-  let lo = Math.min(...vals), hi = Math.max(...vals);
+  // X-Achse = echte Zeit: Position nach Tagesdistanz, dynamisch ueber
+  // die gesamte Historie (Luecken im Zeitraum stauchen nicht)
+  const DAY = 86400000;
+  const d0 = new Date(days[0] + "T00:00:00").getTime();
+  const d1 = new Date(days[days.length - 1] + "T00:00:00").getTime();
+  const spanD = Math.max(1, (d1 - d0) / DAY);
+  const x = ts => PL + (W - PL - PR)
+    * ((new Date(ts.slice(0, 10) + "T00:00:00").getTime() - d0) / DAY) / spanD;
+  // Y-Achse aus allen Serien (7 Tage + gesamt)
+  const allVals = [];
+  days.forEach(d => buckets.forEach(b => {
+    const h = byDay[d][b];
+    if (h) [h.bias, h.bias_7d].forEach(v => { if (v != null) allVals.push(v); });
+  }));
+  let lo = Math.min(...allVals), hi = Math.max(...allVals);
   if (hi - lo < 1) { hi += 0.5; lo -= 0.5; }
-  const x = d => PAD + (W - 2 * PAD) * (dates.indexOf(d.slice(0, 10)) / (dates.length - 1));
-  const y = v => PAD + (H - 2 * PAD) * (1 - (v - lo) / (hi - lo));
-  const zero = lo < 0 && hi > 0
-    ? `<line x1="${PAD}" x2="${W - PAD}" y1="${y(0)}" y2="${y(0)}" stroke="#666" stroke-dasharray="2 3" stroke-width="0.7"/>` : "";
-  // Y-Skala aus BEIDEN Wertreihen (7T + gesamt)
-  const allVals = hist.flatMap(h => buckets.includes(h.bucket)
-    ? [h.bias, h.bias_7d].filter(v => v != null) : []);
-  let lo2 = Math.min(...allVals), hi2 = Math.max(...allVals);
-  if (hi2 - lo2 < 1) { hi2 += 0.5; lo2 -= 0.5; }
-  lo = lo2; hi = hi2;
-  const lines = buckets.map(b => {
-    const pts = points[b].slice().sort((a, c) => a.computed_at < c.computed_at ? -1 : 1);
-    if (!pts.length) return "";
-    const mk = (key, width, dash) => pts
-      .filter(p => p[key] != null)
-      .map((p, i, arr) => `${arr.length - 1 - i ? "L" : "M"}${x(p.computed_at).toFixed(1)},${y(p[key]).toFixed(1)}`)
-      .join(" ");
-    const dots = pts.filter(p => p.bias_7d != null).map(p =>
-      `<circle cx="${x(p.computed_at).toFixed(1)}" cy="${y(p.bias_7d).toFixed(1)}" r="2.6" fill="${BIAS_COLORS[b]}"><title>${b}: 7T ${p.bias_7d} (n=${p.n_7d}) | gesamt ${p.bias} (n=${p.sample_n})</title></circle>`).join("");
-    const gesamt = `<path d="${mk("bias", 1.6, "")}" fill="none" stroke="${BIAS_COLORS[b]}" stroke-width="1.0" stroke-dasharray="3 3" opacity=".65"/>`;
-    const rolling = `<path d="${mk("bias_7d", 1.6, "")}" fill="none" stroke="${BIAS_COLORS[b]}" stroke-width="2.2"/>`;
-    return gesamt + rolling + dots;
+  const y = v => PT + (H - PT - PB) * (1 - (v - lo) / (hi - lo));
+  const X0 = PL, X1 = W - PR;
+  // Nulllinie + Y-Labels
+  const axis = [];
+  if (lo < 0 && hi > 0) axis.push(
+    `<line x1="${X0}" x2="${X1}" y1="${y(0).toFixed(1)}" y2="${y(0).toFixed(1)}" stroke="#667" stroke-dasharray="2 3" stroke-width="0.7"/>`,
+    `<text x="${X0 - 3}" y="${y(0).toFixed(1)}" class="iw-ax" text-anchor="end" dominant-baseline="middle">0</text>`);
+  [hi, lo].forEach((v, k) => axis.push(
+    `<text x="${X0 - 3}" y="${y(v) + (k ? -3 : 3)}" class="iw-ax" text-anchor="end">${v > 0 ? "+" : ""}${v.toFixed(1)}</text>`));
+  // X-Ticks: 5 gleichmaessig verteilte Datumsmarken
+  const fmtD = t => new Date(t).toLocaleDateString("de-DE",
+    { day: "2-digit", month: "2-digit" });
+  for (let k = 0; k <= 4; k++) {
+    const t = d0 + (d1 - d0) * k / 4;
+    const px = PL + (X1 - PL) * k / 4;
+    axis.push(`<line x1="${px.toFixed(1)}" x2="${px.toFixed(1)}" y1="${H - PB}" y2="${H - PB + 3}" stroke="#556"/>`,
+      `<text x="${px.toFixed(1)}" y="${H - 5}" class="iw-ax" text-anchor="middle">${fmtD(t)}</text>`);
+  }
+  // Serien: gesamt (duenn, gestrichelt) + 7-Tage (kraeftig, durchgehend)
+  const series = buckets.map(b => {
+    const pts = days.map(d => byDay[d][b]).filter(Boolean);
+    if (pts.length < 2 && !pts.length) return "";
+    const mk = key => pts.filter(p => p[key] != null).map((p, i) =>
+      `${i ? "L" : "M"}${x(p.computed_at).toFixed(1)},${y(p[key]).toFixed(1)}`).join(" ");
+    const dots = pts.map(p =>
+      `<circle cx="${x(p.computed_at).toFixed(1)}" cy="${y(p.bias_7d != null ? p.bias_7d : p.bias).toFixed(1)}" r="2.3" fill="${BIAS_COLORS[b]}"><title>${b}: 7T ${p.bias_7d ?? "\u2013"} (n=${p.n_7d ?? "?"}) | gesamt ${p.bias} (n=${p.sample_n})</title></circle>`).join("");
+    return `<path d="${mk("bias")}" fill="none" stroke="${BIAS_COLORS[b]}" stroke-width="0.9" stroke-dasharray="3 3" opacity=".55"/>`
+      + `<path d="${mk("bias_7d")}" fill="none" stroke="${BIAS_COLORS[b]}" stroke-width="2"/>`
+      + dots;
   }).join("");
+  // Legende: letzter Stand je Bucket
   const last = {};
-  buckets.forEach(b => {
-    const s = points[b].slice().sort((a, c) =>
-      a.computed_at < c.computed_at ? -1 : 1);
-    if (s.length) last[b] = s[s.length - 1];
-  });
+  days.slice().reverse().some(d => buckets.some(b => {
+    if (byDay[d][b] && !last[b]) last[b] = byDay[d][b];
+    return false;
+  }));
+  buckets.forEach(b => { if (!last[b]) days.some(d => {
+    if (byDay[d][b]) { last[b] = byDay[d][b]; return true; } return false; }); });
   const fmtV = (b, v) => v == null ? "\u2013"
     : `${v > 0 ? "+" : ""}${v.toFixed(b.startsWith("clouds") ? 1 : 2)}`;
   const legend = buckets.map(b => {
@@ -1213,8 +1283,10 @@ function iwChartSvg(hist) {
     return `<span><i style="background:${BIAS_COLORS[b]}"></i>${BIAS_LABELS[b][0]}
        <b>${v7}</b> / gesamt ${fmtV(b, last[b].bias)}</span>`;
   }).join("");
-  const span = `<div class="iw-chart-span">${dates[0].slice(5)} \u2013 ${dates[dates.length - 1].slice(5)} (${dates.length} Tage)</div>`;
-  return `<div class="iw-chart"><svg viewBox="0 0 ${W} ${H}" role="img">${zero}${lines}</svg>
+  const spanLab = spanD >= 60 ? `${(spanD / 30.4).toFixed(1)} Monate`
+    : `${Math.round(spanD)} Tage`;
+  const span = `<div class="iw-chart-span">${days[0].slice(5)} \u2014 ${days[days.length - 1].slice(5)} (${spanLab})</div>`;
+  return `<div class="iw-chart"><svg viewBox="0 0 ${W} ${H}" role="img">${axis.join("")}${series}</svg>
     <div class="iw-legend">${legend}</div>${span}</div>`;
 }
 

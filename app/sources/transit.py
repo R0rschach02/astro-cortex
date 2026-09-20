@@ -47,6 +47,10 @@ class Connection:
     changes_count: int
     line_names: list = field(default_factory=list)
     walking_minutes_total: float = 0.0
+    # Visueller Fahrplan: [{"kind":"walk","min":8},
+    #   {"kind":"ride","line":"625","dep":"20:26","arr":"20:31",
+    #    "from":"...","to":"..."}, ...]
+    steps: list = field(default_factory=list)
 
 
 def _haversine_m(lat1, lon1, lat2, lon2) -> float:
@@ -377,16 +381,32 @@ class GTFSStaticSource:
         seq_last = self._trip_times[legs[-1][0]]
         start_sid = seq0[legs[0][1]][0]
         dest_sid = seq_last[legs[-1][2]][0]
-        # Fusswege zwischen Umstieg-Stops (leg-Ende != naechster leg-Start)
+        # Visueller Fahrplan (Pills) + Fussweg-Summe zwischen Umstiegen
+        steps = []
         walk_transfer_min = 0.0
-        for k in range(len(legs) - 1):
-            s_a = self._trip_times[legs[k][0]][legs[k][2]][0]
-            s_b = self._trip_times[legs[k + 1][0]][legs[k + 1][1]][0]
-            if s_a != s_b:
-                _n1, la1, lo1 = self._stops[s_a]
-                _n2, la2, lo2 = self._stops[s_b]
-                walk_transfer_min += _haversine_m(
-                    la1, lo1, la2, lo2) / WALK_SPEED_M_PER_MIN
+        if walk_start_min >= 1:
+            steps.append({"kind": "walk", "min": round(walk_start_min)})
+        for k, (t, i, j, _arr) in enumerate(legs):
+            seq = self._trip_times[t]
+            steps.append({
+                "kind": "ride",
+                "line": self._line(t),
+                "dep": (base + seq[i][2]).strftime("%H:%M"),
+                "arr": (base + seq[j][3]).strftime("%H:%M"),
+                "from": self._stops.get(seq[i][0], ("?",))[0],
+                "to": self._stops.get(seq[j][0], ("?",))[0]})
+            if k < len(legs) - 1:
+                s_a = self._trip_times[legs[k][0]][legs[k][2]][0]
+                s_b = self._trip_times[legs[k + 1][0]][legs[k + 1][1]][0]
+                if s_a != s_b:
+                    _n1, la1, lo1 = self._stops[s_a]
+                    _n2, la2, lo2 = self._stops[s_b]
+                    wmin = round(_haversine_m(
+                        la1, lo1, la2, lo2) / WALK_SPEED_M_PER_MIN)
+                    walk_transfer_min += wmin
+                    steps.append({"kind": "walk", "min": wmin})
+        if walk_dest_min >= 1:
+            steps.append({"kind": "walk", "min": round(walk_dest_min)})
         return Connection(
             start_halt=self._stops.get(start_sid, ("?",))[0],
             dest_halt=self._stops.get(dest_sid, ("?",))[0],
@@ -395,7 +415,8 @@ class GTFSStaticSource:
             changes_count=len(legs) - 1,
             line_names=[self._line(t) for t, *_ in legs],
             walking_minutes_total=round(walk_start_min + walk_dest_min
-                                        + walk_transfer_min, 1))
+                                        + walk_transfer_min, 1),
+            steps=steps)
 
     # ---------- oeffentliche async-Schnittstelle (Spec) ----------
     async def fetch_connections(self, start_lat: float, start_lon: float,

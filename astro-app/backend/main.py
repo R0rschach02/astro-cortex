@@ -582,8 +582,36 @@ def api_deployment(id: str, home: str = "Ilvesheim HQ",
     log.info("[API] deployment %s: night=%s gw=%s-%s service_day=%s "
              "home=%s", id, night.date(), gws_dt.strftime("%H:%M"),
              gwe_dt.strftime("%H:%M"), service_day, home_loc.get("name"))
+    # Dynamic Abort: Wenn das Fenster JETZT laeuft, die bias-korrigierte
+    # Prognose der kommenden Stunden im Fenster pruefen. Kippt eine Stunde
+    # auf NO-GO (z.B. Wolken ziehen auf), wird die Rueckfahrt-Suche auf
+    # diesen Umschlagpunkt vorverlegt - statt stur bis Fensterende.
+    abort_at = None
+    abort_reason = None
+    if gws_dt <= now < gwe_dt and entry.get("series"):
+        try:
+            profile = ac.get_profile(ac.load_state())
+        except Exception:  # noqa: BLE001 - Profil-Default reicht
+            profile = "dso"
+        series, _bias_info = _apply_bias_to_series(
+            entry["series"], _load_bias(), now)
+        for h in series:
+            try:
+                ts = _dt.datetime.fromisoformat(h.get("ts", ""))
+            except (ValueError, TypeError):
+                continue
+            if ts < now or ts >= gwe_dt:
+                continue
+            ok, reasons = ac._hour_score(h, profile)
+            if not ok:
+                abort_at = ts
+                abort_reason = ", ".join(reasons)
+                log.info("[API] DYNAMIC ABORT %s: Stunde %s no-go (%s)",
+                         id, ts.strftime("%H:%M"), abort_reason)
+                break
+
     plan = deployment_window(gws_dt, gwe_dt, home_loc, obs, transit,
-                             setup_minutes)
+                             setup_minutes, abort_at=abort_at)
     note = None
     if not plan.latest_departure:
         note = ("Keine OePNV-Verbindung fuer dieses Zeitfenster gefunden "
@@ -601,6 +629,9 @@ def api_deployment(id: str, home: str = "Ilvesheim HQ",
         "setup_buffer_min": plan.setup_buffer_min,
         "transit_source": plan.transit_source,
         "home": home_loc.get("name", "?"),
+        **({"dynamic_abort": {**plan.dynamic_abort,
+                              "reason": abort_reason}}
+           if plan.dynamic_abort else {}),
         **({"note": note} if note else {}),
     }
 

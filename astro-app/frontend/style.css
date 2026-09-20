@@ -906,3 +906,29 @@ body.night .basemap-tile { filter: none; }
 .gauge-ticks { fill: none; stroke: #1d2733; stroke-width: 1;
   stroke-dasharray: 2 4; }
 .gauge-hub { fill: #2a3542; stroke: #4a5a6f; stroke-width: 1.5; }
+
+/* ---- Transit Pills: visueller Fahrplan ---- */
+.tp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px;
+  margin: 5px 0 2px; }
+.tp-pill { display: inline-flex; align-items: center; gap: 4px;
+  border-radius: 10px; padding: 2px 8px; font: 700 10px var(--mono);
+  letter-spacing: .04em; white-space: nowrap; border: 1px solid;
+  cursor: default; }
+.tp-pill b { font-weight: 700; }
+.tp-bus { color: #6fc2ff; border-color: rgba(111,194,255,.55);
+  background: rgba(111,194,255,.10); }
+.tp-tram { color: #ffd24a; border-color: rgba(255,210,74,.55);
+  background: rgba(255,210,74,.10); }
+.tp-walk { color: #9fe8b8; border-color: rgba(159,232,184,.45);
+  background: rgba(159,232,184,.08); }
+.tp-arrow { color: var(--dim); font-size: 10px; }
+
+/* Dynamic Abort: Wetterumschlag im laufenden Fenster */
+.transit-abort { color: #ff5c50; border: 1px solid rgba(255,75,62,.6);
+  background: rgba(255,75,62,.12); padding: 5px 8px; margin: 4px 0;
+  font: 700 10.5px var(--mono); letter-spacing: .06em;
+  animation: abort-blink 1.1s steps(2, start) infinite; }
+@keyframes abort-blink { 50% { background: rgba(255,75,62,.28); } }
+
+/* Bias-Chart: Achsen-Labels */
+.iw-ax { fill: #7d8fa1; font: 8.5px var(--mono); }
