@@ -498,6 +498,23 @@ _TRANSIT_BBOX = (48.8, 7.8, 50.2, 9.5)  # VRN-Gebiet um Mannheim/Pfalz
 # aller Transit-Einsatzwege, kein dynamisches Nutzer-GPS mehr.
 HQ_ILVESHEIM = {"lat": 49.4783726, "lon": 8.5662896}
 
+_GTFS_CACHE = {}
+
+
+def _transit_source(service_day):
+    """GTFS-Quelle pro Service-Datum cachen: der 153MB-Feed wird sonst bei
+    jedem /api/deployment-Aufruf neu geparst (~8s)."""
+    import sys as _sys
+    _sys.path.insert(0, "/home/enigma")
+    from app.sources.transit import GTFSStaticSource
+    src = _GTFS_CACHE.get(service_day)
+    if src is None:
+        src = GTFSStaticSource("/home/enigma/gtfs", bbox=_TRANSIT_BBOX,
+                               service_date=service_day)
+        _GTFS_CACHE.clear()   # nur den jeweils aktuellen Service-Tag halten
+        _GTFS_CACHE[service_day] = src
+    return src
+
 
 @app.get("/api/deployment")
 def api_deployment(id: str, home: str = "Ilvesheim HQ",
@@ -511,8 +528,7 @@ def api_deployment(id: str, home: str = "Ilvesheim HQ",
     import sys as _sys
     _sys.path.insert(0, "/home/enigma")
     from app.engine.deployment import deployment_window
-    from app.sources.transit import (GTFSNotAvailableError,
-                                     GTFSStaticSource)
+    from app.sources.transit import GTFSNotAvailableError
     from datetime import datetime as _dt, timedelta as _td
 
     try:
@@ -557,9 +573,7 @@ def api_deployment(id: str, home: str = "Ilvesheim HQ",
     # Service-Datum = Tag der Hinreise (Golden-Window-Abend)
     service_day = gws_dt.date()
     try:
-        transit = GTFSStaticSource("/home/enigma/gtfs",
-                                   bbox=_TRANSIT_BBOX,
-                                   service_date=service_day)
+        transit = _transit_source(service_day)
     except GTFSNotAvailableError as e:
         raise HTTPException(503, str(e))
 
