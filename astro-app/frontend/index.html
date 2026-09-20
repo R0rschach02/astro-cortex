@@ -16,8 +16,6 @@
     <!-- ============ OBERTES PANEL: STATUS & COMMS ============ -->
     <header id="topbar">
       <div id="title" class="tp-brand">ASTRO&nbsp;CC<span class="tp-sub">COMMAND&nbsp;&amp;&nbsp;CONTROL</span></div>
-      <div class="tp-block mono"><span class="tp-label">GPS</span><span id="tp-coords">--.----&nbsp;/&nbsp;--.----</span></div>
-      <div class="tp-block mono"><span class="tp-label">UTC</span><span id="tp-clock">--:--:--</span></div>
       <div class="tp-block mono" id="tp-status"><span class="led"></span><span id="tp-status-text">SYSTEM&nbsp;SECURE</span></div>
       <!-- Glareshield: quadratische Warnlampen wie im Jet-Cockpit -->
       <div class="led-strip" id="status-leds">
@@ -27,6 +25,57 @@
         <span class="sq-led" id="led-uap" title="UAP DB Link (Vorbereitung)"></span>
       </div>
       <div id="freshness" class="freshness mono">lade…</div>
+      <!-- Primaer-Fluginstrumente: die vier Rundinstrumente direkt am
+           Glareshield, streng horizontal -->
+      <div class="glareshield-gauges" id="astro-instruments">
+        <div class="gauge-row">
+          <div class="gauge-wrap">
+            <svg viewBox="0 0 100 90" class="gauge" id="gauge-seeing">
+              <circle cx="50" cy="45" r="35" class="gauge-body"/>
+              <circle cx="50" cy="45" r="35" class="gauge-ring"/>
+              <circle cx="50" cy="45" r="30" class="gauge-ticks"/>
+              <line x1="50" y1="45" x2="50" y2="15" class="gauge-needle needle-amber" id="seeing-needle" transform="rotate(-90 50 45)"/>
+              <circle cx="50" cy="45" r="4" class="gauge-hub"/>
+              <text x="50" y="65" text-anchor="middle" class="gauge-label">SEEING</text>
+              <text x="50" y="83" text-anchor="middle" class="gauge-val" id="seeing-val">--</text>
+            </svg>
+          </div>
+          <div class="gauge-wrap">
+            <svg viewBox="0 0 100 90" class="gauge" id="gauge-tau">
+              <circle cx="50" cy="45" r="35" class="gauge-body"/>
+              <circle cx="50" cy="45" r="35" class="gauge-ring"/>
+              <circle cx="50" cy="45" r="30" class="gauge-ticks"/>
+              <line x1="50" y1="45" x2="50" y2="15" class="gauge-needle needle-cyan" id="tau-needle" transform="rotate(90 50 45)"/>
+              <circle cx="50" cy="45" r="4" class="gauge-hub"/>
+              <text x="50" y="65" text-anchor="middle" class="gauge-label">TAU&nbsp;DP</text>
+              <text x="50" y="83" text-anchor="middle" class="gauge-val" id="tau-val">--</text>
+            </svg>
+          </div>
+          <div class="gauge-wrap">
+            <svg viewBox="0 0 100 90" class="gauge" id="gauge-wind">
+              <circle cx="50" cy="45" r="35" class="gauge-body"/>
+              <circle cx="50" cy="45" r="35" class="gauge-ring"/>
+              <circle cx="50" cy="45" r="30" class="gauge-ticks"/>
+              <line x1="50" y1="45" x2="50" y2="15" class="gauge-needle needle-cyan" id="wind-needle" transform="rotate(-90 50 45)"/>
+              <circle cx="50" cy="45" r="4" class="gauge-hub"/>
+              <text x="50" y="65" text-anchor="middle" class="gauge-label">WIND</text>
+              <text x="50" y="83" text-anchor="middle" class="gauge-val" id="wind-val">--</text>
+            </svg>
+          </div>
+          <div class="gauge-wrap">
+            <!-- inverse Skala: 10K (sicher) rechts, 0K (Beschlag) links -->
+            <svg viewBox="0 0 100 90" class="gauge" id="gauge-dew">
+              <circle cx="50" cy="45" r="35" class="gauge-body"/>
+              <circle cx="50" cy="45" r="35" class="gauge-ring"/>
+              <circle cx="50" cy="45" r="30" class="gauge-ticks"/>
+              <line x1="50" y1="45" x2="50" y2="15" class="gauge-needle needle-cyan" id="dew-needle" transform="rotate(90 50 45)"/>
+              <circle cx="50" cy="45" r="4" class="gauge-hub"/>
+              <text x="50" y="65" text-anchor="middle" class="gauge-label">DEW</text>
+              <text x="50" y="83" text-anchor="middle" class="gauge-val" id="dew-val">--</text>
+            </svg>
+          </div>
+        </div>
+      </div>
       <div class="tp-actions">
         <button id="btn-mode" class="hbtn mode" title="Profil: DSO / Planetarisch">DSO</button>
         <button id="btn-refresh" class="hbtn" title="Jetzt aktualisieren">&#8635;</button>
@@ -92,61 +141,6 @@
           <button class="iw-tab" data-tab="bot">BOT&nbsp;CMDS</button>
         </div>
         <div id="iw-body"></div>
-      </div>
-      <div class="panel-hdr" style="margin-top:8px">ASTRO&nbsp;INSTR</div>
-      <div id="astro-instruments">
-        <!-- Threat-Gauges: Wind + Dew als Rundinstrumente im Stil der
-             SEEING/TAU-Gauges (Zentrum 50/45, Nadel y2=15, SVG-Rotation) -->
-        <div class="gauge-row">
-          <div class="gauge-wrap">
-            <svg viewBox="0 0 100 90" class="gauge" id="gauge-wind">
-              <circle cx="50" cy="45" r="35" class="gauge-body"/>
-              <circle cx="50" cy="45" r="35" class="gauge-ring"/>
-              <circle cx="50" cy="45" r="30" class="gauge-ticks"/>
-              <line x1="50" y1="45" x2="50" y2="15" class="gauge-needle needle-cyan" id="wind-needle" transform="rotate(-90 50 45)"/>
-              <circle cx="50" cy="45" r="4" class="gauge-hub"/>
-              <text x="50" y="68" text-anchor="middle" class="gauge-label">WIND&nbsp;KM/H</text>
-              <text x="50" y="82" text-anchor="middle" class="gauge-val" id="wind-val">--</text>
-            </svg>
-          </div>
-          <div class="gauge-wrap">
-            <!-- inverse Skala: 10K (sicher) rechts, 0K (Beschlag) links -->
-            <svg viewBox="0 0 100 90" class="gauge" id="gauge-dew">
-              <circle cx="50" cy="45" r="35" class="gauge-body"/>
-              <circle cx="50" cy="45" r="35" class="gauge-ring"/>
-              <circle cx="50" cy="45" r="30" class="gauge-ticks"/>
-              <line x1="50" y1="45" x2="50" y2="15" class="gauge-needle needle-cyan" id="dew-needle" transform="rotate(90 50 45)"/>
-              <circle cx="50" cy="45" r="4" class="gauge-hub"/>
-              <text x="50" y="68" text-anchor="middle" class="gauge-label">DEW&nbsp;10K&#8594;0K</text>
-              <text x="50" y="82" text-anchor="middle" class="gauge-val" id="dew-val">--</text>
-            </svg>
-          </div>
-        </div>
-        <div class="gauge-row">
-          
-          <div class="gauge-wrap">
-            <svg viewBox="0 0 100 90" class="gauge" id="gauge-seeing">
-              <circle cx="50" cy="45" r="35" class="gauge-body"/>
-              <circle cx="50" cy="45" r="35" class="gauge-ring"/>
-              <circle cx="50" cy="45" r="30" class="gauge-ticks"/>
-              <line x1="50" y1="45" x2="50" y2="15" class="gauge-needle needle-amber" id="seeing-needle" transform="rotate(-90 50 45)"/>
-              <circle cx="50" cy="45" r="4" class="gauge-hub"/>
-              <text x="50" y="68" text-anchor="middle" class="gauge-label">SEEING</text>
-              <text x="50" y="82" text-anchor="middle" class="gauge-val" id="seeing-val">--</text>
-            </svg>
-          </div>
-          <div class="gauge-wrap">
-            <svg viewBox="0 0 100 90" class="gauge" id="gauge-tau">
-              <circle cx="50" cy="45" r="35" class="gauge-body"/>
-              <circle cx="50" cy="45" r="35" class="gauge-ring"/>
-              <circle cx="50" cy="45" r="30" class="gauge-ticks"/>
-              <line x1="50" y1="45" x2="50" y2="15" class="gauge-needle needle-cyan" id="tau-needle" transform="rotate(90 50 45)"/>
-              <circle cx="50" cy="45" r="4" class="gauge-hub"/>
-              <text x="50" y="68" text-anchor="middle" class="gauge-label">TAU&nbsp;DP</text>
-              <text x="50" y="82" text-anchor="middle" class="gauge-val" id="tau-val">--</text>
-            </svg>
-          </div>
-        </div>
       </div>
       <div class="panel-hdr" style="margin-top:6px">COMMS&nbsp;FEED</div>
       <div id="comms-terminal" class="mono" aria-live="polite"></div>

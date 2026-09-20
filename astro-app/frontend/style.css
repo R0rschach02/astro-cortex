@@ -486,7 +486,8 @@ body.night .iw-toggle-row { border-color: #3a2020; }
   min-width: 38px; }
 
 /* ---------- Rechtes Panel: Intel ---------- */
-.right-scroll { max-height: 40vh; overflow-y: auto; }
+.right-scroll { flex: 1 1 auto; min-height: 0;
+  max-height: none; overflow-y: auto; }
 .iw-tabs { display: flex; gap: 4px; margin-bottom: 6px; }
 .iw-tab { flex: 1; background: #141a22; border: 1px solid var(--line);
   border-radius: 0 !important; color: var(--dim); font: 700 10.5px var(--mono);
@@ -494,7 +495,7 @@ body.night .iw-toggle-row { border-color: #3a2020; }
 .iw-tab.active { color: var(--amber2); border-color: #6d5a1f;
   background: #191510; }
 #comms-terminal {
-  flex: 1; min-height: 90px; max-height: 22vh; overflow-y: auto;
+  flex: 1 1 auto; min-height: 140px; max-height: 30vh; overflow-y: auto;
   background: #020503; border: 1px solid #1e3a24; border-radius: 0;
   padding: 6px 8px; font-size: 11px; line-height: 1.55; color: #2fff7a;
   text-shadow: 0 0 6px rgba(47,255,122,.45);
@@ -588,7 +589,12 @@ body.night .iw-toggle-row { border-color: #3a2020; }
   #cockpit:not(.collapse-right) { grid-template-columns: 0 1fr 300px; }
   #cockpit:not(.collapse-left):not(.collapse-right) {
     grid-template-columns: 178px 1fr 300px; }
-  .tp-sub, .tp-block:nth-child(2) { display: none; }
+  .tp-sub { display: none; }
+  /* Glareshield bricht auf eigene Zeile um, Instrumente bleiben gross */
+  #topbar { flex-wrap: wrap; row-gap: 4px; }
+  .glareshield-gauges { order: 10; width: 100%; margin-left: 0; }
+  .glareshield-gauges .gauge-wrap { width: 21vw; }
+  .glareshield-gauges .gauge-row { gap: 3vw; }
   #right-panel { max-width: 300px; }
   /* Glareshield-LEDs bleiben auch mobil sichtbar; Freshness-Text weicht */
   #freshness { display: none; }
@@ -706,9 +712,16 @@ body.night .basemap-tile { filter: none; }
 .leaflet-layer .basemap-tile::-webkit-selection { filter: none; }
 
 /* ---- Astro-Instrumente (Gauges + LED-Matrix) ---- */
-#astro-instruments { padding: 4px 0; }
-.gauge-row { display: flex; gap: 4px; justify-content: space-around; }
-.gauge-wrap { flex: 1; max-width: 100px; }
+#astro-instruments { padding: 2px 0; }
+.gauge-row { display: flex; flex-direction: row; gap: 2vw;
+  justify-content: center; align-items: stretch; }
+.gauge-wrap { flex: 1 1 0; max-width: 130px; min-width: 0; }
+.gauge-wrap svg { width: 100%; height: auto; display: block; }
+/* Primaer-Fluginstrumente am Glareshield: sichtbar gross, Update-Pfad
+   der Nadeln unveraendert (SVG-Attribute, kein CSS-transform) */
+.glareshield-gauges { margin-left: auto; flex: 0 1 auto;
+  display: flex; align-items: center; }
+.glareshield-gauges .gauge-wrap { flex: 0 1 auto; width: clamp(78px, 8.5vw, 122px); }
 .gauge { width: 100%; height: auto; }
 .gauge-body { fill: #0a0d12; stroke: none; }
 .gauge-ring { fill: none; stroke: #2d3d4f; stroke-width: 2; }
@@ -717,9 +730,9 @@ body.night .basemap-tile { filter: none; }
 .needle-amber { stroke: #ffd24a; filter: drop-shadow(0 0 3px rgba(255,210,74,.5)); }
 .needle-cyan { stroke: #4db2ff; filter: drop-shadow(0 0 3px rgba(77,178,255,.5)); }
 .gauge-hub { fill: #2a3542; stroke: #4a5a6f; stroke-width: 1.5; }
-.gauge-label { fill: #5d7186; font-size: 7px; letter-spacing: 1px;
+.gauge-label { fill: #7d93a8; font-size: 10px; letter-spacing: 1.2px;
   font-family: var(--mono); }
-.gauge-val { fill: #c9d6e2; font-size: 11px; font-weight: 700;
+.gauge-val { fill: #e8f0f7; font-size: 17px; font-weight: 700;
   font-family: var(--mono); }
 
 /* LED-Matrix: quadratische Status-LEDs */

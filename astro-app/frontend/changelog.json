@@ -282,6 +282,12 @@
       "title": "Cockpit-Layout: Threat-Gauges + Glareshield-LEDs",
       "detail": "(1) WIND SHEAR und DEW RISK sind keine vertikalen Balken mehr, sondern zwei analoge Rundinstrumente exakt im SVG-Stil der SEEING/TAU-Gauges (Zentrum 50/45, Nadel per SVG-Rotate-Attribut, perfekt zentriert). Wind-Skala 0-40 km/h, Nadel amber >20, rot >30. Taupunkt-Spread auf INVERSER Skala 10K (sicher, rechts) bis 0K (Beschlag, links), Nadel amber <3K, rot <1.5K mit Blinken. (2) Die LED-Statusmatrix (VRN Sync, Bias, OBS Mode, UAP) ist aus dem rechten Panel in die obere Statusleiste gewandert - horizontal neben dem SYSTEM-SECURE-Indikator angeordnet wie Warnlampen am Glareshield eines Jets. Freigewordener Platz right: Instrumente atmen, mobile Entlastung (Freshness-Text weicht unter 980px, LEDs bleiben).",
       "usage": "Rechts nur noch Instrumente; Status-LEDs oben in der Top-Bar"
+    },
+    {
+      "date": "2026-09-19",
+      "title": "Glareshield-Instrumentierung: Gauges als Primaer-Fluginstrumente in der Top-Bar",
+      "detail": "(1) DEAD WEIGHT: GPS-Koordinaten- und UTC-Uhr-Display inkl. ihrer Update-Loops (1s-Clock-Interval, setTpCoords) entfernt - der Live-Spot-Button funktioniert weiterhin. (2) Die vier Rundinstrumente (SEEING, TAU DP, WIND, DEW) sind aus dem rechten Panel in die Top-Bar gewandert und dort streng horizontal angeordnet (flex-direction row, gap 2vw), rechts vor den Aktions-Buttons. (3) MASSIVE SKALIERUNG: Instrumente bis 122px breit (clamp 78px-8.5vw-122px), digitale Werte von 11 auf 17 Einheiten und Labels von 7 auf 10 Einheiten vergroessert - auf den ersten Blick ablesbar. (4) RECHTES PANEL: keine leeren Container; Bias-Liniendiagramm (flex:1 statt 40vh-Deckel) und Comms-Feed (min 140px) teilen sich die volle Spaltenhoehe. Mobile: Instrumente brechen auf eine eigene Zeile um (21vw je Gauge), die versehentlich den Status-Block treffende nth-child(2)-Regel ist korrigiert.",
+      "usage": "Alle vier Instrumente direkt unter der Augenbraue im Glareshield; rechts nur noch Bias + Comms"
     }
   ]
 }

@@ -745,7 +745,6 @@ function gpsWatch() {
   if (!navigator.geolocation) { alert("Geolocation hier nicht verfügbar (HTTPS nötig)."); return; }
   $("btn-gps").textContent = "…";
   navigator.geolocation.getCurrentPosition(async (pos) => {
-    setTpCoords(pos.coords.latitude, pos.coords.longitude);
     try {
       const r = await api("/api/watch", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -897,13 +896,6 @@ function commsLog(text, severity) {
   t.appendChild(div);
   while (t.children.length > 40) t.removeChild(t.firstChild);
   t.scrollTop = t.scrollHeight;
-}
-
-// UTC-Uhr + Status-Koppelung im oberen Panel
-function setTpCoords(lat, lon) {
-  const el = document.getElementById("tp-coords");
-  if (el && lat != null) el.textContent =
-    `${lat.toFixed(4)} / ${lon.toFixed(4)}`;
 }
 
 function updateAstroInstruments(data) {
@@ -1127,12 +1119,6 @@ async function fetchTransitRoute(name, lat, lon) {
 }
 
 function initCockpitStatus() {
-  const clock = () => {
-    const el = document.getElementById("tp-clock");
-    if (el) el.textContent = new Date().toISOString().slice(11, 19);
-  };
-  clock();
-  setInterval(clock, 1000);
   commsLog("ASTRO CC ONLINE — SYSTEM SECURE");
 }
 
