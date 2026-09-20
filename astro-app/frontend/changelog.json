@@ -1,263 +1,269 @@
 {
- "entries": [
-  {
-   "date": "2026-08-15",
-   "title": "Astro-Crawler Kernsystem",
-   "tag": "nachgetragen aus Projektverlauf",
-   "desc": "Crawler für ClearOutside (Wolken L/M/H), Meteoblue (Seeing/Jetstream), DWD-Unwetterwarnungen mit Punkt-in-Polygon, BrightSky-Bodendaten; SQLite-Historie; Telegram-Bot mit Alarmen (Gewitter/Regen/Entwarnung/Rating-Wechsel, 90-min-Cooldown); Split-Timing: Heavy-Timer alle 30 min (Playwright), Radar-Timer alle 5 min (HTTP only).",
-   "usage": "Bot: /status /spots /rate W S T — Daten: ~/.astro_crawler.db"
-  },
-  {
-   "date": "2026-08-15",
-   "title": "PWA \"Astro Command Center\"",
-   "tag": "nachgetragen aus Projektverlauf",
-   "desc": "Karte (Leaflet) mit rating-farbigen Markern, Detail-Panel mit Ampel-Indikatoren pro Parameter, Lichtverschmutzungs-Layer (Lorenz-Tiles via lokalem Proxy-Cache), DWD-Warnpolygone als Overlay, Rotlicht-Modus, Offline-Service-Worker, GPS-Live-Standort via /api/watch. Erreichbar über Tailscale-HTTPS.",
-   "usage": "https://seriousjoke.tailcc473e.ts.net — GPS-Button setzt Live-Standort"
-  },
-  {
-   "date": "2026-08-15",
-   "title": "Skyfield-Astronomie + Beobachtungsprofile",
-   "tag": "nachgetragen aus Projektverlauf",
-   "desc": "Lokale Ephemeriden (de421.bsp): Mond (Kulmination, >30°-Fenster), astronomische Dunkelheit, Planeten-Fenster. Profile DSO vs. Planetarisch mit unterschiedlichen Schwellen (DSO: Seeing >3.0\" hart, Beschlags-Score hart für den offenen 150P-Newton ohne Tauheizung; Planetarisch: Seeing >2.0\" hart, Mond egal). BrightSky-Nachtverlauf (Temp/Feuchte/Böen) für 600D und EQ5.",
-   "usage": "Bot: /mode dso|planet — PWA: 🌌/🪐-Button"
-  },
-  {
-   "date": "2026-08-15",
-   "title": "Clear-Sky-Alarm",
-   "tag": "nachgetragen aus Projektverlauf",
-   "desc": "Push, wenn Bewölkung <20% für die nächsten 2 Stunden UND astronomische Nacht gleichzeitig; danach automatisch deaktiviert (kein Spam). Max. 24 h aktiv.",
-   "usage": "Bot: /clear weinheim  oder  /clear 50.0000006 8.0000006"
-  },
-  {
-   "date": "2026-08-16",
-   "title": "Session-Start-Snapshot",
-   "tag": "nachgetragen aus Projektverlauf",
-   "desc": "/session start verknüpft die Startbedingungen (Heavy-Crawl der Location) mit der Session; jedes /rate während der offenen Session koppelt an DIESE Startbedingungen statt an die Lage beim Eintippen (für spätere ML-Kalibrierung). Nächstes start ersetzt automatisch, Auto-Ablauf nach 14 h.",
-   "usage": "Bot: /session start  →  /rate W S T  →  optional /session end"
-  },
-  {
-   "date": "2026-08-16",
-   "title": "Standort-Update (5 Spots)",
-   "tag": "nachgetragen aus Projektverlauf",
-   "desc": "Hemsbach (Sulzbach) und Weinheim auf vor Ort vermessene Koordinaten aktualisiert (Namen unverändert, Historie läuft durch); Neu: Viernheim (Heddesheimer Str.). Insgesamt: Neckarplatten, Hemsbach, Weinheim, Spinelli Park, Viernheim.",
-   "usage": "Automatisch — Marker in der PWA"
-  },
-  {
-   "date": "2026-08-16",
-   "title": "Meridian-Flip-Reminder",
-   "tag": "nachgetragen aus Projektverlauf",
-   "desc": "/track berechnet die nächste obere Kulmination (skyfield, statischer Messier-Katalog M1-M110) und pusht 15-20 Min vorher 'gleich flippen'. Erkennt zirkumpolare Objekte, deren Kulmination tagsüber liegt.",
-   "usage": "Bot: /track M81"
-  },
-  {
-   "date": "2026-08-16",
-   "title": "FWHM-Sync-Endpunkt",
-   "tag": "nachgetragen aus Projektverlauf",
-   "desc": "Nachtrags-Endpunkt für gemessene FWHM-Werte nach Sessionende (z. B. aus SharpCap), schreibt in fwhm_log. Ungültige Zeilen werden gezählt übersprungen.",
-   "usage": "POST /api/fwhm_sync {\"measurements\": [{\"ts\": \"…\", \"fwhm\": 2.4}, …]}"
-  },
-  {
-   "date": "2026-08-16",
-   "title": "Vorausschau + Golden Window",
-   "tag": "nachgetragen aus Projektverlauf",
-   "desc": "Stündliche Vorausschau aller Werte bis Sonnenaufgang (gleiche Quellen, keine Extra-Requests) als neuer Panel-Tab. Golden Window: bestes zusammenhängende Fenster der Nacht nach Profil-Schwellen, mit Begründung. Latest-wins-JSON, keine DB-Aufblähung.",
-   "usage": "PWA: Marker antippen → Tab 'Vorausschau'"
-  },
-  {
-   "date": "2026-08-17",
-   "title": "Bortle-Empfehlung",
-   "tag": "nachgetragen aus Projektverlauf",
-   "desc": "Zenit-Lichtverschmutzung per Pixel-Sampling aus den Lorenz-Tiles (16-Zonen-Palette aus der Original-Legende): Zone, mag/arcsec², ≈Bortle — plus Filter-Tipp je Profil (Antlia Triband / Omegon UHC).",
-   "usage": "Automatisch im Panel (Zeile 'Zenit-Lichtverschm.')"
-  },
-  {
-   "date": "2026-08-17",
-   "title": "Nacht-Fenster-Korrekturen",
-   "tag": "nachgetragen aus Projektverlauf",
-   "desc": "Dunkelheitsfenster korrekt vor UND während der Nacht (vorher: um 20:30 wurde die gestrige Nacht geliefert, nachts wurde der Dunkel-Beginn abgeschnitten, morgens die bürgerliche statt astronomische Dämmerung beendet). Mond-Cache mit 6-h-TTL.",
-   "usage": "Automatisch"
-  },
-  {
-   "date": "2026-08-17",
-   "title": "Changelog + Git-Deploy-Tracking",
-   "tag": "neu",
-   "desc": "Diese Ansicht: append-only changelog.json, bei jedem Feature-Deploy ein Eintrag mehr. Zusätzlich versionsverfolgt git jetzt jeden Deploy (Commit im Deploy-Skript).",
-   "usage": "Zahnrad-Menü → 'Änderungen'"
-  },
-  {
-   "date": "2026-08-17",
-   "title": "Wind-Eskalation für aktive Sessions",
-   "tag": "neu",
-   "desc": "Bei laufender /session: Böen >40 km/h → sofortige Warnung (60-min-Cooldown); >60 km/h → Abbruch-Push ('Teleskop einpacken'), aber erst nach Bestätigung im zweiten Radar-Tick (~10 min Debounce gegen Ausreißer-Böen). Basis ist der frische 2-h-Böenwert je Tick.",
-   "usage": "Automatisch — nur aktiv nach /session start"
-  },
-  {
-   "date": "2026-08-17",
-   "title": "Secrets aus dem Code (Git-fähig)",
-   "tag": "neu",
-   "desc": "TELEGRAM_TOKEN/CHAT_ID liegen in ~/.env (Mini-Loader, keine Extra-Abhängigkeit), .env.example im Repo, Git-Historie sauber neu initialisiert. Token-Revocation beim BotFather empfohlen.",
-   "usage": "~/.env pflegen; python astro_crawler.py --setup-telegram schreibt dort hinein"
-  },
-  {
-   "date": "2026-08-23",
-   "title": "Session-Call-Sheet",
-   "tag": "neu",
-   "desc": "Vollständiges Beobachtungsblatt bei /session start und on-demand: Rating, Golden Window (bzw. beste Dunkelstunde als Fallback), Ziel-Vorschlag (bestplatzierter Messier im Fenster, Mondabstand illumination-gewichtet statt hart gefiltert), Mond, Wind mit Eskalationsgrenzen, Beschlags-Risiko und feste DSO-Gear-Checkliste.",
-   "usage": "Bot: /callsheet [Standort]  — oder automatisch bei /session start"
-  },
-  {
-   "date": "2026-08-23",
-   "title": "Dew-Event-Logging",
-   "tag": "neu",
-   "desc": "/dew protokolliert den Beschlag-Eintritt der laufenden Session (einmal pro Session): Dauer seit Session-Start, Tau-Spread Start→Onset (Start aus dem Session-Snapshot), Temp/Feuchte zum Zeitpunkt. Reine Datensammlung für die spätere Beschlags-Kalibrierung — kein automatischer Trigger, keine Rating-Änderung; Session bleibt offen.",
-   "usage": "Bot: /dew (während der Session, wenn der Fangspiegel beschlägt)"
-  },
-  {
-   "date": "2026-08-23",
-   "title": "Externes Uptime-Monitoring",
-   "tag": "neu",
-   "desc": "Dead-Man's-Switch über healthchecks.io: Der Radar-Tick pingt nach jedem erfolgreichen Durchlauf HEALTHCHECK_PING_URL an; der uvicorn-Prozess pingt alle 15 min HEALTHCHECK_PING_URL_APP (in-process — Prozess tot = Pings stoppen = Alarm). Down-Erkennung und Telegram-Alarmierung übernimmt healthchecks.io autonom; Ping-Fehler hier bleiben folgenlos für den Tick.",
-   "usage": "Aktivierung: URLs in ~/.env eintragen (leer = inaktiv)"
-  },
-  {
-   "date": "2026-08-23",
-   "title": "Regenradar-Animation + Abendplan",
-   "tag": "neu",
-   "desc": "Regenradar-Layer (RainViewer) mit Play/Pause-Loop durch die letzten ~2 h + Nowcast und Zeitstempel-Anzeige; Satellit-Toggle mit Empty-Handling. Dazu zwei proactive Pushes: taeglicher Abendplan ab 18 Uhr (Golden Windows mit Ziel-Vorschlag, Sammelzeile fuer Rest) und Live-Abweichungswarnung waehrend der Nacht (Wolken +30pp oder Seeing +1.0\" gegen die Planungs-Vorhersage, nur Verschlechterung, 90-min-Cooldown).",
-   "usage": "PWA: Layer-Control → 'Regenradar' — Pushes kommen automatisch"
-  },
-  {
-   "date": "2026-08-24",
-   "title": "Regen-Tropfen an den Standorten",
-   "tag": "nachgetragen aus Projektverlauf",
-   "desc": "Die Standort-Marker auf der Karte zeigen jetzt selbst einen kleinen Regentropfen, wenn dort Niederschlag gemeldet wird - der Tropfen wird groesser, je mehr es regnet, und erscheint als Umriss, wenn Regen nur angesagt ist. So siehst du auf einen Blick, welche deiner Plätze nass sind.",
-   "usage": "Karte: Tropfen-Symbol direkt am Standort-Marker (ab 30% Regenwahrscheinlichkeit als Umriss)"
-  },
-  {
-   "date": "2026-08-24",
-   "title": "Weniger Einzel-Nachrichten bei Abweichungen",
-   "tag": "nachgetragen aus Projektverlauf",
-   "desc": "Wenn das Wetter von der Vorhersage abweicht, waehrend keine Beobachtung laeuft, gibt es dafuer jetzt abends EINE zusammengefasste Zeile im Abendplan statt mehrerer einzelner Nachrichten. Waehrend einer laufenden Beobachtung bleibt die sofortige Warnung wie bisher.",
-   "usage": "Telegram: Abendplan enthaelt ggf. 'Heute X Vorhersage-Abweichung(en)...'"
-  },
-  {
-   "date": "2026-08-30",
-   "title": "Neue Beobachtungsstandorte in der Pfalz",
-   "tag": "nachgetragen aus Projektverlauf",
-   "desc": "Ellerstadt Ost und Fussgoennheim Rand sind jetzt dabei - zwei dunkle Plaetze in der Pfalz (ueber einen Kollaborateur, Uebernachtung moeglich). Sie laufen voll mit: Ampel, Vorausschau, Abendplan und Alarme.",
-   "usage": "Karte: beide neue Marker; Abby fragen lohnt sich vor der ersten Nacht dort"
-  },
-  {
-   "date": "2026-08-30",
-   "title": "Karten-Hintergrund auf OpenStreetMap",
-   "tag": "nachgetragen aus Projektverlauf",
-   "desc": "Die Basis-Karte kommt jetzt von OpenStreetMap - der bisherige Anbieter verlangt ploetzlich einen API-Schluessel. Optik bleibt ruhig und dunkel, der Rotlicht-Modus funktioniert wie bisher.",
-   "usage": "Nichts zu tun - Karte laedt automatisch neu"
-  },
-  {
-   "date": "2026-08-30",
-   "title": "Regen-Anzeige komplett neu: Symbole statt Farbflaechen",
-   "tag": "nachgetragen aus Projektverlauf",
-   "desc": "Regen wird nicht mehr als grosse Farbflaeche gezeichnet, sondern als verstaendliche Wolken-Symbole mit Tropfen ueber die Region verteilt: mehr Tropfen = mehr Regen, bei einer Gewitterwarnung kommt ein Blitz dazu. Mit dem Zeit-Regler unten links kannst du durch die naechsten 6 Stunden spulen, die Play-Taste laeuft automatisch durch. Die alte Radar-Karte bleibt als 'Radar-Rohansicht' im Layer-Menue.",
-   "usage": "Karte: Regler unten links (0 = jetzt, +6 h = spaeter); Play = Automatik"
-  },
-  {
-   "date": "2026-09-05",
-   "title": "Fix: Vorausschau war einige Tage unvollstaendig",
-   "tag": "nachgetragen aus Projektverlauf",
-   "desc": "Die mehrtaegige Vorausschau hatte sich ueber mehrere Tage nicht mehr aktualisiert und zeigte veraltete Stunden - ein Fehler im Aufbau ist behoben. Zusaetzlich beginnt sie jetzt immer mit der aktuellen Stunde und sagt klar Bescheid, wenn gerade weniger als 2 Tage verfuegbar sind.",
-   "usage": "Vorausschau-Tab aktualisiert sich wieder mit jedem Lauf (alle 30 min)"
-  },
-  {
-   "date": "2026-09-05",
-   "title": "Wolken-Vorhersage wird automatisch genauer",
-   "tag": "nachgetragen aus Projektverlauf",
-   "desc": "Die App gleicht jetzt taeglich ab, wie die Wolken-Vorhersage in der Vergangenheit danebenlag, und justiert die angezeigten Werte automatisch nach. Bisher war die Vorhersage deutlich zu optimistisch (real war es im Schnitt 9-11% mehr Bewoelkung als angesagt) - das wird jetzt in der Anzeige ausglichen. Die Ampel-Bewertung selbst bleibt vorerst unveraendert.",
-   "usage": "Vorausschau-Tab: Werte sind bereits korrigiert; nichts zu tun"
-  },
-  {
-   "date": "2026-09-06",
-   "title": "Vorausschau mit konkreten Daten + Standort-Wechsel",
-   "tag": "neu",
-   "desc": "Die Vorausschau ist jetzt mit echten Daten beschriftet (z. B. \"Sa, 06.09.2026\") statt \"Heute / +1 / +2\" - besonders praktisch bei der Planung ueber mehrere Tage. Und die Standorte haben sich geaendert: Neu dabei ist der Untere Luisenpark in Mannheim; Fussgoennheim Rand ist raus (dessen bisherige Werte bleiben in der Historie).",
-   "usage": "Vorausschau-Tab: Nacht-Beschriftung zeigt das Datum; Karte: neuer Marker Unterer Luisenpark"
-  },
-  {
-   "date": "2026-09-06",
-   "title": "Vorausschau ab 18 Uhr: der ganze Abend auf einen Blick",
-   "tag": "neu",
-   "desc": "Die Vorausschau zeigt jetzt jeden Abend ab 18 Uhr durchgehend - auch die hellen Stunden. So siehst du den ganzen Uebergang (18 Uhr hell -> Daemmerung -> dunkel) und kannst besser planen, wann du losfahren und aufbauen willst. Dunkle Stunden sind wie bisher markiert; Fenster fuer Deep-Sky beginnen weiterhin erst, wenn es richtig dunkel ist.",
-   "usage": "Vorausschau-Tab: erste Stunde ist jetzt 18 Uhr - Sommer wie Winter"
-  },
-  {
-   "date": "2026-09-13",
-   "title": "Neuer Standort: Koenigsstuhl Heidelberg",
-   "tag": "neu",
-   "desc": "Der Koenigsstuhl ist jetzt als achter Standort dabei - Hoehenlage mit geschaetzter Bortle-Klasse 4, also deutlich dunklerer Himmel als in der Stadt. Tages-Tour von Mannheim (~20 km); es gibt dort keine Uebernachtungs-Infrastruktur. Er laeuft voll mit: Ampel, Vorausschau, Abendplan und Alarme.",
-   "usage": "Karte: neuer Marker suedlich von Heidelberg"
-  },
-  {
-   "date": "2026-09-13",
-   "title": "Neue Abfrage: Was ist mit dem Teleskop gerade sichtbar?",
-   "tag": "neu",
-   "desc": "Fuer Technik-Interessierte: Ein neuer API-Abruf (/api/observable) rechnet aus, welche Messier-Objekte vom gewaehlten Standort aus mit deinem Teleskop (150 mm) prinzipiell sichtbar sind - abhaengig von Helligkeitsgrenze (Bortle-Klasse), Seeing und Hoehe ueber dem Horizont. Reine Filterung, keine Empfehlungen. Die Anzeige in der App folgt spaeter.",
-   "usage": "API: /api/observable?id=ellerstadt_east&equipment=newton_150"
-  },
-  {
-   "date": "2026-09-14",
-   "title": "Grundstein gelegt: Anreise per Bahn einplanen",
-   "tag": "neu",
-   "desc": "Vorbereitung fuer die Frage \"Wann muss die letzte Bahn losfahren?\": Fahrplandaten (GTFS) koennen jetzt geladen und Verbindungen mit bis zu zwei Umstiegen gerechnet werden - komplett offline auf dem eigenen Rechner, auf Basis offener Daten (DELFI/VRN-Umfeld). Die Anzeige im Abendplan folgt, sobald der Fahrplan-Feed eingespielt ist.",
-   "usage": "Noch intern - API-Endpunkt und Anzeige folgen"
-  },
-  {
-   "date": "2026-09-14",
-   "title": "Neu: Wie zuverlaessig sind die Vorhersagen?",
-   "tag": "neu",
-   "desc": "Oben links gibt es jetzt ein kleines Diagramm-Symbol. Dahinter: Wie genau die Wetter-Vorhersagen stimmen (gemessen an vergangenen Abweichungen, taeglich aktualisiert) und eine Liste aller Telegram-Bot-Befehle mit Erklaerung. Einfach antippen - die Ansicht klaert auf, wie stark die Anzeige automatisch nachkorrigiert wird (Wolken werden z.B. real oft ~9% trueber als angesagt).",
-   "usage": "Karte: Symbol oben links antippen; zwei Reiter (Zuverlaessigkeit / Bot-Befehle)"
-  },
-  {
-   "date": "2026-09-16",
-   "title": "Beobachtungs-Schalter + volle Zuverlaessigkeits-Historie",
-   "tag": "neu",
-   "desc": "Im Zuverlaessigkeits-Fenster gibt es jetzt unten einen Kippschalter \"ASTRO OBSERVATION\" (Flugzeug-Cockpit-Stil): Ist er nicht gelegt, schickt der Telegram-Bot KEINE Wetter-Alarme mehr - nur wenn du wirklich beobachtest (oder eine Session laeuft), wird aktiv gewarnt. Abendplan und Co. bleiben unberuehrt. Das Zuverlaessigkeits-Diagramm zeigt jetzt ausserdem den kompletten Verlauf seit dem 23.08. - rueckwirkend aus den echten Messdaten berechnet, mit krassen Linien fuer die aktuelle Treffsicherheit (letzte 7 Tage) und gestrichelten fuer den Gesamtdurchschnitt.",
-   "usage": "Karte: Diagramm-Symbol oben rechts unten im Panel Schalter legen/umlegen"
-  },
-  {
-   "date": "2026-09-17",
-   "title": "Komplett-Redesign: Astro CC wird zum Cockpit",
-   "tag": "neu",
-   "desc": "Die App ist jetzt eine echte Kommandozentrale: Die Karte ist die Windschutzscheibe im Zentrum, drumherum ein fester Cockpit-Rahmen. Links massive Hardware-Schalter fuer die Sensoren (Regen, Radar, Satellit, Warnungen, Lichtverschmutzung) mit Status-LEDs - kein Menue mehr. Rechts das Intel-Panel mit der Vorhersage-Zuverlaessigkeit, darunter ein Matrix-Terminal (COMMS FEED), das live Rating-Wechsel, Warnungen und System-Ereignisse als gruenen Text-Lauf mitzeigt. Ganz unten rechts der grosse ASTRO-OBSERVATION-Waffenschalter. Unten eine industrielle Zeitlinie fuer die 6-Stunden-Vorhersage. Oben: UTC-Uhr, GPS-Koordinaten, blinkender System-Status. Alles kantig, dunkel, Monospace.",
-   "usage": "Direkt erkennbar: links Sensoren schalten, rechts Intel lesen, unten Zeit spulen, Schalter unten rechts legt die Alarme scharf"
-  },
-  {
-   "date": "2026-09-17",
-   "title": "Taktische Karte: dunkle Kacheln + Ziel-Erfassung",
-   "tag": "neu",
-   "desc": "Die Karte ist jetzt dunkel-grau taktisch statt hell-bunt - wie ein echtes Radar-Display. Die Standorte sind keine runden Pins mehr, sondern Ziel-Erfassungs-Fadenkreuze mit eckigen Klammmern: gruen fuer GO, gelb fuer MAYBE, rot fuer NO-GO; bei aktiver Gewitterwarnung blinkt das Fadenkreuz rot. Im COMMS-Feed blinken echte Wetter-Alarme jetzt hart rot (WARNING: DWD STORM CELL DETECTED), statt zwischen den gruenen System-Zeilen unterzugehen.",
-   "usage": "Karte: dunkel, Fadenkreuze statt Pins; rote Blink-Zeilen im Terminal = Gefahr"
-  },
-  {
-   "date": "2026-09-17",
-   "title": "Bahnanbindung live + dunkle Karte + Astro-Instrumente",
-   "tag": "neu",
-   "desc": "Drei grosse Updates: (1) Die Karte ist jetzt tiefschwarz taktisch (die hellen Kacheln waren nur ein Zwischenschritt). (2) Bahnanbindung ist live: Fuer jeden Standort kann ab sofort abgefragt werden, wann die letzte Bahn hingehen muesste und wann die erste zurueckfaehrt - komplett offline aus dem VRN-Fahrplan berechnet. Neue API: /api/deployment. (3) Astro-Instrumente im Cockpit: Mond-Radar (Hohe/Azimut), Seeing- und Taupunkt-Anzeigen als analoge Rundinstrumente, Status-LED-Matrix fuer Missions-Faktoren.",
-   "usage": "Karte: dunkel; API: /api/deployment?id=ellerstadt_east; Instrumente im rechten Panel"
-  },
-  {
-   "date": "2026-09-19",
-   "title": "Frontend-Politur: Marker, Instrumente, Bahnanbindung",
-   "tag": "neu",
-   "desc": "Vier Verbesserungen auf einen Schlag: (1) Die Standort-Marker sind wieder grosse, gut sichtbare farbige Punkte mit Glow - auf jeder Karte lesbar. (2) Die Messinstrumente (Seeing, Taupunkt) sind jetzt korrekt zentriert - die Nadeln rotieren sauber im Kreis. (3) Neues Mond-Horizont-Display im linken Panel: zeigt den besten Standort der Nacht und darueber, wo der Mond gerade am Himmel steht. (4) Jeder Standort hat jetzt einen TRANSIT-ROUTE-Button: Ein Klick zeigt die Bahnanbindung von deinem GPS-Standort dorthin - mit letzter Hin- und fruehester Rueckfahrt.",
-   "usage": "Standort anklicken -> TRANSIT ROUTE klicken; linkes Panel zeigt den Mond-Horizont"
-  },
-  {
-   "date": "2026-09-20",
-   "title": "Zielerfassung & Gefahren-Anzeige (Cockpit-Phase 3)",
-   "tag": "neu",
-   "desc": "Zwei neue Cockpit-Instrumente: (1) LUNAR TARGET LOCK im linken Panel unter dem Mond-Horizont - zeigt ob der Mond als Beobachtungsziel erfasst ist ([LOCKED] gruen wenn hoeher als 30 Grad) oder ausser Reichweite ([OUT OF RANGE] rot). Der beste Planet wird als [SECONDARY] in grau darunter angezeigt. (2) THREAT ASSESSMENT im rechten Panel - zwei vertikale Balkenanzeigen wie Tankanzeigen: WIND SHEAR (Wind/Böen, ab 20 km/h gelb, ab 30 rot) und DEW RISK (Taupunkt-Abstand, je kleiner desto gefaehrlicher - unter 1.5 K leuchtet FROST RISK rot fuer den ungeschuetzten Fangspiegel).",
-   "usage": "Linkes Panel: [LOCKED]/[OUT OF RANGE] Status; rechtes Panel: Wind- und Tau-Balken"
-  }
- ]
+  "entries": [
+    {
+      "date": "2026-08-15",
+      "title": "Astro-Crawler Kernsystem",
+      "tag": "nachgetragen aus Projektverlauf",
+      "desc": "Crawler für ClearOutside (Wolken L/M/H), Meteoblue (Seeing/Jetstream), DWD-Unwetterwarnungen mit Punkt-in-Polygon, BrightSky-Bodendaten; SQLite-Historie; Telegram-Bot mit Alarmen (Gewitter/Regen/Entwarnung/Rating-Wechsel, 90-min-Cooldown); Split-Timing: Heavy-Timer alle 30 min (Playwright), Radar-Timer alle 5 min (HTTP only).",
+      "usage": "Bot: /status /spots /rate W S T — Daten: ~/.astro_crawler.db"
+    },
+    {
+      "date": "2026-08-15",
+      "title": "PWA \"Astro Command Center\"",
+      "tag": "nachgetragen aus Projektverlauf",
+      "desc": "Karte (Leaflet) mit rating-farbigen Markern, Detail-Panel mit Ampel-Indikatoren pro Parameter, Lichtverschmutzungs-Layer (Lorenz-Tiles via lokalem Proxy-Cache), DWD-Warnpolygone als Overlay, Rotlicht-Modus, Offline-Service-Worker, GPS-Live-Standort via /api/watch. Erreichbar über Tailscale-HTTPS.",
+      "usage": "https://seriousjoke.tailcc473e.ts.net — GPS-Button setzt Live-Standort"
+    },
+    {
+      "date": "2026-08-15",
+      "title": "Skyfield-Astronomie + Beobachtungsprofile",
+      "tag": "nachgetragen aus Projektverlauf",
+      "desc": "Lokale Ephemeriden (de421.bsp): Mond (Kulmination, >30°-Fenster), astronomische Dunkelheit, Planeten-Fenster. Profile DSO vs. Planetarisch mit unterschiedlichen Schwellen (DSO: Seeing >3.0\" hart, Beschlags-Score hart für den offenen 150P-Newton ohne Tauheizung; Planetarisch: Seeing >2.0\" hart, Mond egal). BrightSky-Nachtverlauf (Temp/Feuchte/Böen) für 600D und EQ5.",
+      "usage": "Bot: /mode dso|planet — PWA: 🌌/🪐-Button"
+    },
+    {
+      "date": "2026-08-15",
+      "title": "Clear-Sky-Alarm",
+      "tag": "nachgetragen aus Projektverlauf",
+      "desc": "Push, wenn Bewölkung <20% für die nächsten 2 Stunden UND astronomische Nacht gleichzeitig; danach automatisch deaktiviert (kein Spam). Max. 24 h aktiv.",
+      "usage": "Bot: /clear weinheim  oder  /clear 50.0000006 8.0000006"
+    },
+    {
+      "date": "2026-08-16",
+      "title": "Session-Start-Snapshot",
+      "tag": "nachgetragen aus Projektverlauf",
+      "desc": "/session start verknüpft die Startbedingungen (Heavy-Crawl der Location) mit der Session; jedes /rate während der offenen Session koppelt an DIESE Startbedingungen statt an die Lage beim Eintippen (für spätere ML-Kalibrierung). Nächstes start ersetzt automatisch, Auto-Ablauf nach 14 h.",
+      "usage": "Bot: /session start  →  /rate W S T  →  optional /session end"
+    },
+    {
+      "date": "2026-08-16",
+      "title": "Standort-Update (5 Spots)",
+      "tag": "nachgetragen aus Projektverlauf",
+      "desc": "Hemsbach (Sulzbach) und Weinheim auf vor Ort vermessene Koordinaten aktualisiert (Namen unverändert, Historie läuft durch); Neu: Viernheim (Heddesheimer Str.). Insgesamt: Neckarplatten, Hemsbach, Weinheim, Spinelli Park, Viernheim.",
+      "usage": "Automatisch — Marker in der PWA"
+    },
+    {
+      "date": "2026-08-16",
+      "title": "Meridian-Flip-Reminder",
+      "tag": "nachgetragen aus Projektverlauf",
+      "desc": "/track berechnet die nächste obere Kulmination (skyfield, statischer Messier-Katalog M1-M110) und pusht 15-20 Min vorher 'gleich flippen'. Erkennt zirkumpolare Objekte, deren Kulmination tagsüber liegt.",
+      "usage": "Bot: /track M81"
+    },
+    {
+      "date": "2026-08-16",
+      "title": "FWHM-Sync-Endpunkt",
+      "tag": "nachgetragen aus Projektverlauf",
+      "desc": "Nachtrags-Endpunkt für gemessene FWHM-Werte nach Sessionende (z. B. aus SharpCap), schreibt in fwhm_log. Ungültige Zeilen werden gezählt übersprungen.",
+      "usage": "POST /api/fwhm_sync {\"measurements\": [{\"ts\": \"…\", \"fwhm\": 2.4}, …]}"
+    },
+    {
+      "date": "2026-08-16",
+      "title": "Vorausschau + Golden Window",
+      "tag": "nachgetragen aus Projektverlauf",
+      "desc": "Stündliche Vorausschau aller Werte bis Sonnenaufgang (gleiche Quellen, keine Extra-Requests) als neuer Panel-Tab. Golden Window: bestes zusammenhängende Fenster der Nacht nach Profil-Schwellen, mit Begründung. Latest-wins-JSON, keine DB-Aufblähung.",
+      "usage": "PWA: Marker antippen → Tab 'Vorausschau'"
+    },
+    {
+      "date": "2026-08-17",
+      "title": "Bortle-Empfehlung",
+      "tag": "nachgetragen aus Projektverlauf",
+      "desc": "Zenit-Lichtverschmutzung per Pixel-Sampling aus den Lorenz-Tiles (16-Zonen-Palette aus der Original-Legende): Zone, mag/arcsec², ≈Bortle — plus Filter-Tipp je Profil (Antlia Triband / Omegon UHC).",
+      "usage": "Automatisch im Panel (Zeile 'Zenit-Lichtverschm.')"
+    },
+    {
+      "date": "2026-08-17",
+      "title": "Nacht-Fenster-Korrekturen",
+      "tag": "nachgetragen aus Projektverlauf",
+      "desc": "Dunkelheitsfenster korrekt vor UND während der Nacht (vorher: um 20:30 wurde die gestrige Nacht geliefert, nachts wurde der Dunkel-Beginn abgeschnitten, morgens die bürgerliche statt astronomische Dämmerung beendet). Mond-Cache mit 6-h-TTL.",
+      "usage": "Automatisch"
+    },
+    {
+      "date": "2026-08-17",
+      "title": "Changelog + Git-Deploy-Tracking",
+      "tag": "neu",
+      "desc": "Diese Ansicht: append-only changelog.json, bei jedem Feature-Deploy ein Eintrag mehr. Zusätzlich versionsverfolgt git jetzt jeden Deploy (Commit im Deploy-Skript).",
+      "usage": "Zahnrad-Menü → 'Änderungen'"
+    },
+    {
+      "date": "2026-08-17",
+      "title": "Wind-Eskalation für aktive Sessions",
+      "tag": "neu",
+      "desc": "Bei laufender /session: Böen >40 km/h → sofortige Warnung (60-min-Cooldown); >60 km/h → Abbruch-Push ('Teleskop einpacken'), aber erst nach Bestätigung im zweiten Radar-Tick (~10 min Debounce gegen Ausreißer-Böen). Basis ist der frische 2-h-Böenwert je Tick.",
+      "usage": "Automatisch — nur aktiv nach /session start"
+    },
+    {
+      "date": "2026-08-17",
+      "title": "Secrets aus dem Code (Git-fähig)",
+      "tag": "neu",
+      "desc": "TELEGRAM_TOKEN/CHAT_ID liegen in ~/.env (Mini-Loader, keine Extra-Abhängigkeit), .env.example im Repo, Git-Historie sauber neu initialisiert. Token-Revocation beim BotFather empfohlen.",
+      "usage": "~/.env pflegen; python astro_crawler.py --setup-telegram schreibt dort hinein"
+    },
+    {
+      "date": "2026-08-23",
+      "title": "Session-Call-Sheet",
+      "tag": "neu",
+      "desc": "Vollständiges Beobachtungsblatt bei /session start und on-demand: Rating, Golden Window (bzw. beste Dunkelstunde als Fallback), Ziel-Vorschlag (bestplatzierter Messier im Fenster, Mondabstand illumination-gewichtet statt hart gefiltert), Mond, Wind mit Eskalationsgrenzen, Beschlags-Risiko und feste DSO-Gear-Checkliste.",
+      "usage": "Bot: /callsheet [Standort]  — oder automatisch bei /session start"
+    },
+    {
+      "date": "2026-08-23",
+      "title": "Dew-Event-Logging",
+      "tag": "neu",
+      "desc": "/dew protokolliert den Beschlag-Eintritt der laufenden Session (einmal pro Session): Dauer seit Session-Start, Tau-Spread Start→Onset (Start aus dem Session-Snapshot), Temp/Feuchte zum Zeitpunkt. Reine Datensammlung für die spätere Beschlags-Kalibrierung — kein automatischer Trigger, keine Rating-Änderung; Session bleibt offen.",
+      "usage": "Bot: /dew (während der Session, wenn der Fangspiegel beschlägt)"
+    },
+    {
+      "date": "2026-08-23",
+      "title": "Externes Uptime-Monitoring",
+      "tag": "neu",
+      "desc": "Dead-Man's-Switch über healthchecks.io: Der Radar-Tick pingt nach jedem erfolgreichen Durchlauf HEALTHCHECK_PING_URL an; der uvicorn-Prozess pingt alle 15 min HEALTHCHECK_PING_URL_APP (in-process — Prozess tot = Pings stoppen = Alarm). Down-Erkennung und Telegram-Alarmierung übernimmt healthchecks.io autonom; Ping-Fehler hier bleiben folgenlos für den Tick.",
+      "usage": "Aktivierung: URLs in ~/.env eintragen (leer = inaktiv)"
+    },
+    {
+      "date": "2026-08-23",
+      "title": "Regenradar-Animation + Abendplan",
+      "tag": "neu",
+      "desc": "Regenradar-Layer (RainViewer) mit Play/Pause-Loop durch die letzten ~2 h + Nowcast und Zeitstempel-Anzeige; Satellit-Toggle mit Empty-Handling. Dazu zwei proactive Pushes: taeglicher Abendplan ab 18 Uhr (Golden Windows mit Ziel-Vorschlag, Sammelzeile fuer Rest) und Live-Abweichungswarnung waehrend der Nacht (Wolken +30pp oder Seeing +1.0\" gegen die Planungs-Vorhersage, nur Verschlechterung, 90-min-Cooldown).",
+      "usage": "PWA: Layer-Control → 'Regenradar' — Pushes kommen automatisch"
+    },
+    {
+      "date": "2026-08-24",
+      "title": "Regen-Tropfen an den Standorten",
+      "tag": "nachgetragen aus Projektverlauf",
+      "desc": "Die Standort-Marker auf der Karte zeigen jetzt selbst einen kleinen Regentropfen, wenn dort Niederschlag gemeldet wird - der Tropfen wird groesser, je mehr es regnet, und erscheint als Umriss, wenn Regen nur angesagt ist. So siehst du auf einen Blick, welche deiner Plätze nass sind.",
+      "usage": "Karte: Tropfen-Symbol direkt am Standort-Marker (ab 30% Regenwahrscheinlichkeit als Umriss)"
+    },
+    {
+      "date": "2026-08-24",
+      "title": "Weniger Einzel-Nachrichten bei Abweichungen",
+      "tag": "nachgetragen aus Projektverlauf",
+      "desc": "Wenn das Wetter von der Vorhersage abweicht, waehrend keine Beobachtung laeuft, gibt es dafuer jetzt abends EINE zusammengefasste Zeile im Abendplan statt mehrerer einzelner Nachrichten. Waehrend einer laufenden Beobachtung bleibt die sofortige Warnung wie bisher.",
+      "usage": "Telegram: Abendplan enthaelt ggf. 'Heute X Vorhersage-Abweichung(en)...'"
+    },
+    {
+      "date": "2026-08-30",
+      "title": "Neue Beobachtungsstandorte in der Pfalz",
+      "tag": "nachgetragen aus Projektverlauf",
+      "desc": "Ellerstadt Ost und Fussgoennheim Rand sind jetzt dabei - zwei dunkle Plaetze in der Pfalz (ueber einen Kollaborateur, Uebernachtung moeglich). Sie laufen voll mit: Ampel, Vorausschau, Abendplan und Alarme.",
+      "usage": "Karte: beide neue Marker; Abby fragen lohnt sich vor der ersten Nacht dort"
+    },
+    {
+      "date": "2026-08-30",
+      "title": "Karten-Hintergrund auf OpenStreetMap",
+      "tag": "nachgetragen aus Projektverlauf",
+      "desc": "Die Basis-Karte kommt jetzt von OpenStreetMap - der bisherige Anbieter verlangt ploetzlich einen API-Schluessel. Optik bleibt ruhig und dunkel, der Rotlicht-Modus funktioniert wie bisher.",
+      "usage": "Nichts zu tun - Karte laedt automatisch neu"
+    },
+    {
+      "date": "2026-08-30",
+      "title": "Regen-Anzeige komplett neu: Symbole statt Farbflaechen",
+      "tag": "nachgetragen aus Projektverlauf",
+      "desc": "Regen wird nicht mehr als grosse Farbflaeche gezeichnet, sondern als verstaendliche Wolken-Symbole mit Tropfen ueber die Region verteilt: mehr Tropfen = mehr Regen, bei einer Gewitterwarnung kommt ein Blitz dazu. Mit dem Zeit-Regler unten links kannst du durch die naechsten 6 Stunden spulen, die Play-Taste laeuft automatisch durch. Die alte Radar-Karte bleibt als 'Radar-Rohansicht' im Layer-Menue.",
+      "usage": "Karte: Regler unten links (0 = jetzt, +6 h = spaeter); Play = Automatik"
+    },
+    {
+      "date": "2026-09-05",
+      "title": "Fix: Vorausschau war einige Tage unvollstaendig",
+      "tag": "nachgetragen aus Projektverlauf",
+      "desc": "Die mehrtaegige Vorausschau hatte sich ueber mehrere Tage nicht mehr aktualisiert und zeigte veraltete Stunden - ein Fehler im Aufbau ist behoben. Zusaetzlich beginnt sie jetzt immer mit der aktuellen Stunde und sagt klar Bescheid, wenn gerade weniger als 2 Tage verfuegbar sind.",
+      "usage": "Vorausschau-Tab aktualisiert sich wieder mit jedem Lauf (alle 30 min)"
+    },
+    {
+      "date": "2026-09-05",
+      "title": "Wolken-Vorhersage wird automatisch genauer",
+      "tag": "nachgetragen aus Projektverlauf",
+      "desc": "Die App gleicht jetzt taeglich ab, wie die Wolken-Vorhersage in der Vergangenheit danebenlag, und justiert die angezeigten Werte automatisch nach. Bisher war die Vorhersage deutlich zu optimistisch (real war es im Schnitt 9-11% mehr Bewoelkung als angesagt) - das wird jetzt in der Anzeige ausglichen. Die Ampel-Bewertung selbst bleibt vorerst unveraendert.",
+      "usage": "Vorausschau-Tab: Werte sind bereits korrigiert; nichts zu tun"
+    },
+    {
+      "date": "2026-09-06",
+      "title": "Vorausschau mit konkreten Daten + Standort-Wechsel",
+      "tag": "neu",
+      "desc": "Die Vorausschau ist jetzt mit echten Daten beschriftet (z. B. \"Sa, 06.09.2026\") statt \"Heute / +1 / +2\" - besonders praktisch bei der Planung ueber mehrere Tage. Und die Standorte haben sich geaendert: Neu dabei ist der Untere Luisenpark in Mannheim; Fussgoennheim Rand ist raus (dessen bisherige Werte bleiben in der Historie).",
+      "usage": "Vorausschau-Tab: Nacht-Beschriftung zeigt das Datum; Karte: neuer Marker Unterer Luisenpark"
+    },
+    {
+      "date": "2026-09-06",
+      "title": "Vorausschau ab 18 Uhr: der ganze Abend auf einen Blick",
+      "tag": "neu",
+      "desc": "Die Vorausschau zeigt jetzt jeden Abend ab 18 Uhr durchgehend - auch die hellen Stunden. So siehst du den ganzen Uebergang (18 Uhr hell -> Daemmerung -> dunkel) und kannst besser planen, wann du losfahren und aufbauen willst. Dunkle Stunden sind wie bisher markiert; Fenster fuer Deep-Sky beginnen weiterhin erst, wenn es richtig dunkel ist.",
+      "usage": "Vorausschau-Tab: erste Stunde ist jetzt 18 Uhr - Sommer wie Winter"
+    },
+    {
+      "date": "2026-09-13",
+      "title": "Neuer Standort: Koenigsstuhl Heidelberg",
+      "tag": "neu",
+      "desc": "Der Koenigsstuhl ist jetzt als achter Standort dabei - Hoehenlage mit geschaetzter Bortle-Klasse 4, also deutlich dunklerer Himmel als in der Stadt. Tages-Tour von Mannheim (~20 km); es gibt dort keine Uebernachtungs-Infrastruktur. Er laeuft voll mit: Ampel, Vorausschau, Abendplan und Alarme.",
+      "usage": "Karte: neuer Marker suedlich von Heidelberg"
+    },
+    {
+      "date": "2026-09-13",
+      "title": "Neue Abfrage: Was ist mit dem Teleskop gerade sichtbar?",
+      "tag": "neu",
+      "desc": "Fuer Technik-Interessierte: Ein neuer API-Abruf (/api/observable) rechnet aus, welche Messier-Objekte vom gewaehlten Standort aus mit deinem Teleskop (150 mm) prinzipiell sichtbar sind - abhaengig von Helligkeitsgrenze (Bortle-Klasse), Seeing und Hoehe ueber dem Horizont. Reine Filterung, keine Empfehlungen. Die Anzeige in der App folgt spaeter.",
+      "usage": "API: /api/observable?id=ellerstadt_east&equipment=newton_150"
+    },
+    {
+      "date": "2026-09-14",
+      "title": "Grundstein gelegt: Anreise per Bahn einplanen",
+      "tag": "neu",
+      "desc": "Vorbereitung fuer die Frage \"Wann muss die letzte Bahn losfahren?\": Fahrplandaten (GTFS) koennen jetzt geladen und Verbindungen mit bis zu zwei Umstiegen gerechnet werden - komplett offline auf dem eigenen Rechner, auf Basis offener Daten (DELFI/VRN-Umfeld). Die Anzeige im Abendplan folgt, sobald der Fahrplan-Feed eingespielt ist.",
+      "usage": "Noch intern - API-Endpunkt und Anzeige folgen"
+    },
+    {
+      "date": "2026-09-14",
+      "title": "Neu: Wie zuverlaessig sind die Vorhersagen?",
+      "tag": "neu",
+      "desc": "Oben links gibt es jetzt ein kleines Diagramm-Symbol. Dahinter: Wie genau die Wetter-Vorhersagen stimmen (gemessen an vergangenen Abweichungen, taeglich aktualisiert) und eine Liste aller Telegram-Bot-Befehle mit Erklaerung. Einfach antippen - die Ansicht klaert auf, wie stark die Anzeige automatisch nachkorrigiert wird (Wolken werden z.B. real oft ~9% trueber als angesagt).",
+      "usage": "Karte: Symbol oben links antippen; zwei Reiter (Zuverlaessigkeit / Bot-Befehle)"
+    },
+    {
+      "date": "2026-09-16",
+      "title": "Beobachtungs-Schalter + volle Zuverlaessigkeits-Historie",
+      "tag": "neu",
+      "desc": "Im Zuverlaessigkeits-Fenster gibt es jetzt unten einen Kippschalter \"ASTRO OBSERVATION\" (Flugzeug-Cockpit-Stil): Ist er nicht gelegt, schickt der Telegram-Bot KEINE Wetter-Alarme mehr - nur wenn du wirklich beobachtest (oder eine Session laeuft), wird aktiv gewarnt. Abendplan und Co. bleiben unberuehrt. Das Zuverlaessigkeits-Diagramm zeigt jetzt ausserdem den kompletten Verlauf seit dem 23.08. - rueckwirkend aus den echten Messdaten berechnet, mit krassen Linien fuer die aktuelle Treffsicherheit (letzte 7 Tage) und gestrichelten fuer den Gesamtdurchschnitt.",
+      "usage": "Karte: Diagramm-Symbol oben rechts unten im Panel Schalter legen/umlegen"
+    },
+    {
+      "date": "2026-09-17",
+      "title": "Komplett-Redesign: Astro CC wird zum Cockpit",
+      "tag": "neu",
+      "desc": "Die App ist jetzt eine echte Kommandozentrale: Die Karte ist die Windschutzscheibe im Zentrum, drumherum ein fester Cockpit-Rahmen. Links massive Hardware-Schalter fuer die Sensoren (Regen, Radar, Satellit, Warnungen, Lichtverschmutzung) mit Status-LEDs - kein Menue mehr. Rechts das Intel-Panel mit der Vorhersage-Zuverlaessigkeit, darunter ein Matrix-Terminal (COMMS FEED), das live Rating-Wechsel, Warnungen und System-Ereignisse als gruenen Text-Lauf mitzeigt. Ganz unten rechts der grosse ASTRO-OBSERVATION-Waffenschalter. Unten eine industrielle Zeitlinie fuer die 6-Stunden-Vorhersage. Oben: UTC-Uhr, GPS-Koordinaten, blinkender System-Status. Alles kantig, dunkel, Monospace.",
+      "usage": "Direkt erkennbar: links Sensoren schalten, rechts Intel lesen, unten Zeit spulen, Schalter unten rechts legt die Alarme scharf"
+    },
+    {
+      "date": "2026-09-17",
+      "title": "Taktische Karte: dunkle Kacheln + Ziel-Erfassung",
+      "tag": "neu",
+      "desc": "Die Karte ist jetzt dunkel-grau taktisch statt hell-bunt - wie ein echtes Radar-Display. Die Standorte sind keine runden Pins mehr, sondern Ziel-Erfassungs-Fadenkreuze mit eckigen Klammmern: gruen fuer GO, gelb fuer MAYBE, rot fuer NO-GO; bei aktiver Gewitterwarnung blinkt das Fadenkreuz rot. Im COMMS-Feed blinken echte Wetter-Alarme jetzt hart rot (WARNING: DWD STORM CELL DETECTED), statt zwischen den gruenen System-Zeilen unterzugehen.",
+      "usage": "Karte: dunkel, Fadenkreuze statt Pins; rote Blink-Zeilen im Terminal = Gefahr"
+    },
+    {
+      "date": "2026-09-17",
+      "title": "Bahnanbindung live + dunkle Karte + Astro-Instrumente",
+      "tag": "neu",
+      "desc": "Drei grosse Updates: (1) Die Karte ist jetzt tiefschwarz taktisch (die hellen Kacheln waren nur ein Zwischenschritt). (2) Bahnanbindung ist live: Fuer jeden Standort kann ab sofort abgefragt werden, wann die letzte Bahn hingehen muesste und wann die erste zurueckfaehrt - komplett offline aus dem VRN-Fahrplan berechnet. Neue API: /api/deployment. (3) Astro-Instrumente im Cockpit: Mond-Radar (Hohe/Azimut), Seeing- und Taupunkt-Anzeigen als analoge Rundinstrumente, Status-LED-Matrix fuer Missions-Faktoren.",
+      "usage": "Karte: dunkel; API: /api/deployment?id=ellerstadt_east; Instrumente im rechten Panel"
+    },
+    {
+      "date": "2026-09-19",
+      "title": "Frontend-Politur: Marker, Instrumente, Bahnanbindung",
+      "tag": "neu",
+      "desc": "Vier Verbesserungen auf einen Schlag: (1) Die Standort-Marker sind wieder grosse, gut sichtbare farbige Punkte mit Glow - auf jeder Karte lesbar. (2) Die Messinstrumente (Seeing, Taupunkt) sind jetzt korrekt zentriert - die Nadeln rotieren sauber im Kreis. (3) Neues Mond-Horizont-Display im linken Panel: zeigt den besten Standort der Nacht und darueber, wo der Mond gerade am Himmel steht. (4) Jeder Standort hat jetzt einen TRANSIT-ROUTE-Button: Ein Klick zeigt die Bahnanbindung von deinem GPS-Standort dorthin - mit letzter Hin- und fruehester Rueckfahrt.",
+      "usage": "Standort anklicken -> TRANSIT ROUTE klicken; linkes Panel zeigt den Mond-Horizont"
+    },
+    {
+      "date": "2026-09-20",
+      "title": "Zielerfassung & Gefahren-Anzeige (Cockpit-Phase 3)",
+      "tag": "neu",
+      "desc": "Zwei neue Cockpit-Instrumente: (1) LUNAR TARGET LOCK im linken Panel unter dem Mond-Horizont - zeigt ob der Mond als Beobachtungsziel erfasst ist ([LOCKED] gruen wenn hoeher als 30 Grad) oder ausser Reichweite ([OUT OF RANGE] rot). Der beste Planet wird als [SECONDARY] in grau darunter angezeigt. (2) THREAT ASSESSMENT im rechten Panel - zwei vertikale Balkenanzeigen wie Tankanzeigen: WIND SHEAR (Wind/Böen, ab 20 km/h gelb, ab 30 rot) und DEW RISK (Taupunkt-Abstand, je kleiner desto gefaehrlicher - unter 1.5 K leuchtet FROST RISK rot fuer den ungeschuetzten Fangspiegel).",
+      "usage": "Linkes Panel: [LOCKED]/[OUT OF RANGE] Status; rechtes Panel: Wind- und Tau-Balken"
+    },
+    {
+      "date": "2026-09-19",
+      "title": "TRANSIT ROUTE: Einsatzweg vom HQ Ilvesheim auf dem Radar",
+      "detail": "Klick auf TRANSIT ROUTE fragt jetzt mit festem HQ-Startpunkt (Equipment-Depot Ilvesheim, 49.4784/8.5663) statt dynamischem Nutzer-GPS ab. Bei HTTP 200 zeichnet Leaflet eine gestrichelte Amber-Linie (dashArray 5,10) vom HQ-Pin zum Zielstandort auf die Karte, vorherige Routen werden entfernt und die Karte zoomt per fitBounds automatisch auf Start+Ziel (Target Tracking). Das Text-Panel beginnt mit der Header-Zeile [ROUTE: ILVESHEIM HQ -> STANDORTNAME]. Backend /api/deployment nutzt HQ-Default (home_lat/home_lon Parameter). Tote Duplikat-Funktion fetchTransitRoute entfernt.",
+      "usage": "Standort anklicken > TRANSIT ROUTE: Einsatzweg erscheint auf der Karte, Zoom zentriert HQ+Ziel"
+    }
+  ]
 }
