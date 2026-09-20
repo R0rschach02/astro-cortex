@@ -384,8 +384,13 @@ class GTFSStaticSource:
         # Visueller Fahrplan (Pills) + Fussweg-Summe zwischen Umstiegen
         steps = []
         walk_transfer_min = 0.0
-        if walk_start_min >= 1:
-            steps.append({"kind": "walk", "min": round(walk_start_min)})
+
+        def _walk_step(minutes: float):
+            """Fussweg-Pill; selbst 20 m sind '1 min' statt 0 (Rundung)."""
+            return {"kind": "walk", "min": max(1, round(minutes))}
+
+        if walk_start_min >= 0.5:
+            steps.append(_walk_step(walk_start_min))
         for k, (t, i, j, _arr) in enumerate(legs):
             seq = self._trip_times[t]
             steps.append({
@@ -401,12 +406,12 @@ class GTFSStaticSource:
                 if s_a != s_b:
                     _n1, la1, lo1 = self._stops[s_a]
                     _n2, la2, lo2 = self._stops[s_b]
-                    wmin = round(_haversine_m(
-                        la1, lo1, la2, lo2) / WALK_SPEED_M_PER_MIN)
+                    wmin = _haversine_m(
+                        la1, lo1, la2, lo2) / WALK_SPEED_M_PER_MIN
                     walk_transfer_min += wmin
-                    steps.append({"kind": "walk", "min": wmin})
-        if walk_dest_min >= 1:
-            steps.append({"kind": "walk", "min": round(walk_dest_min)})
+                    steps.append(_walk_step(wmin))
+        if walk_dest_min >= 0.5:
+            steps.append(_walk_step(walk_dest_min))
         return Connection(
             start_halt=self._stops.get(start_sid, ("?",))[0],
             dest_halt=self._stops.get(dest_sid, ("?",))[0],
