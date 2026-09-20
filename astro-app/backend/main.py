@@ -581,7 +581,7 @@ def api_deployment(id: str, home: str = "Ilvesheim HQ",
         "extraction_warning_ts": plan.extraction_warning_ts,
         "setup_buffer_min": plan.setup_buffer_min,
         "transit_source": plan.transit_source,
-        "home": home.get("name", "?"),
+        "home": home_loc.get("name", "?"),
         **({"note": note} if note else {}),
     }
 
