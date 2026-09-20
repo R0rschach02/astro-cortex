@@ -312,6 +312,12 @@
       "title": "Hotfix 2: doppelte schliessende Klammer",
       "detail": "Nach dem Klammer-Restaurant doppelt geendet: das Replacementsende und der Index-Schnitt brachten je eine schliessende Klammer mit. Korrigiert; Syntax jetzt browser-verifiziert vor dem Deploy.",
       "usage": "-"
+    },
+    {
+      "date": "2026-09-21",
+      "title": "Flightstick immer greifbar",
+      "detail": "Das Detail-Panel als Bottom-Sheet (z-index 1200) ueberdeckte den Flightstick komplett - Stick jetzt auf z-index 1250, auch bei geoeffnetem Standort-Panel bedienbar (wie ein Gashebel immer zugaenglich).",
+      "usage": "-"
     }
   ]
 }

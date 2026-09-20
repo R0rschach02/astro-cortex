@@ -946,7 +946,7 @@ body.night .basemap-tile { filter: none; }
 /* ---- Flightstick: physisches Targeting unten links ---- */
 #flightstick { position: absolute; left: 14px; bottom: 14px; width: 96px;
   height: 96px; border-radius: 50%; touch-action: none; cursor: grab;
-  user-select: none; z-index: 900;
+  user-select: none; z-index: 1250;   /* ueber dem Panel-Bottom-Sheet */
   background: radial-gradient(circle at 50% 38%, #1a2129, #0b0f14 72%);
   border: 2px solid #333e4a;
   box-shadow: 0 4px 14px rgba(0,0,0,.65), inset 0 2px 10px rgba(0,0,0,.85); }
