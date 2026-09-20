@@ -494,8 +494,15 @@ def api_bias_history(days: int = Query(30, ge=1, le=365)):
 _TRANSIT_BBOX = (48.8, 7.8, 50.2, 9.5)  # VRN-Gebiet um Mannheim/Pfalz
 
 
+# HQ Ilvesheim: Equipment-Depot (Teleskop & Crawler) - fester Startpunkt
+# aller Transit-Einsatzwege, kein dynamisches Nutzer-GPS mehr.
+HQ_ILVESHEIM = {"lat": 49.4783726, "lon": 8.5662896}
+
+
 @app.get("/api/deployment")
-def api_deployment(id: str, home: str = "mannheim_hbf",
+def api_deployment(id: str, home: str = "Ilvesheim HQ",
+                   home_lat: float = HQ_ILVESHEIM["lat"],
+                   home_lon: float = HQ_ILVESHEIM["lon"],
                    setup_minutes: int = 30):
     """OePNV-Deployment-Plan fuer einen Standort: letzte Bahn hin (um
     rechtzeitig vor dem Golden Window + Aufbau-Puffer da zu sein),
@@ -519,12 +526,12 @@ def api_deployment(id: str, home: str = "mannheim_hbf",
                 or l.get("name") == id), None)
     if obs is None:
         raise HTTPException(404, f"Kein Standort mit id '{id}'")
-    home = next((l for l in locs
-                 if l.get("id") == home or l.get("name") == home), None)
-    if home is None:
-        # Fallback: Mannheim Hbf als festen Heimatknoten
-        home = {"id": "mannheim_hbf", "name": "Mannheim Hbf",
-                "lat": 49.4793, "lon": 8.4689}
+    home_loc = next((l for l in locs
+                     if l.get("id") == home or l.get("name") == home), None)
+    if home_loc is None:
+        # HQ-Default: Ilvesheim (per home_lat/home_lon ueberschreibbar)
+        home_loc = {"id": "hq_ilvesheim", "name": "Ilvesheim HQ",
+                    "lat": home_lat, "lon": home_lon}
 
     # Golden Window aus dem Forecast (naechstes Fenster)
     try:
@@ -556,7 +563,7 @@ def api_deployment(id: str, home: str = "mannheim_hbf",
     except GTFSNotAvailableError as e:
         raise HTTPException(503, str(e))
 
-    plan = deployment_window(gws_dt, gwe_dt, home, obs, transit,
+    plan = deployment_window(gws_dt, gwe_dt, home_loc, obs, transit,
                              setup_minutes)
     note = None
     if not plan.latest_departure:

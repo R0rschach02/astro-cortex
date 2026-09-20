@@ -613,7 +613,7 @@ function panelHtml(s) {
     </div>
     <div class="grp mono"><b>Planeten &gt; 30°</b><span class="age">de421 · lokal</span></div>
     <div class="kv mono">${planetRows || row("Planeten", "keine Daten")}</div>
-    <button class="transit-btn" onclick="fetchTransitRoute('${esc(s.id || s.name)}', ${s.lat}, ${s.lon})" title="OePNV vom GPS-Standort hierher">&#128646; TRANSIT ROUTE</button>
+    <button class="transit-btn" onclick="fetchTransitRoute('${esc(s.id || s.name)}', ${s.lat}, ${s.lon})" title="OePNV-Einsatzweg vom HQ (Ilvesheim) zu diesem Standort">&#128646; TRANSIT ROUTE</button>
     <div id="transit-result" class="transit-result"></div>
     <div class="sub" style="margin-top:10px">
       Wolkenquelle: ${esc(s.clouds_source || "n/a")} &middot; ${isPlanet
@@ -1023,22 +1023,44 @@ function updateLunarHorizon(data) {
   }
 }
 
+/* HQ: Equipment-Depot Ilvesheim (Teleskop & Crawler) - fester Startpunkt
+   aller Transit-Einsatzwege. Kein dynamisches Nutzer-GPS mehr. */
+const HQ = { name: "ILVESHEIM HQ", lat: 49.4783726, lon: 8.5662896 };
+let routeLayer = null;   // aktuelle Einsatzweg-Darstellung (HQ-Pin + Linie)
+
+function drawRouteLine(destLat, destLon, destName) {
+  // vorherige Route entfernen, bevor eine neue gezeichnet wird
+  if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+  const line = L.polyline(
+    [[HQ.lat, HQ.lon], [destLat, destLon]],
+    { color: "#ffb300", weight: 3, opacity: 0.8, dashArray: "5, 10" });
+  const hqIcon = L.divIcon({
+    className: "hq-pin",
+    html: "<div class='hq-dot'></div><div class='hq-tag'>HQ</div>",
+    iconSize: [0, 0] });
+  routeLayer = L.layerGroup([
+    L.marker([HQ.lat, HQ.lon], { icon: hqIcon, interactive: false }),
+    line,
+  ]).addTo(map);
+  // Target Tracking: Start und Ziel gemeinsam in der Mitte zentrieren
+  map.fitBounds(line.getBounds(), { padding: [50, 50] });
+  commsLog("EINSATZWEG EINGEZEICHNET: " + HQ.name + " \u2192 "
+    + String(destName || "?").toUpperCase());
+}
+
 async function fetchTransitRoute(name, lat, lon) {
   const resultEl = document.getElementById("transit-result");
   if (!resultEl) return;
-  resultEl.innerHTML = "<div class='transit-loading'>\u23F3 VRN-Fahrplan...</div>";
-  let homeLat = 49.4793, homeLon = 8.4689;
-  try {
-    const pos = await new Promise((res, rej) => {
-      navigator.geolocation.getCurrentPosition(res, rej, {timeout: 5000});
-    });
-    homeLat = pos.coords.latitude; homeLon = pos.coords.longitude;
-    setTpCoords(homeLat, homeLon);
-  } catch (e) { console.debug("GPS nicht verfuegbar, nutze Hbf"); }
+  resultEl.innerHTML =
+    "<div class='transit-loading'>\u23F3 VRN-Fahrplan ab HQ...</div>";
   try {
     const d = await api("/api/deployment?id=" + encodeURIComponent(name)
+      + "&home_lat=" + HQ.lat + "&home_lon=" + HQ.lon
       + "&setup_minutes=30");
-    let html = "";
+    // HTTP 200: Einsatzweg auf dem Radar zeichnen (HQ -> Ziel)
+    drawRouteLine(lat, lon, name);
+    let html = "<div class='transit-head'>[ROUTE: " + HQ.name + " -> "
+      + esc(String(name).toUpperCase()) + "]</div>";
     if (d.latest_departure) {
       const ld = d.latest_departure;
       html += "<div class='transit-conn'><b>\u27A1 Hin:</b> " + ld.time
@@ -1058,7 +1080,7 @@ async function fetchTransitRoute(name, lat, lon) {
       html += "<div class='transit-none'>Keine Rueckverbindung.</div>";
     }
     html += "<div class='transit-src'>" + esc(d.transit_source)
-      + " | " + esc(d.golden_window) + "</div>";
+      + " | GW " + esc(d.golden_window) + "</div>";
     resultEl.innerHTML = html;
   } catch (e) {
     resultEl.innerHTML = "<div class='transit-none'>\u274C "
