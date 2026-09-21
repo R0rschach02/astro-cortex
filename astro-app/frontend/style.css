@@ -613,8 +613,10 @@ body.night .iw-toggle-row { border-color: #3a2020; }
   #topbar .glareshield-gauges .gauge-row { gap: 12px; }
   .tp-actions { flex-shrink: 0; }
 
-  /* ===== 3) FLIGHTSTICK: massiv verkleinert, fixiert ueber dem Rand ===== */
-  #flightstick { position: fixed; left: 50%; bottom: 8px;
+  /* ===== 3) FLIGHTSTICK: massiv verkleinert, fixiert ueber dem Rand =====
+     Doppel-ID-Spezifitaet noetig: die Basis-#flightstick-Regeln stehen
+     spaeter im Dateifluss und wuerden sonst gewinnen. */
+  #cockpit #flightstick { position: fixed; left: 50%; bottom: 8px;
     transform: translateX(-50%) scale(0.6);
     transform-origin: 50% 100%; }
 }

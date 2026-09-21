@@ -360,6 +360,12 @@
       "title": "Mobile Responsive: vertikales Stacking, wischbarer Glareshield, Stick-Skalierung",
       "detail": "Kompletter Neubau der @media (max-width: 980px)-Queries: (1) Das Cockpit-Grid stapelt untereinander (top/map/left/right/bottom), Karte volle Bildschirmbreite (100vw) auf 58-62vh, Panels in voller Breite darunter, Seite scrollt vertikal - alle collapse-Klassen-Varianten werden ueberschrieben. (2) Die Top-Bar ist auf Mobile horizontal wischbar (overflow-x auto, flex-wrap nowrap, versteckte Scrollbar): die 5 Gauges behalten 96px statt sich微型 zu quetschen. (3) Der HOTAS-Stick skaliert auf 60% (transform-origin unten), position:fixed ueber dem unteren Rand - bleibt beim Scrollen greifbar und verdeckt kein UI.",
       "usage": "Handy: Karte oben in Vollbreite, Instrumente durchwischen, Panels darunter"
+    },
+    {
+      "date": "2026-09-21",
+      "title": "Mobile-Fix: Stick-Override-Spezifitaet + Lesson 20",
+      "detail": "Der mobile Flightstick-Override (fixed, scale 0.6) verlor gegen die spaeter im Dateifluss stehende Basis-#flightstick-Regel - jetzt Doppel-ID-Spezifitaet (#cockpit #flightstick). Lesson 20 dokumentiert das Muster (Media-Overrides brauchen hoehere Spezifitaet als spaeter angehaengte Basis-Regeln, Dateireihenfolge schlaegt still).",
+      "usage": "-"
     }
   ]
 }

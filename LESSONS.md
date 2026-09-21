@@ -253,3 +253,14 @@ Werte (Basen, Einheiten, Normalisierungen) genau EINMAL definieren und als Param
 durchreichen - oder als Instanz-Zustand (self.service_date). Gilt auch fuer: Zeitzonen,
 Einheiten-Conversion, NFC-Normalisierung. **English:** Compute derived values once,
 pass them down; recomputing them independently invites silent divergence.
+
+## Lesson 20: Media-Query-Overrides vs. spaetere Basis-Regeln
+**Symptom:** Mobile-Regeln greifen nicht (Stick blieb 115px statt scale(0.6), Gauges
+blieben clamp-Skala) obwohl der Media-Block korrekt war. **Ursache:** Der Mobile-Block
+liegt frueh in der Datei (Zeitpunkt des ersten Responsive-Baus); spaeter angehaengte
+Basis-Regeln gleicher Spezifitaet (#flightstick {...}) gewinnen per Dateireihenfolge.
+**Regel:** Mobile-Overrides IMMER mit hoeherer Spezifitaet schreiben (zusaetzlicher
+ID-Kontext wie `#cockpit #flightstick`), weil die Datei permanent waechst und
+Media-Bloecke meist oben bleiben. Vor Deploy: Mobile-Viewport gegen die Basis-Regel
+derselben Property pruefen. **English:** Media overrides need higher specificity
+than base rules appended later in the file - source order silently wins.
