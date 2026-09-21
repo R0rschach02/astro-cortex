@@ -354,6 +354,12 @@
       "title": "UI-Revision: Brackets zurueck, volle LINK-Namen, Lunar mittig, BAT-Kippschalter",
       "detail": "(1) ROLLBACK: Die roten eckigen Zielklammern (.target-locked ::before/::after, pulsierend) sind zurueck - der Flightstick navigiert nicht mehr blind. (2) LINK-Feld ohne Ellipsis-Kappung: Namen wie UNTERER LUISENPARK werden voll ausgeschrieben; Platz durch kompaktere Top-Bar (gap 10) und 110px-Gauges, Instrumentengruppe ueber Auto-Margins balanciert. (3) LUNAR HORIZON: Instrument und ALT/ILLUM-Werte jetzt flexbox-zentriert im linken Panel. (4) HYPER-REALISMUS: Astro-Observation-Toggle als mechanischer Flugzeug-Kippschalter - Metallbasisplatte mit Sechskantmutter und Lagerbohrung, verchromter Hebel mit 3D-Gradienten und Hartlicht-Kante; SAFE = Hebel zeigt physisch nach unten (178deg), ARMED kippt mit Snap-Animation nach oben (2deg); Drop-Shadows wechseln mit der Stellung, ARMED/SAFE-Labels leuchten zustandsabhaengig.",
       "usage": "Toggle rechts unten kippt den Hebel; Karte zeigt Zielklammern; volle Ortsnamen im LINK"
+    },
+    {
+      "date": "2026-09-21",
+      "title": "Mobile Responsive: vertikales Stacking, wischbarer Glareshield, Stick-Skalierung",
+      "detail": "Kompletter Neubau der @media (max-width: 980px)-Queries: (1) Das Cockpit-Grid stapelt untereinander (top/map/left/right/bottom), Karte volle Bildschirmbreite (100vw) auf 58-62vh, Panels in voller Breite darunter, Seite scrollt vertikal - alle collapse-Klassen-Varianten werden ueberschrieben. (2) Die Top-Bar ist auf Mobile horizontal wischbar (overflow-x auto, flex-wrap nowrap, versteckte Scrollbar): die 5 Gauges behalten 96px statt sich微型 zu quetschen. (3) Der HOTAS-Stick skaliert auf 60% (transform-origin unten), position:fixed ueber dem unteren Rand - bleibt beim Scrollen greifbar und verdeckt kein UI.",
+      "usage": "Handy: Karte oben in Vollbreite, Instrumente durchwischen, Panels darunter"
     }
   ]
 }
