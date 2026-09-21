@@ -9,6 +9,7 @@
 !/locations.json.example
 !/tests/
 !/LESSONS.md
+!/SYSTEM_AUDIT.md
 !/messier.csv
 !/.gitignore
 !/.gitattributes
