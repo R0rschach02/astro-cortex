@@ -92,7 +92,12 @@ function initMap() {
   // aendern - Leaflet muss den Container neu vermessen
   setTimeout(() => map.invalidateSize(), 100);
   setTimeout(() => map.invalidateSize(), 500);
+  // Kartenbox aendert nur ihre Pixelmasse bei echten Viewport-Events -
+  // Overlay-Toggles (Mobile) beruehren sie bewusst NICHT.
   window.addEventListener("resize", () => map.invalidateSize());
+  window.addEventListener("orientationchange", () => map.invalidateSize());
+  window.visualViewport?.addEventListener("resize",
+    () => map.invalidateSize());
 
   // Zeitregler sitzt statisch im unteren Cockpit-Panel (Timeline):
   // nur Listener, kein dynamisches Element mehr.
@@ -131,18 +136,41 @@ function initMap() {
   // Zoom + Panel-Pins
   $("zoom-in")?.addEventListener("click", () => map.zoomIn());
   $("zoom-out")?.addEventListener("click", () => map.zoomOut());
+
+  /* Mobile: Panels sind exklusive Slide-in-HUD-Overlays ueber der
+     Fullscreen-Map. Toggle aendert NUR die Transform-Klasse - die
+     Karten-Box behaelt ihre Pixelmasse, invalidateSize bleibt an
+     resize/orientationchange/visualViewport gebunden (nicht hier!).
+     Desktop-Pfad (Grid-Spalte auf 0) unveraendert. */
+  const isMobileUI = () => window.matchMedia("(max-width: 980px)").matches;
+  const toggleHud = (side) => {
+    const el = document.getElementById(side === "left"
+      ? "left-panel" : "right-panel");
+    const other = document.getElementById(side === "left"
+      ? "right-panel" : "left-panel");
+    const open = !el.classList.contains("hud-open");
+    el.classList.toggle("hud-open", open);
+    if (open) other.classList.remove("hud-open");   // Exklusivitaet
+    localStorage.setItem("astro_hud_" + side, open ? "1" : "0");
+  };
+  // Beim Start hoechstens EIN Overlay wiederherstellen
+  if (isMobileUI()) {
+    if (localStorage.getItem("astro_hud_left") === "1")
+      document.getElementById("left-panel")?.classList.add("hud-open");
+    else if (localStorage.getItem("astro_hud_right") === "1")
+      document.getElementById("right-panel")?.classList.add("hud-open");
+  }
   $("left-panel-pin")?.addEventListener("click", () => {
+    if (isMobileUI()) return toggleHud("left");
     document.getElementById("cockpit").classList.toggle("collapse-left");
     setTimeout(() => map.invalidateSize(), 200);
   });
+  $("left-hud-btn")?.addEventListener("click", () => toggleHud("left"));
   $("right-panel-pin")?.addEventListener("click", () => {
+    if (isMobileUI()) return toggleHud("right");
     document.getElementById("cockpit").classList.toggle("collapse-right");
     setTimeout(() => map.invalidateSize(), 200);
   });
-  if (window.matchMedia("(max-width: 980px)").matches) {
-    document.getElementById("cockpit").classList.add("collapse-left",
-                                                     "collapse-right");
-  }
   // Raster folgt dem Ausschnitt (debounced); Cache im Backend faengt Pan an
   map.on("moveend zoomend", () => {
     if (!rgActive) return;

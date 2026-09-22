@@ -452,6 +452,7 @@ body.night .iw-toggle-row { border-color: #3a2020; }
 #freshness { margin-left: auto; }
 
 /* ---------- Panels allgemein ---------- */
+#left-hud-btn { display: none; }
 #left-panel, #right-panel {
   background: var(--panel); border: 1px solid var(--line);
   border-radius: 0; padding: 10px; overflow-y: auto;
@@ -585,26 +586,45 @@ body.night .iw-toggle-row { border-color: #3a2020; }
 
 /* Mobile: Panels einklappbar, default zu */
 @media (max-width: 980px) {
-  /* ===== 1) VERTIKALES STACKING: Cockpit fliesst untereinander ===== */
+  /* ===== PHASE 1: FULLSCREEN-MAP + SLIDE-IN-HUD-OVERLAYS =====
+     Kein Grid, kein Dokument-Scroll: Cockpit ist nur noch der
+     Fixrahmen; Karte fuellt den Viewport, Panels sind exklusive
+     Slide-Overlays (z 1100), HUD-Chrome bleibt darueber/darunter. */
   #cockpit, #cockpit.collapse-left, #cockpit.collapse-right,
   #cockpit.collapse-left.collapse-right {
-    grid-template-columns: 100vw;
-    grid-template-areas: "top" "map" "left" "right" "bottom";
-    grid-template-rows: auto minmax(58vh, 62vh) auto auto auto;
-    overflow-y: auto; }
-  #map-wrap { min-height: 58vh; width: 100vw; }
-  #left-panel, #right-panel { width: 100vw; max-width: 100vw;
-    max-height: none; overflow: visible; border: 1px solid var(--line);
-    border-top: none; }
-  #right-panel { border-top: 1px solid var(--line); }
-  .right-scroll { max-height: none; overflow: visible; }
-  #cockpit.collapse-left #left-panel,
-  #cockpit.collapse-right #right-panel { overflow: visible; border: inherit; }
+    display: block; overflow: hidden; }
 
-  /* ===== 2) GLARESHIELD scrollbar: Instrumente wischen statt quetschen ===== */
-  #topbar { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap;
+  #topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+    flex-wrap: nowrap; overflow-x: auto; white-space: nowrap;
     scrollbar-width: none; -webkit-overflow-scrolling: touch; }
   #topbar::-webkit-scrollbar { display: none; }
+
+  #map-wrap { position: fixed; inset: 0; width: 100vw;
+    height: 100vh; height: 100dvh; min-height: 0; z-index: 0; }
+
+  #bottom-panel { position: fixed; left: 0; right: 0; bottom: 0;
+    z-index: 950; }
+
+  /* Slide-Overlays: geschlossen = ausserhalb + klick-durchlaessig */
+  #left-panel { position: fixed; top: 0; bottom: 0; left: 0;
+    width: min(78vw, 320px); z-index: 1100;
+    max-width: none; max-height: none;
+    transform: translateX(-100%); transition: transform .28s ease-out;
+    pointer-events: none; overflow-y: auto; }
+  #right-panel { position: fixed; top: 0; bottom: 0; right: 0;
+    width: min(78vw, 320px); z-index: 1100;
+    max-width: none; max-height: none;
+    transform: translateX(100%); transition: transform .28s ease-out;
+    pointer-events: none; overflow-y: auto; }
+  #left-panel.hud-open, #right-panel.hud-open {
+    transform: translateX(0); pointer-events: auto; }
+  /* Desktop-Collapse-Regeln duerfen mobile nichts verdecken */
+  #cockpit.collapse-left #left-panel,
+  #cockpit.collapse-right #right-panel { overflow-y: auto;
+    border: 1px solid var(--line); }
+  #left-hud-btn { display: inline-flex; }
+
+  /* Glareshield-Wischleiste (unveraendert aus Stacking-Modell) */
   .tp-sub { display: none; }
   #topbar .telemetry-link { margin-left: 12px; flex-shrink: 0; }
   #topbar .glareshield-gauges { order: 0; width: auto;
@@ -613,9 +633,7 @@ body.night .iw-toggle-row { border-color: #3a2020; }
   #topbar .glareshield-gauges .gauge-row { gap: 12px; }
   .tp-actions { flex-shrink: 0; }
 
-  /* ===== 3) FLIGHTSTICK: massiv verkleinert, fixiert ueber dem Rand =====
-     Doppel-ID-Spezifitaet noetig: die Basis-#flightstick-Regeln stehen
-     spaeter im Dateifluss und wuerden sonst gewinnen. */
+  /* Flightstick: fixiert, 60% (Doppel-ID schlaegt spaetere Basis) */
   #cockpit #flightstick { position: fixed; left: 50%; bottom: 8px;
     transform: translateX(-50%) scale(0.6);
     transform-origin: 50% 100%; }

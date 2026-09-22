@@ -366,6 +366,12 @@
       "title": "Mobile-Fix: Stick-Override-Spezifitaet + Lesson 20",
       "detail": "Der mobile Flightstick-Override (fixed, scale 0.6) verlor gegen die spaeter im Dateifluss stehende Basis-#flightstick-Regel - jetzt Doppel-ID-Spezifitaet (#cockpit #flightstick). Lesson 20 dokumentiert das Muster (Media-Overrides brauchen hoehere Spezifitaet als spaeter angehaengte Basis-Regeln, Dateireihenfolge schlaegt still).",
       "usage": "-"
+    },
+    {
+      "date": "2026-09-22",
+      "title": "Phase 1 Mobile: Fullscreen-Map mit Slide-in-HUD-Overlays",
+      "detail": "Mobile (<980px) komplett auf Overlay-Modell umgebaut (Grundlage SYSTEM_AUDIT.md 1.3, Capacitor-Vorbereitung): Das Cockpit-Gitter wird durch ein reines Fix-Layout ersetzt - die Karte fuelle den kompletten Viewport (100vw/100dvh), kein vertikales Dokument-Scrollen mehr (overflow hidden statt auto). Sensor-/Lunar-Panel (links) und Bias-/Comms-Panel (rechts) sind exklusive Slide-in-Overlays (z 1100, transform translateX, Transition 0.28s, pointer-events none wenn geschlossen = Karte bleibt klickbar). Oeffnen eines Overlays schliesst das andere automatisch; Schliessen nur per Toggle (◄SENS-Handle neu in der T-Track-Leiste, INTEL► rechts, Panel-Pin von innen). Desktop-Grid inklusive Collapse-Verhalten unveraendert (matchMedia-Weiche in den Pin-Handlern). map.invalidateSize haengt jetzt ausschliesslich an resize/orientationchange/visualViewport - nicht an Overlay-Toggles (Kartenbox behaelt ihre Masse). HUD-Chrome (Topbar-Wischleiste z1000, T-Track z950, Flightstick fixed z1250) unangetastet; Overlay-Zustand persistiert in localStorage (max. einer beim Start).",
+      "usage": "Handy: Karte fullscreen; ◄SENS/INTEL► blenden Panels als Overlays ein, exklusiv, Karte bleibt bedienbar"
     }
   ]
 }
