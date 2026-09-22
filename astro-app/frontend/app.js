@@ -150,7 +150,10 @@ function initMap() {
       ? "right-panel" : "left-panel");
     const open = !el.classList.contains("hud-open");
     el.classList.toggle("hud-open", open);
-    if (open) other.classList.remove("hud-open");   // Exklusivitaet
+    if (open) {   // Exklusivitaet - inkl. Persistenz-Sync
+      other.classList.remove("hud-open");
+      localStorage.setItem("astro_hud_" + (side === "left" ? "right" : "left"), "0");
+    }
     localStorage.setItem("astro_hud_" + side, open ? "1" : "0");
   };
   // Beim Start hoechstens EIN Overlay wiederherstellen

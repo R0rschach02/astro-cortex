@@ -606,12 +606,12 @@ body.night .iw-toggle-row { border-color: #3a2020; }
     z-index: 950; }
 
   /* Slide-Overlays: geschlossen = ausserhalb + klick-durchlaessig */
-  #left-panel { position: fixed; top: 0; bottom: 0; left: 0;
+  #left-panel { position: fixed; top: 0; bottom: 54px; left: 0;
     width: min(78vw, 320px); z-index: 1100;
     max-width: none; max-height: none;
     transform: translateX(-100%); transition: transform .28s ease-out;
     pointer-events: none; overflow-y: auto; }
-  #right-panel { position: fixed; top: 0; bottom: 0; right: 0;
+  #right-panel { position: fixed; top: 0; bottom: 54px; right: 0;
     width: min(78vw, 320px); z-index: 1100;
     max-width: none; max-height: none;
     transform: translateX(100%); transition: transform .28s ease-out;
