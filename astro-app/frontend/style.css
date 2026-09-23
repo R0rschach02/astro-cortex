@@ -1051,3 +1051,17 @@ body.night .basemap-tile { filter: none; }
   color: #9fb0c0; text-shadow: 0 0 6px rgba(159,176,192,.5); }
 .guard-master input:checked ~ .guard-frame .guard-off {
   color: #44505c; }
+
+/* GPS-Ping-Freshness (Phase 2): fuenfte Glareshield-LED + Textfeld.
+   Zustaende: off (nie), on gruen (<30 min), on amber (<2 h),
+   on red (>2 h = Watchpoint abgelaufen), ping-error (blinkt). */
+.sq-led.on.red { background: #ff5c50; border-color: #8f3a34;
+  box-shadow: 0 0 8px rgba(255,92,80,.6); }
+.sq-led.ping-error { background: #5a6470; border-color: #ff5c50;
+  animation: ping-err 0.9s steps(2, start) infinite; }
+@keyframes ping-err { 50% { background: #ff5c50;
+  box-shadow: 0 0 10px rgba(255,92,80,.8); } }
+.ping-link { color: #9fb0c0; font-size: 10px; font-weight: 700;
+  letter-spacing: .07em; padding: 3px 7px; white-space: nowrap;
+  border: 1px solid rgba(159,176,192,.3);
+  background: rgba(159,176,192,.05); }

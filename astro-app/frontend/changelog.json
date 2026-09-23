@@ -378,6 +378,12 @@
       "title": "Phase-1-Feinschliff: Overlays enden ueber dem T-Track",
       "detail": "Die Slide-Overlays laufen bis 54px ueber dem unteren Rand - die T-Track-Leiste mit beiden Toggle-Handles (SENS/INTEL) und dem Regen-Scrubber bleibt auch bei offenem Overlay bedienbar (zuvor ueberdeckte das rechte Overlay seinen eigenen Toggle). Auto-Close des jeweils anderen Overlays synchronisiert jetzt auch dessen localStorage-Zustand (kein Stale-Restore beim Neuladen).",
       "usage": "-"
+    },
+    {
+      "date": "2026-09-23",
+      "title": "Phase 2: GPS-Ping on Demand + Capacitor-Vorbereitung",
+      "detail": "GPS-Ping als Ein-Tap-Messung (kein Tracking): Plattform-Weiche in gpsWatch - nativ ueber das vom Capacitor-Runtime injizierte window.Capacitor.Plugins.Geolocation (bundler-frei), Browser wie bisher navigator.geolocation.getCurrentPosition (war bereits Einmal-Aufruf). Beide Pfade muenden in handlePingResult: Koordinate+Timestamp in localStorage (astro_last_ping), POST /api/watch (2h Watchpoint) mit x-api-token falls im Config-Menue hinterlegt. Fuenfte Glareshield-LED (led-ping) mit Ampel gekoppelt ans 2h-Verfallsfenster: gruen <30min, amber 30min-2h, rot >2h; Fehler (Berechtigung verweigert/kein Fix) = blinkender Fehlerzustand statt stehen zu bleiben - unterscheidbar von noch-nie-gepingt. PING: X MIN-Textfeld im Telemetry-Link-Stil, aktualisiert im bestaehenden 60s-refresh()-Takt (kein Zusatztimer). Native-Scaffold unter astro-app/native (capacitor.config.ts webDir ../frontend, setup_native.sh mit 1:1-Befehlsfolge + Manifest-Injection NUR Foreground-GPS, required=false, bewusst kein Background/Wake-Lock) - Ausfuehrung auf Node-Maschine noetig, Server hat kein npm.",
+      "usage": "GPS-Button: eine Messung, Watchpoint 2h, Ampel-LED zeigt Freshness"
     }
   ]
 }

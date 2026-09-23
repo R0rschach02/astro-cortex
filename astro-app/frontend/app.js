@@ -86,6 +86,7 @@ function initMap() {
   buildGauges();
   buildLunar();
   initFlightstick();
+  pingLedState();
   initInfoWidget();
   initCockpitStatus();
   // Grid-Layout mit minmax kann die Map-Groesse nach dem ersten Render
@@ -778,24 +779,98 @@ function toggleNight() {
   localStorage.setItem("astro_night", document.body.classList.contains("night") ? "1" : "0");
 }
 
-function gpsWatch() {
-  if (!navigator.geolocation) { alert("Geolocation hier nicht verfügbar (HTTPS nötig)."); return; }
-  $("btn-gps").textContent = "…";
-  navigator.geolocation.getCurrentPosition(async (pos) => {
-    try {
-      const r = await api("/api/watch", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lat: pos.coords.latitude, lon: pos.coords.longitude, hours: 2 }),
-      });
-      map.setView([pos.coords.latitude, pos.coords.longitude], 12);
-      alert(`Live-Standort aktiv für 2 h:\n${r.name}\nRadar: ${r.radar_status}`);
-      refresh();
-    } catch (e) { alert("Watch fehlgeschlagen: " + e.message); }
-    $("btn-gps").textContent = "\u25CE";
-  }, (err) => {
-    alert("GPS-Fehler: " + err.message);
-    $("btn-gps").textContent = "\u25CE";
-  }, { enableHighAccuracy: true, timeout: 15000 });
+
+/* ============================================================
+   GPS-PING (Phase 2): ein Tap = eine Messung. Native nutzt das vom
+   Capacitor-Runtime injizierte window.Capacitor.Plugins.Geolocation
+   (kein Bundler noetig), Browser bleibt bei navigator.geolocation.
+   Beide Pfade muenden in handlePingResult: localStorage -> POST
+   /api/watch (2 h Watchpoint) -> Freshness-LED/Text.
+   ============================================================ */
+let pingBusy = false;
+
+function pingLedState() {
+  /* Ampel gekoppelt ans 2h-Verfallsfenster von /api/watch:
+     nie -> off (dim), Fehler -> blink (ping-error),
+     <30min -> gruen, 30min-2h -> amber, >2h -> rot */
+  const led = document.getElementById("led-ping");
+  const txt = document.getElementById("ping-link");
+  if (!led) return;
+  let cls = "sq-led", label = "PING: --", title = "GPS-Ping: noch nie";
+  const err = JSON.parse(localStorage.getItem("astro_ping_error") || "null");
+  const last = JSON.parse(localStorage.getItem("astro_last_ping") || "null");
+  if (err && (!last || err.ts > last.ts)) {
+    cls += " ping-error";
+    label = "PING: FEHLER";
+    title = "GPS-Ping fehlgeschlagen: " + (err.msg || "?");
+  } else if (last) {
+    const min = Math.floor((Date.now() - last.ts) / 60000);
+    if (min < 30) cls += " on";
+    else if (min < 120) cls += " on amber";
+    else cls += " on red";
+    label = "PING: " + (min < 120 ? min + " MIN" : Math.floor(min / 60) + " H");
+    title = "GPS-Ping vor " + min + " min";
+  }
+  led.className = cls;
+  led.setAttribute("title", title);
+  if (txt) { txt.textContent = label; txt.title = title; }
+}
+
+async function handlePingResult(lat, lon) {
+  const ts = Date.now();
+  localStorage.setItem("astro_last_ping", JSON.stringify({lat, lon, ts}));
+  localStorage.removeItem("astro_ping_error");
+  pingLedState();
+  commsLog("GPS-PING: " + lat.toFixed(4) + " / " + lon.toFixed(4));
+  try {
+    const headers = {"Content-Type": "application/json"};
+    const tok = localStorage.getItem("astro_api_token");
+    if (tok) headers["x-api-token"] = tok;
+    const r = await api("/api/watch", {method: "POST", headers,
+      body: JSON.stringify({lat, lon, hours: 2})});
+    commsLog("WATCHPOINT 2H AKTIV: " + (r.name || "Live"));
+    refresh();
+  } catch (e) {
+    commsLog("WATCH-POST FEHLGESCHLAGEN: " + e.message, "alert");
+  }
+}
+
+function pingFailure(msg) {
+  localStorage.setItem("astro_ping_error",
+    JSON.stringify({ts: Date.now(), msg: String(msg).slice(0, 120)}));
+  pingLedState();
+  commsLog("GPS-PING FEHLGESCHLAGEN: " + msg, "alert");
+}
+
+async function gpsWatch() {
+  if (pingBusy) return;
+  pingBusy = true;
+  $("btn-gps").textContent = "\u2026";
+  const done = () => { $("btn-gps").textContent = "\u25CE"; pingBusy = false; };
+  const native = window.Capacitor && window.Capacitor.isNativePlatform
+    && window.Capacitor.isNativePlatform();
+  try {
+    let lat, lon;
+    if (native) {
+      // Capacitor-Plugin (vom Runtime injiziert - kein Bundler noetig)
+      const r = await window.Capacitor.Plugins.Geolocation.getCurrentPosition(
+        { enableHighAccuracy: true, timeout: 15000 });
+      lat = r.coords.latitude; lon = r.coords.longitude;
+    } else {
+      if (!navigator.geolocation)
+        throw new Error("Geolocation nicht verfuegbar (HTTPS noetig)");
+      const pos = await new Promise((res, rej) =>
+        navigator.geolocation.getCurrentPosition(res, rej,
+          { enableHighAccuracy: true, timeout: 15000 }));
+      lat = pos.coords.latitude; lon = pos.coords.longitude;
+    }
+    map.setView([lat, lon], 12);
+    await handlePingResult(lat, lon);
+  } catch (e) {
+    pingFailure(e.message || e);
+    alert("GPS-Ping fehlgeschlagen: " + (e.message || e));
+  }
+  done();
 }
 
 function configure() {
@@ -1145,6 +1220,7 @@ function setGaugeVal(id, txt, cls) {
 }
 
 function updateAstroInstruments(data) {
+  pingLedState();   // Freshness-Ampel im bestaehenden 60s-Takt
   const s = telemetrySpot(data);
   if (!s) return;
   setTelemetry(s.name, true);   // Link-Label synchron halten
