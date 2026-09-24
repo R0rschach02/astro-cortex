@@ -637,6 +637,27 @@ def api_deployment(id: str, home: str = "Ilvesheim HQ",
     }
 
 
+
+# --- Phase 2: Native-APK-Download (statisch, token-gated wie fwhw_sync) ---
+APK_PATH = "/home/enigma/astro-app/native/android/app/build/outputs/apk/debug/app-debug.apk"
+
+
+@app.get("/native/astro-cortex.apk")
+def api_native_apk(token: Optional[str] = None, request: Request = None):
+    """Debug-APK der Capacitor-Shell (Phase 2). Gleicher Token-Mechanismus
+    wie fwhw_sync - per Header x-api-token ODER Query-Parameter (fuer
+    einfache Browser-Downloads ueber Tailscale). Kein Token konfiguriert
+    = Endpunkt offen (bewusst, Heimnetz)."""
+    if API_TOKEN and (request.headers.get("x-api-token") != API_TOKEN
+                      and token != API_TOKEN):
+        raise HTTPException(401, "Ungueltiger API-Token")
+    if not os.path.exists(APK_PATH):
+        raise HTTPException(404, "APK nicht gebaut - native/setup_native.sh"
+                                 " + gradlew assembleDebug ausfuehren")
+    return FileResponse(APK_PATH, media_type="application/vnd.android.package-archive",
+                        filename="astro-cortex.apk")
+
+
 class ObsModeBody(BaseModel):
     active: bool
 

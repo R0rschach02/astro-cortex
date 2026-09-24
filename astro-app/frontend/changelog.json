@@ -384,6 +384,12 @@
       "title": "Phase 2: GPS-Ping on Demand + Capacitor-Vorbereitung",
       "detail": "GPS-Ping als Ein-Tap-Messung (kein Tracking): Plattform-Weiche in gpsWatch - nativ ueber das vom Capacitor-Runtime injizierte window.Capacitor.Plugins.Geolocation (bundler-frei), Browser wie bisher navigator.geolocation.getCurrentPosition (war bereits Einmal-Aufruf). Beide Pfade muenden in handlePingResult: Koordinate+Timestamp in localStorage (astro_last_ping), POST /api/watch (2h Watchpoint) mit x-api-token falls im Config-Menue hinterlegt. Fuenfte Glareshield-LED (led-ping) mit Ampel gekoppelt ans 2h-Verfallsfenster: gruen <30min, amber 30min-2h, rot >2h; Fehler (Berechtigung verweigert/kein Fix) = blinkender Fehlerzustand statt stehen zu bleiben - unterscheidbar von noch-nie-gepingt. PING: X MIN-Textfeld im Telemetry-Link-Stil, aktualisiert im bestaehenden 60s-refresh()-Takt (kein Zusatztimer). Native-Scaffold unter astro-app/native (capacitor.config.ts webDir ../frontend, setup_native.sh mit 1:1-Befehlsfolge + Manifest-Injection NUR Foreground-GPS, required=false, bewusst kein Background/Wake-Lock) - Ausfuehrung auf Node-Maschine noetig, Server hat kein npm.",
       "usage": "GPS-Button: eine Messung, Watchpoint 2h, Ampel-LED zeigt Freshness"
+    },
+    {
+      "date": "2026-09-24",
+      "title": "Phase 2 komplett: Debug-APK gebaut + Download-Route",
+      "detail": "Die Native-Blockade ist ohne sudo aufgeloest: nvm+Node 24, JDK 17/21 und Android SDK (cmdline-tools, platform/build-tools 34) liegen komplett im Home-Verzeichnis. setup_native.sh laeuft durch (cap add android, sync, Manifest-Foreground-Patch - Injektion jetzt robust am <manifest>-Tag und als letzter Schritt, da cap sync sie sonst ueberschrieb). Gradle assembleDebug baut die 4,8MB Debug-APK (Java-21-Toolchain fuer das Geolocation-Plugin, Pfad in gradle.properties registriert). Neue Route /native/astro-cortex.apk liefert die APK mit dem fwhw_sync-Token-Mechanismus (Header x-api-token ODER ?token= Query fuer Browser-Download ueber Tailscale). build_apk.sh baut nach Web-Aenderungen neu.",
+      "usage": "APK ueber Tailscale laden: /native/astro-cortex.apk - dann 'aus unbekannten Quellen' installieren"
     }
   ]
 }

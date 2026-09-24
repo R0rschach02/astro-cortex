@@ -1,0 +1,11 @@
+{
+  "appId": "de.astrocortex.app",
+  "appName": "Astro Cortex",
+  "webDir": "../frontend",
+  "android": {
+    "allowMixedContent": false
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}
