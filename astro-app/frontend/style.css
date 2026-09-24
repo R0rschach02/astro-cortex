@@ -436,8 +436,6 @@ body.night .iw-toggle-row { border-color: #3a2020; }
   border-bottom: 1px solid var(--line-hi);
   padding-top: 0; border-radius: 0;
 }
-.tp-brand { font-family: var(--mono); font-weight: 700; letter-spacing: 3px;
-  font-size: 18px; color: var(--amber2); }
 .tp-sub { display: block; font-size: 8.5px; letter-spacing: 2.5px;
   color: var(--dim); }
 .tp-block { font-size: 12px; color: var(--txt); display: flex;
@@ -625,7 +623,6 @@ body.night .iw-toggle-row { border-color: #3a2020; }
   #left-hud-btn { display: inline-flex; }
 
   /* Glareshield-Wischleiste (unveraendert aus Stacking-Modell) */
-  .tp-sub { display: none; }
   #topbar .telemetry-link { margin-left: 12px; flex-shrink: 0; }
   #topbar .glareshield-gauges { order: 0; width: auto;
     margin-left: 0; margin-right: 0; flex-shrink: 0; }
@@ -643,7 +640,7 @@ body.night #topbar, body.night #bottom-panel,
 body.night #left-panel, body.night #right-panel {
   background: #120a08; border-color: #3a2020;
 }
-body.night .tp-brand, body.night .panel-hdr, body.night .tl-label b,
+body.night .panel-hdr, body.night .tl-label b,
 body.night .guard-caption { color: #ff6a5e; }
 body.night #comms-terminal { color: #ff5f54; border-color: #4a1f1c;
   text-shadow: 0 0 6px rgba(255,95,84,.4);
@@ -949,6 +946,10 @@ body.night .basemap-tile { filter: none; }
 .telemetry-link { margin-left: auto; color: #3aff7c;
   font-size: 11px; font-weight: 700;
   letter-spacing: .08em; padding: 3px 9px; white-space: nowrap;
+  /* Festbreite: laengster Realname ~22 Zeichen - Name-Wechsel (Flightstick)
+     darf LINK und Gauges nicht verschieben */
+  min-width: 268px; max-width: 268px; overflow: hidden;
+  text-align: center;
   border: 1px solid rgba(58,255,124,.35); background: rgba(58,255,124,.06);
   text-shadow: 0 0 8px rgba(58,255,124,.55);
   box-shadow: 0 0 10px rgba(58,255,124,.12), inset 0 0 8px rgba(58,255,124,.07); }

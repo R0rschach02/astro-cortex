@@ -396,6 +396,12 @@
       "title": "Native-App-Fix: CORS + Flightstick weicht Standort-Panel",
       "detail": "(1) ROOT CAUSE der leeren App auf dem Handy: Der Capacitor-WebView (Origin https://localhost) fragt den Tailscale-Endpoint cross-origin an - ohne CORS-Header blockte er JEDE API-Antwort (keine Standorte, GPS-Ping-POST scheiterte ebenfalls). CORSMiddleware ergaenzt (Wildcard-regex vertretbar: privater Server hinter Tailscale-Auth; x-api-token/Header+Methoden freigegeben). Serverseitiger Fix - die bereits installierte App funktioniert nach Deploy ohne Neuinstallation. (2) Flightstick (alle Plattformen): verschwindet weich (opacity .25s), sobald das Standort-Bottom-Sheet oeffnet, und kehrt beim Zuklappen zurueck - opacity statt transform, damit die mobile scale-Positionierung unberuehrt bleibt.",
       "usage": "App oeffnen: Standorte laden jetzt; Marker-Tap: Stick weicht, Panel zu: Stick kommt zurueck"
+    },
+    {
+      "date": "2026-09-24",
+      "title": "Transit-Restaurierung + stabile Top-Bar",
+      "detail": "(1) REGRESSION BEHOBEN: Der Transit-Block (HQ-Konstante, drawRouteLine mit Doppel-Linie, transitPills, fetchTransitRoute mit Dynamic-Abort-Render) war seit dem Gauge-Generator-Einbau verloren - der Index-Schnitt der Threat-Block-Entfernung lief bis zur naechsten Funktion und frass alles dazwischen. Vollstaendig aus dem letzten funktionierenden Stand restauriert und E2E verifiziert. (2) [LINK:]-Feld mit fester Breite (268px, zentriert): Ortswechsel per Flightstick rueckt weder LINK noch die Gauges mehr. (3) ASTRO-CC-Brand aus der Top-Bar entfernt (freigewordener Platz fuer Instrumente).",
+      "usage": "TRANSIT ROUTE rechnet wieder; Top-Bar ruht sich bei Zielenwechsel nicht mehr um"
     }
   ]
 }

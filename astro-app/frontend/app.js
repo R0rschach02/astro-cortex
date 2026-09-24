@@ -1355,6 +1355,107 @@ function _bearingDeg(lat1, lon1, lat2, lon2) {
   return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
+/* HQ: Equipment-Depot Ilvesheim (Teleskop & Crawler) - fester Startpunkt
+   aller Transit-Einsatzwege. Kein dynamisches Nutzer-GPS mehr. */
+const HQ = { name: "ILVESHEIM HQ", lat: 49.4783726, lon: 8.5662896 };
+let routeLayer = null;   // aktuelle Einsatzweg-Darstellung (HQ-Pin + Linie)
+
+function drawRouteLine(destLat, destLon, destName) {
+  // vorherige Route entfernen, bevor eine neue gezeichnet wird
+  if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
+  // Doppel-Linien-Trick: solide schwarze Kontur fuer Kontrast gegen
+  // die dunkle Kachelkarte, darueber die taktisch rote gestrichelte
+  // Trajektorie. Beide im selben LayerGroup -> Cleanup entfernt beide.
+  const casing = L.polyline(
+    [[HQ.lat, HQ.lon], [destLat, destLon]],
+    { color: "#000000", weight: 7, opacity: 1 });
+  const line = L.polyline(
+    [[HQ.lat, HQ.lon], [destLat, destLon]],
+    { color: "#ff3b30", weight: 4, opacity: 0.95, dashArray: "10, 15" });
+  const hqIcon = L.divIcon({
+    className: "hq-pin",
+    html: "<div class='hq-dot'></div><div class='hq-tag'>HQ</div>",
+    iconSize: [0, 0] });
+  routeLayer = L.layerGroup([
+    L.marker([HQ.lat, HQ.lon], { icon: hqIcon, interactive: false }),
+    casing,
+    line,
+  ]).addTo(map);
+  map.fitBounds(line.getBounds(), { padding: [50, 50] });
+  commsLog("EINSATZWEG EINGEZEICHNET: " + HQ.name + " \u2192 "
+    + String(destName || "?").toUpperCase());
+}
+
+/* Visueller Fahrplan: Verbindung als Pill-Kette rendern.
+   Walk = Fussgaenger-Icon + Minuten, Tram/Stadtbahn (RNV) = amber,
+   Bus/Regional = blau. Tooltip zeigt die Haltestellen. */
+function transitPills(steps) {
+  if (!steps || !steps.length) return "";
+  return "<div class='tp-row'>" + steps.map(s => {
+    if (s.kind === "walk")
+      return "<span class='tp-pill tp-walk'>\uD83D\uDEB6 " + s.min
+        + "\u2032</span>";
+    const tram = /^RNV/i.test(s.line || "");
+    return "<span class='tp-pill " + (tram ? "tp-tram" : "tp-bus")
+      + "' title='" + esc(s.from) + " \u2192 " + esc(s.to) + "'>"
+      + "<b>" + esc(s.line) + "</b> " + esc(s.dep) + "\u2013" + esc(s.arr)
+      + "</span>";
+  }).join("<span class='tp-arrow'>\u2799</span>") + "</div>";
+}
+
+async function fetchTransitRoute(name, lat, lon) {
+  const resultEl = document.getElementById("transit-result");
+  if (!resultEl) return;
+  resultEl.innerHTML =
+    "<div class='transit-loading'>\u23F3 VRN-Fahrplan ab HQ...</div>";
+  try {
+    const d = await api("/api/deployment?id=" + encodeURIComponent(name)
+      + "&home_lat=" + HQ.lat + "&home_lon=" + HQ.lon
+      + "&setup_minutes=30");
+    // HTTP 200: Einsatzweg auf dem Radar zeichnen (HQ -> Ziel)
+    drawRouteLine(lat, lon, name);
+    let html = "<div class='transit-head'>[ROUTE: " + HQ.name + " -> "
+      + esc(String(name).toUpperCase()) + "]</div>";
+    if (d.dynamic_abort) {
+      const ret = d.extraction ? d.extraction.earliest_return : "BERECHNET";
+      html += "<div class='transit-abort'>\u26A0 DYNAMIC ABORT: "
+        + "WETTERUMSCHLAG - N\u00C4CHSTE R\u00DCCKFAHRT " + esc(ret)
+        + " \u00b7 Umschlag " + esc(d.dynamic_abort.time)
+        + " (" + esc(d.dynamic_abort.reason || "?") + ")</div>";
+      commsLog("DYNAMIC ABORT: WETTERUMSCHLAG \u2192 R\u00DCCKFAHRT "
+        + ret + " AB " + d.dynamic_abort.time, "alert");
+    }
+    if (d.latest_departure) {
+      const ld = d.latest_departure;
+      html += "<div class='transit-conn'><b>\u27A1 HIN " + esc(ld.time)
+        + " \u2192 " + esc(ld.arrival) + " AN</b>"
+        + (ld.steps && ld.steps.length
+          ? transitPills(ld.steps)
+          : "<div class='tp-row'><span class='tp-pill tp-bus'><b>"
+            + esc(ld.lines.join(", ")) + "</b></span></div>")
+        + "</div>";
+    } else if (d.note) {
+      html += "<div class='transit-none'>\u26A0 " + esc(d.note) + "</div>";
+    }
+    if (d.extraction) {
+      const ex = d.extraction;
+      html += "<div class='transit-conn'><b>\u2B05 R\u00DCCK "
+        + esc(ex.earliest_return) + " \u2192 " + esc(ex.arrival_home)
+        + " AN</b> \u00b7 Abbau ab " + esc(d.extraction_warning_ts || "?")
+        + (ex.steps && ex.steps.length ? transitPills(ex.steps) : "")
+        + "</div>";
+    } else if (!d.latest_departure) {
+      html += "<div class='transit-none'>Keine Rueckverbindung.</div>";
+    }
+    html += "<div class='transit-src'>" + esc(d.transit_source)
+      + " | GW " + esc(d.golden_window) + "</div>";
+    resultEl.innerHTML = html;
+  } catch (e) {
+    resultEl.innerHTML = "<div class='transit-none'>\u274C "
+      + esc(e.message || "Fehler") + "</div>";
+  }
+}
+
 function initFlightstick() {
   const fs = document.getElementById("flightstick");
   if (!fs) return;
