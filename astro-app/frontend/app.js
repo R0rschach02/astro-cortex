@@ -940,7 +940,16 @@ window.addEventListener("DOMContentLoaded", () => {
   refresh();
   setInterval(refresh, REFRESH_MS);
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js").catch(e => console.warn("SW:", e));
+    // Native (Capacitor): KEIN Service Worker - Assets kommen gebuendelt
+    // aus der APK; ein SW-Cache wuerde bei App-Updates veraltete
+    // Zustaende aus der Erstinstallation servieren (gleiche Origin).
+    const isNative = window.Capacitor
+      && window.Capacitor.isNativePlatform
+      && window.Capacitor.isNativePlatform();
+    if (!isNative) {
+      navigator.serviceWorker.register("sw.js")
+        .catch(e => console.warn("SW:", e));
+    }
   }
 });
 

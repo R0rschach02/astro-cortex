@@ -402,6 +402,12 @@
       "title": "Transit-Restaurierung + stabile Top-Bar",
       "detail": "(1) REGRESSION BEHOBEN: Der Transit-Block (HQ-Konstante, drawRouteLine mit Doppel-Linie, transitPills, fetchTransitRoute mit Dynamic-Abort-Render) war seit dem Gauge-Generator-Einbau verloren - der Index-Schnitt der Threat-Block-Entfernung lief bis zur naechsten Funktion und frass alles dazwischen. Vollstaendig aus dem letzten funktionierenden Stand restauriert und E2E verifiziert. (2) [LINK:]-Feld mit fester Breite (268px, zentriert): Ortswechsel per Flightstick rueckt weder LINK noch die Gauges mehr. (3) ASTRO-CC-Brand aus der Top-Bar entfernt (freigewordener Platz fuer Instrumente).",
       "usage": "TRANSIT ROUTE rechnet wieder; Top-Bar ruht sich bei Zielenwechsel nicht mehr um"
+    },
+    {
+      "date": "2026-09-24",
+      "title": "App-Release: Transit-Aktualitaet garantiert, Handy-Dichte, Teleskop-Icon",
+      "detail": "(1) Service Worker wird in der nativen App nicht mehr registriert: Der SW-Cache teilte sich die localhost-Origin ueber App-Updates hinweg und konnte Assets aus der Erstinstallation servieren - Ursache dafuer, dass die APK weiterhin altes (transit-lostes) JS zeigte obwohl die neue APK die reparierte Logik enthielt. Nativ kommen Assets ohnehin gebuendelt aus der APK. (2) Mobile-Dichte auf Handybildschirm bemessen statt Desktop-Monitor: Glareshield-Gauges 74px (statt 96px), Panels min(70vw, 280px), Flightstick scale 0.55. (3) App-Icon: Teleskop in Silber/Weiss auf Schwarz (programmatisch gezeichnet, Sterne akzentuiert) - adaptive Launcher-Icons + Splash in allen Dichten via @capacitor/assets.",
+      "usage": "APK neu installieren: Icon = Teleskop, Transit laeuft, Elemente handy-gerecht"
     }
   ]
 }

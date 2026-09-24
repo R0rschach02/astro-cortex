@@ -17,6 +17,7 @@
     "@capacitor/geolocation": "^8.2.2"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "typescript": "^7.0.2"
   }
 }

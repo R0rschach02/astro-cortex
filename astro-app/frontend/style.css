@@ -605,12 +605,12 @@ body.night .iw-toggle-row { border-color: #3a2020; }
 
   /* Slide-Overlays: geschlossen = ausserhalb + klick-durchlaessig */
   #left-panel { position: fixed; top: 0; bottom: 54px; left: 0;
-    width: min(78vw, 320px); z-index: 1100;
+    width: min(70vw, 280px); z-index: 1100;
     max-width: none; max-height: none;
     transform: translateX(-100%); transition: transform .28s ease-out;
     pointer-events: none; overflow-y: auto; }
   #right-panel { position: fixed; top: 0; bottom: 54px; right: 0;
-    width: min(78vw, 320px); z-index: 1100;
+    width: min(70vw, 280px); z-index: 1100;
     max-width: none; max-height: none;
     transform: translateX(100%); transition: transform .28s ease-out;
     pointer-events: none; overflow-y: auto; }
@@ -626,13 +626,13 @@ body.night .iw-toggle-row { border-color: #3a2020; }
   #topbar .telemetry-link { margin-left: 12px; flex-shrink: 0; }
   #topbar .glareshield-gauges { order: 0; width: auto;
     margin-left: 0; margin-right: 0; flex-shrink: 0; }
-  #topbar .glareshield-gauges .gauge-wrap { width: 96px; }
-  #topbar .glareshield-gauges .gauge-row { gap: 12px; }
+  #topbar .glareshield-gauges .gauge-wrap { width: 74px; }
+  #topbar .glareshield-gauges .gauge-row { gap: 8px; }
   .tp-actions { flex-shrink: 0; }
 
   /* Flightstick: fixiert, 60% (Doppel-ID schlaegt spaetere Basis) */
-  #cockpit #flightstick { position: fixed; left: 50%; bottom: 8px;
-    transform: translateX(-50%) scale(0.6);
+  #cockpit #flightstick { position: fixed; left: 50%; bottom: 6px;
+    transform: translateX(-50%) scale(0.55);
     transform-origin: 50% 100%; }
 }
 /* Nachtmodus: alles kriegt Rotstich statt Farbe */
