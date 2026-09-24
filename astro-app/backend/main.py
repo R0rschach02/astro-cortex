@@ -30,6 +30,7 @@ sys.path.insert(0, os.path.expanduser("~"))
 import astro_crawler as ac  # noqa: E402
 
 from fastapi import FastAPI, HTTPException, Query, Request  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from fastapi.responses import FileResponse, Response  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
@@ -941,6 +942,18 @@ async def _healthcheck_loop():
 # nicht. 'no-cache' = Revalidation mit ETag (StaticFiles liefert ETag/Last-
 # Modified mit) -> effizient UND immer frisch. Tiles/Icons duerfen lange
 # gecacht werden (aendern sich nie).
+# CORS: Die native App (Capacitor, Origin https://localhost bzw.
+# capacitor://localhost) ruft den Tailscale-Endpoint cross-origin auf -
+# ohne diese Headers blockiert der WebView saemtliche API-Antworten.
+# Wildcard ist vertretbar: privater Server hinter Tailscale-Auth.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=".*",
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "x-api-token"],
+)
+
+
 @app.middleware("http")
 async def cache_control_headers(request, call_next):
     resp = await call_next(request)

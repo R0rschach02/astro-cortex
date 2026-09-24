@@ -667,6 +667,7 @@ function renderSpots(data) {
       currentSpot = s;
       setTelemetry(s.name);
       $("panel").classList.remove("hidden");
+      setStickHidden(true);   // Panel offen = Stick weicht dem Sheet
       showTab("now");
       fetchBortle(s);
     });
@@ -930,7 +931,10 @@ window.addEventListener("DOMContentLoaded", () => {
       toggleCfgMenu(false);
     }
   });
-  $("panel-close").onclick = () => $("panel").classList.add("hidden");
+  $("panel-close").onclick = () => {
+    $("panel").classList.add("hidden");
+    setStickHidden(false);    // Panel zu = Stick kehrt zurueck
+  };
   $("tab-now").onclick = () => showTab("now");
   $("tab-fc").onclick = () => showTab("fc");
   refresh();
@@ -998,6 +1002,13 @@ function initInfoWidget() {
 
 // Comms-Feed: Matrix-Terminal im rechten Panel. Neue Zeilen erscheinen
 // unten (Text laeuft nach oben), autoscroll, max 40 Zeilen.
+/* Flightstick ausblenden, waehrend das Standort-Bottom-Sheet offen ist
+   (alle Plattformen) - reine Sichtbarkeit, keine Transform-Kollision. */
+function setStickHidden(hide) {
+  document.getElementById("flightstick")
+    ?.classList.toggle("fs-hidden", hide);
+}
+
 function commsLog(text, severity) {
   const t = document.getElementById("comms-terminal");
   if (!t) return;

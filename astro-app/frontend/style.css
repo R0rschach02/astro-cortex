@@ -1065,3 +1065,8 @@ body.night .basemap-tile { filter: none; }
   letter-spacing: .07em; padding: 3px 7px; white-space: nowrap;
   border: 1px solid rgba(159,176,192,.3);
   background: rgba(159,176,192,.05); }
+
+/* Flightstick weicht dem oeffnenden Standort-Sheet (opacity statt
+   transform: kollidiert nicht mit der mobilen scale-Positionierung) */
+#flightstick { transition: opacity .25s ease; }
+#flightstick.fs-hidden { opacity: 0; pointer-events: none; }
