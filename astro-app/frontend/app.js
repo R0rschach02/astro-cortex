@@ -590,6 +590,20 @@ function markerIcon(spot, rainNew) {
   });
 }
 
+/* Libration/Kolongitude: vorzeichenbehaftete Grad + 2-3-Naechte-Blick */
+function fmtSigned(v) {
+  return (v > 0 ? "+" : "") + (v != null ? v.toFixed(1) : "?");
+}
+
+function moonNightsRows(nights) {
+  if (!nights || !nights.length) return "";
+  const lines = nights.slice(0, 3).map(n =>
+    row("Kolong " + n.night.slice(5),
+      n.colong.toFixed(1) + "° · lib " + fmtSigned(n.lib_l)
+      + "/" + fmtSigned(n.lib_b) + "°"));
+  return lines.join("");
+}
+
 function panelHtml(s) {
   const m = s.moon || {};
   const isPlanet = CURRENT_PROFILE === "planet";
@@ -644,6 +658,13 @@ function panelHtml(s) {
       ${row(dot(TH.moonAlt(m.max_alt)) + " Mond-Kulmination", m.culm ? `${esc(m.culm)} (${fmt(m.max_alt, "°")})` : "n/a")}
       ${row("Mond &gt; 30°", m.window ? esc(m.window) : "nie in dieser Nacht")}
       ${row("Astron. Dunkelheit", s.dark_window ? esc(s.dark_window) : "n/a")}
+      ${m.libration ? row("Libration l/b",
+        fmtSigned(m.libration.lib_l) + "° / " + fmtSigned(m.libration.lib_b) + "°")
+        : ""}
+      ${m.libration ? row("Kolongitude",
+        m.libration.colong.toFixed(2) + "° <span class='age'>(LROC-Ref.)</span>")
+        : ""}
+      ${moonNightsRows(m.nights)}
       ${lpLine(s)}
     </div>
     <div class="grp mono"><b>Planeten &gt; 30°</b><span class="age">de421 · lokal</span></div>

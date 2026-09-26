@@ -408,6 +408,12 @@
       "title": "App-Release: Transit-Aktualitaet garantiert, Handy-Dichte, Teleskop-Icon",
       "detail": "(1) Service Worker wird in der nativen App nicht mehr registriert: Der SW-Cache teilte sich die localhost-Origin ueber App-Updates hinweg und konnte Assets aus der Erstinstallation servieren - Ursache dafuer, dass die APK weiterhin altes (transit-lostes) JS zeigte obwohl die neue APK die reparierte Logik enthielt. Nativ kommen Assets ohnehin gebuendelt aus der APK. (2) Mobile-Dichte auf Handybildschirm bemessen statt Desktop-Monitor: Glareshield-Gauges 74px (statt 96px), Panels min(70vw, 280px), Flightstick scale 0.55. (3) App-Icon: Teleskop in Silber/Weiss auf Schwarz (programmatisch gezeichnet, Sterne akzentuiert) - adaptive Launcher-Icons + Splash in allen Dichten via @capacitor/assets.",
       "usage": "APK neu installieren: Icon = Teleskop, Transit laeuft, Elemente handy-gerecht"
+    },
+    {
+      "date": "2026-09-26",
+      "title": "Mond-Block: Libration + Kolongitude (LROC-Planungsgrundlage)",
+      "detail": "Zwei neue Werte im Mond-Datensatz - jetzt und fuer die naechsten 2-3 Naechte (je ein Wert zur Mitte der astronomischen Dunkelheit, keine Stundenserie: Kolongitude wandert ~12.2 Grad/Tag, Libration ueber ~27 Tage). Berechnung komplett lokal ueber Skyfields PlanetaryConstants mit moon_080317.tf + pck00008.tpc + moon_pa_de421_1900-2050.bpc (einmaliger Download nach ~/.skyfield, MOON_ME_DE421-Frame). Konvention identisch zu XEphem (colong = (90 - Sub-Solar-Laenge Ost) % 360, Libration +/-180 normalisiert). Pflicht-Validierung als Dauer-Test verankert: JD 2449992.5 -> 3.69 Grad (XEphem-Referenzfall aus mooncolong.c; DE421 liefert 3.741, Toleranz 0.1) + Tagesraten- und Wertebereichstests. Mond-Cache auf v3 (Neuberechnung erzwingen). Anzeige im Standort-Panel: LIBRATION l/b, KOLONGITUDE mit LROC-Ref-Hinweis und je Nacht eine KOLONG-Zeile. Kein LROC-Scraper - Referenzbild-Suche bleibt manuell ueber QuickMap.",
+      "usage": "Standort-Panel Mond-Block: Kolongitude je Nacht ablesbar, Session an LROC-Aufnahmen angleichen"
     }
   ]
 }
