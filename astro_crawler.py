@@ -1986,6 +1986,51 @@ def _night_window(load, eph, ts, topo, t_now=None):
     return start, (min(nxt_rise) if nxt_rise else ts.tt_jd(start.tt + 0.5))
 
 
+
+# --- Libration + Kolongitude (PlanetaryConstants, DE421-PA-Kernel) ---
+# Kernel einmalig in ~/.skyfield (wie de421.bsp); Validierungsfall aus
+# XEphem libastro/mooncolong.c: JD 2449992.5 -> Kolongitude 3.69 Grad
+# (XEphem-Serie 3.686, DE421 hier 3.741 - innerhalb der Magazin-Reihe).
+_MOON_PC = None
+
+
+def _libration_colong_state(t) -> Optional[dict]:
+    """Libration (Sub-Erd-Punkt) + Kolongitude (Morgen-Terminator) zu t.
+    Konvention: Sub-Solar-Laenge +Ost, colong = (90 - lonE) % 360
+    (identisch zu XEphem/Bruning-Talcott). None, wenn Kernel fehlen -
+    Libration ist Komfort-Daten, darf nie craschen."""
+    global _MOON_PC
+    import os
+    try:
+        if _MOON_PC is None:
+            from skyfield.planetarylib import PlanetaryConstants
+            tf = os.path.join(SKYFIELD_DIR, "moon_080317.tf")
+            tpc = os.path.join(SKYFIELD_DIR, "pck00008.tpc")
+            bpc = os.path.join(SKYFIELD_DIR, "moon_pa_de421_1900-2050.bpc")
+            if not all(os.path.exists(p) for p in (tf, tpc, bpc)):
+                return None
+            pc = PlanetaryConstants()
+            pc.read_text(open(tf, "rb"))
+            pc.read_text(open(tpc, "rb"))
+            pc.read_binary(open(bpc, "rb"))
+            _MOON_PC = (pc, pc.build_frame_named("MOON_ME_DE421"))
+        pc, frame = _MOON_PC
+        from skyfield.api import Loader
+        load = Loader(SKYFIELD_DIR)
+        eph = load("de421.bsp")
+        earth, moon, sun = eph["earth"], eph["moon"], eph["sun"]
+        blat, blon, _ = (earth - moon).at(t).frame_latlon(frame)
+        slat, slon, _ = (sun - moon).at(t).frame_latlon(frame)
+        lon_e = slon.degrees % 360
+        lib_l = ((blon.degrees + 180.0) % 360.0) - 180.0
+        return {"lib_l": round(lib_l, 2),
+                "lib_b": round(blat.degrees, 2),
+                "colong": round((90.0 - lon_e) % 360.0, 2)}
+    except Exception as e:  # noqa: BLE001 - Feature darf nie craschen
+        log.warning("[Nacht] Libration nicht berechenbar: %s", type(e).__name__)
+        return None
+
+
 def compute_moon(lat: float, lon: float) -> dict:
     """Nacht-Astronomie fuer eine Location: Mond + Dunkelheit + Planeten.
 
@@ -2077,20 +2122,47 @@ def compute_moon(lat: float, lon: float) -> dict:
             return ts.tt_jd(sun_grid[i_a].tt + f * (sun_grid[i_b].tt - sun_grid[i_a].tt))
         t0 = interp(i0 - 1, i0) if i0 > 0 else sun_grid[i0]
         t1 = interp(i1, i1 + 1) if i1 + 1 < len(neg) else sun_grid[i1]
-        return f"{_fmt_hm(t0)}-{_fmt_hm(t1)}"
+        # Zeit-Mitte des Fensters mitliefern (Libration/Kolong-Sample)
+        jd_mid = (t0.tt + t1.tt) / 2
+        return f"{_fmt_hm(t0)}-{_fmt_hm(t1)}", jd_mid
 
     above = np.nonzero(neg >= 18.0)[0]
     dark_windows = []
+    night_mids = []          # JD-Mitten je Dunkelheitsfenster (bis 3)
     if len(above):
         seg = [above[0]]
         for i in above[1:]:
             if i == seg[-1] + 1:
                 seg.append(i)
             else:
-                dark_windows.append(_seg_window(seg[0], seg[-1]))
+                w, jd_mid = _seg_window(seg[0], seg[-1])
+                dark_windows.append(w)
+                night_mids.append(jd_mid)
                 seg = [i]
-        dark_windows.append(_seg_window(seg[0], seg[-1]))
+        w, jd_mid = _seg_window(seg[0], seg[-1])
+        dark_windows.append(w)
+        night_mids.append(jd_mid)
     dark = dark_windows[0] if dark_windows else None
+
+    # --- Libration + Kolongitude: EIN Wert pro Nacht (Mitte der
+    # astronomischen Dunkelheit), bis zu 3 Naechte ---
+    if not night_mids:
+        night_mids = [(start_t.tt + sunrise_t.tt) / 2]
+    nights = []
+    for jd_mid in night_mids[:3]:
+        st = _libration_colong_state(ts.tt_jd(jd_mid))
+        if not st:
+            continue
+        # Abend-Datum des Fensters: Mitte liegt nach Mitternacht -
+        # 12 h zurueck ergibt das Datum des Beobachtungsabends
+        from datetime import timedelta as _td
+        st["night"] = (ts.tt_jd(jd_mid).utc_datetime()
+                       - _td(hours=12)).date().isoformat()
+        nights.append(st)
+    if nights:
+        moon["libration"] = {k2: nights[0][k2] for k2 in
+                             ("lib_l", "lib_b", "colong")}
+        moon["nights"] = nights
 
     # --- Planeten (de421: Barycenter genuegt fuer Hoehenwinkel) ---
     planets = {}
@@ -2123,7 +2195,7 @@ def moon_cached(lat: float, lon: float) -> Optional[dict]:
             cache = json.load(f)
     except (OSError, ValueError):
         pass
-    key = f"v2|{datetime.now():%Y-%m-%d}|{lat:.3f}|{lon:.3f}"
+    key = f"v3|{datetime.now():%Y-%m-%d}|{lat:.3f}|{lon:.3f}"
     if key in cache:
         entry = cache[key]
         try:
