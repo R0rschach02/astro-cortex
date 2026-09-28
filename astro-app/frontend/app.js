@@ -13,7 +13,10 @@
 const CF_API = "https://api.teamigel.com";
 const isNativeApp = () => !!(window.Capacitor
   && window.Capacitor.isNativePlatform
-  && window.Capacitor.isNativePlatform());
+  && window.Capacitor.isNativePlatform())
+  || location.origin === "https://localhost"
+  || location.origin === "http://localhost"
+  || location.protocol === "capacitor:";
 let BASE = (localStorage.getItem("astro_base") || "").replace(/\/$/, "");
 if (BASE.includes("tailcc473e.ts.net")) BASE = CF_API;   // Migration
 if (!BASE && isNativeApp()) BASE = CF_API;               // nativer Default
@@ -891,6 +894,7 @@ function setDatalinkMode(mode) {
 }
 
 async function uplinkNow() {
+  localStorage.removeItem("astro_auth_pending");   // Auth-Retry erlauben
   const btn = document.getElementById("uplink-btn");
   if (btn) btn.classList.add("uplink-busy");
   commsLog("UPLINK: hole Daten + GPS-Ping...");
