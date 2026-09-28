@@ -817,8 +817,10 @@ function toggleNight() {
 let refreshTimer = null;
 
 function datalinkMode() {
-  return localStorage.getItem("astro_datalink")
+  const m = localStorage.getItem("astro_datalink")
     || (window.matchMedia("(max-width: 980px)").matches ? "man" : "auto");
+  localStorage.setItem("astro_datalink", m);   // Default einmalig festhalten
+  return m;
 }
 
 function applyDatalinkMode() {

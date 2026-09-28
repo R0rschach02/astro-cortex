@@ -420,6 +420,12 @@
       "title": "Backend-Autonomie + DATALINK-Kippschalter (Akku-Schonung)",
       "detail": "Der Igel uebernimmt die schwere Last komplett allein: NEU serverseitig im 5-Min-Radar-Tick check_dynamic_abort_alerts() - laeuft ein Golden Window und die bias-korrigierte Prognose kippt auf NO-GO, gibt es EINEN Telegram-Alarm pro Standort/Nacht (Dedup via State, gegated wie jeder Wetter-Push). Crawler/Bias/Golden-Window-Push/Abweichungs-Alarme liefen bereits autonom per systemd-Timer. Die App wird zum reinen Display: DATALINK-BAT-Kippschalter (AUTO = 60s-Polling fuer Netzbetrieb, MAN = stumm, Standard MAN auf schmalen Viewports/Batterie, AUTO am Desktop, persisted). Prominenter UPLINK-Button in der T-Track-Leiste: ein Druck = frische Daten + GPS-Ping. DATA-AGE-Anzeige in der Top-Bar (Alter des letzten erfolgreichen Abrufs, gruen <30min, amber blinkend 30min-2h, rot >2h) - aktualisiert lokal ohne Netztraffic. Frische-Vermerkung bei jedem erfolgreichen refresh().",
       "usage": "Akku: DATALINK auf MAN, UPLINK druecken = Daten+Ping; Igel warnt per Telegram allein"
+    },
+    {
+      "date": "2026-09-28",
+      "title": "Ergonomie: DATALINK-Schalter in den T-Track verlagert",
+      "detail": "Der DATALINK AUTO/MAN-Kippschalter verlaesst das rechte Master-Switch-Dock (Ballung mit OBS-Schalter, UPLINK und INTEL-Toggle) und sitzt jetzt ganz links in der T-Track-Leiste - Kommunikation links, Sensoren/OBS rechts, weniger Fehlklicks im Feld. Kompakte Bauform (40x62px Desktop, 34x52px mobil mit kleineren AUTO/MAN-Labels), Funktionsweise und Persistenz unveraendert.",
+      "usage": "DATALINK-Hebel jetzt links unten neben T-TRACK"
     }
   ]
 }

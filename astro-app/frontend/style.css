@@ -1096,3 +1096,14 @@ body.night .basemap-tile { filter: none; }
 .guard-master input:not(:checked) ~ .guard-frame .dl-man {
   text-shadow: 0 0 6px rgba(159,176,192,.6); }
 .guard-master input:not(:checked) ~ .guard-frame .dl-auto { color: #3c5a4a; }
+
+/* DATALINK im T-Track: Kommunikation links, Sensoren/OBS rechts.
+   Footer ist schmal -> Schalter kompakt und mittig ausgerichtet. */
+#bottom-panel .guard-master { gap: 6px; align-self: center; }
+#bottom-panel .bat-switch { width: 40px; height: 62px; }
+@media (max-width: 980px) {
+  #bottom-panel .guard-master { gap: 3px; }
+  #bottom-panel .bat-switch { width: 34px; height: 52px; }
+  #bottom-panel .guard-frame .guard-on,
+  #bottom-panel .guard-frame .guard-off { font-size: 9px; letter-spacing: 1px; }
+}
