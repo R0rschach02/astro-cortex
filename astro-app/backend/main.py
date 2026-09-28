@@ -31,7 +31,8 @@ import astro_crawler as ac  # noqa: E402
 
 from fastapi import FastAPI, HTTPException, Query, Request  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
-from fastapi.responses import FileResponse, Response  # noqa: E402
+from fastapi.responses import (FileResponse, HTMLResponse,
+                     Response)  # noqa: E402
 from fastapi.staticfiles import StaticFiles  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 
@@ -659,6 +660,38 @@ def api_native_apk(token: Optional[str] = None, request: Request = None):
                         filename="astro-cortex.apk")
 
 
+
+# --- Cloudflare-Access-Auth-Bridge fuer die native App ---
+# Die App navigiert (bei abgelaufenem CF_Authorization) hierher; Access
+# erzwingt Email-OTP im selben WebView, danach kehrt diese Seite zur
+# App-Origin https://localhost zurueck - Cookie bleibt im WebView-Glas.
+AUTH_BRIDGE_HTML = """<!DOCTYPE html>
+<html lang="de"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ASTRO CC - AUTH</title>
+<meta http-equiv="refresh" content="1;url=https://localhost/">
+<style>
+ body { background:#07090c; color:#3aff7c; font-family:monospace;
+        display:flex; align-items:center; justify-content:center;
+        height:100vh; margin:0; text-align:center; }
+ a { color:#ffd24a; font-size:18px; }
+ small { color:#5d7186; display:block; margin-top:24px; }
+</style></head><body>
+ <div><b>ASTRO CC // AUTH OK</b><br>
+  <a href="https://localhost/">&#9650; ZURUECK ZUR APP</a>
+  <small>Browser-Nutzer: dieses Tab kann geschlossen werden -<br>
+  die App ist ueber ihre gewohnte Adresse erreichbar.</small>
+ </div>
+</body></html>"""
+
+
+@app.get("/auth/mobile")
+def api_auth_mobile():
+    """Bruecke nach dem Cloudflare-Access-Login (siehe AUTH_BRIDGE_HTML).
+    Erreicht den Ursprung NUR mit gueltigem CF_Authorization-Cookie."""
+    return HTMLResponse(AUTH_BRIDGE_HTML)
+
+
 class ObsModeBody(BaseModel):
     active: bool
 
@@ -942,13 +975,16 @@ async def _healthcheck_loop():
 # nicht. 'no-cache' = Revalidation mit ETag (StaticFiles liefert ETag/Last-
 # Modified mit) -> effizient UND immer frisch. Tiles/Icons duerfen lange
 # gecacht werden (aendern sich nie).
-# CORS: Die native App (Capacitor, Origin https://localhost bzw.
-# capacitor://localhost) ruft den Tailscale-Endpoint cross-origin auf -
-# ohne diese Headers blockiert der WebView saemtliche API-Antworten.
-# Wildcard ist vertretbar: privater Server hinter Tailscale-Auth.
+# CORS: Die native App (Capacitor, Origin https://localhost) ruft den
+# Cloudflare-Tunnel https://api.teamigel.com cross-origin auf - mit
+# CREDENTIALS (CF_Authorization-Cookie). Wildcard + Credentials ist per
+# Spec verboten, deshalb explizite Origins; Tailscale bleibt als Fallback.
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=".*",
+    allow_origins=["https://localhost", "capacitor://localhost",
+                   "https://api.teamigel.com",
+                   "https://seriousjoke.tailcc473e.ts.net"],
+    allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "x-api-token"],
 )

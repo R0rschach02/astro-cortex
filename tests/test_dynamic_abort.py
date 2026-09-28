@@ -21,7 +21,7 @@ class _AbortCase:
             def read(self):
                 import json
                 now = datetime.now()
-                night = (now - timedelta(hours=2)).date().isoformat()
+                night = (now - timedelta(minutes=30)).date().isoformat()
                 flip = (now + timedelta(hours=1)).strftime("%Y-%m-%dT%H:00")
                 return json.dumps({"Testort": {
                     "golden_windows": [{"night": night, "start":
@@ -35,11 +35,6 @@ class _AbortCase:
 
     def fake_locations(self, *a):
         return [{"name": "Testort", "lat": 49.5, "lon": 8.6}]
-
-
-def self_night(now):
-    # Abenddatum des laufenden Fensters (Start vor 30 min)
-    return (now - timedelta(hours=2)).date().isoformat()
 
 
 def test_abort_alarm_feuert_einmal_und_dedup(monkeypatch):

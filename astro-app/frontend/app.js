@@ -8,7 +8,16 @@
  */
 "use strict";
 
-const BASE = (localStorage.getItem("astro_base") || "").replace(/\/$/, "");
+/* Cloudflare-Tunnel-Endpoint (Access-geschuetzt). Nativ ist er der
+   Default; alte Tailscale-Konfigurationen wandern einmalig um. */
+const CF_API = "https://api.teamigel.com";
+const isNativeApp = () => !!(window.Capacitor
+  && window.Capacitor.isNativePlatform
+  && window.Capacitor.isNativePlatform());
+let BASE = (localStorage.getItem("astro_base") || "").replace(/\/$/, "");
+if (BASE.includes("tailcc473e.ts.net")) BASE = CF_API;   // Migration
+if (!BASE && isNativeApp()) BASE = CF_API;               // nativer Default
+localStorage.setItem("astro_base", BASE);
 const $ = (id) => document.getElementById(id);
 const REFRESH_MS = 60_000;
 
@@ -33,9 +42,35 @@ function ratingColor(rating) {
 }
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
-async function api(path, opts) {
-  const res = await fetch(BASE + path, opts);
-  if (!res.ok) throw new Error(path + " -> HTTP " + res.status);
+/* Cloudflare-Access-Login-Flow: prallt der Call an der Wand (CORS-
+   TypeError, HTML-Antwort oder 401/403), oeffnet die App IM SELBEN
+   WebView BASE/auth/mobile - dort Email-OTP, danach Brueckenseite
+   zurueck zu https://localhost (Cookie bleibt im WebView-Glas,
+   Custom-Tabs waeren ein fremdes Cookie-Glas!). */
+function startCfAuthFlow() {
+  if (localStorage.getItem("astro_auth_pending")) return;
+  localStorage.setItem("astro_auth_pending", "1");
+  commsLog("CF-ACCESS: LOGIN ERFORDERLICH - oeffne Auth-Fenster", "alert");
+  window.location.href = BASE + "/auth/mobile";
+}
+
+async function api(path, opts = {}) {
+  opts.credentials = "include";   // CF_Authorization-Cookie mitsenden
+  let res;
+  try {
+    res = await fetch(BASE + path, opts);
+  } catch (e) {
+    // Netzwerk-/CORS-Fehler = Wand (nativ); Browser zeigt Fehler wie bisher
+    if (isNativeApp()) startCfAuthFlow();
+    throw e;
+  }
+  const ct = res.headers.get("content-type") || "";
+  if (!res.ok || ct.includes("text/html")) {
+    if (isNativeApp() && (res.status === 401 || res.status === 403
+        || ct.includes("text/html")))
+      startCfAuthFlow();
+    throw new Error(path + " -> HTTP " + res.status);
+  }
   return res.json();
 }
 
@@ -715,6 +750,10 @@ function renderSpots(data) {
 async function refresh() {
   try {
     const data = await api("/api/spots");
+    if (localStorage.getItem("astro_auth_pending")) {
+      localStorage.removeItem("astro_auth_pending");
+      commsLog("CF-ACCESS: AUTH OK - Sensoren online");
+    }
     localStorage.setItem("astro_last_refresh_ts", String(Date.now()));
     updateDataAge();
     lastSpots = data;

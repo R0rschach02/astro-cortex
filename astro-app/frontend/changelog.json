@@ -444,6 +444,12 @@
       "title": "DATALINK-Dock mobil ins SENS-Overlay verlagert",
       "detail": "Auf dem Handy lebt das DATALINK-Modul nicht mehr fixiert ueber dem T-Track, sondern IM <SENS-Slide-in-Overlay am Panel-Ende (spiegelbildlich zum OBS-Dock rechts) - die linke Spalte ist auf dem Handy das Overlay, nicht wie am Desktop dauerhaft sichtbar. JS zieht das Dock bei mobilen Viewports ins Panel (DOM-Umzug, IDs/Logik unveraendert), CSS macht es dort static/vollbreit mit margin-top:auto. Desktop unberuehrt: fixiertes Dock ueber dem Track bleibt.",
       "usage": "Handy: ◄SENS oeffnen -> DATALINK-Schalter unten im Panel"
+    },
+    {
+      "date": "2026-09-29",
+      "title": "Tailscale-Kappung: Cloudflare-Tunnel + Access-Auth in der App",
+      "detail": "Die mobile App haengt nicht mehr an Tailscale: BASE nativ jetzt https://api.teamigel.com (Cloudflare Tunnel auf 127.0.0.1:8000); alte Tailscale-Konfigurationen wandern einmalig automatisch um. Die API ist durch Cloudflare Access (Email OTP) geschuetzt - dafuer: (1) Jeder fetch mit credentials include (CF_Authorization-Cookie). (2) CORS auf allow_credentials + explizite Origins umgestellt (Wildcard+Credentials waere per Spec verboten). (3) Auth-Interceptor: prallt ein Call an der Wand (CORS-TypeError, HTML-Antwort, 401/403), navigiert die App IM SELBEN WEBVIEW zu /auth/mobile - bewusst kein Custom-Tab-Plugin, denn deren Cookie-Glas ist vom App-WebView getrennt; nach Email-OTP dient eine Backend-Brueckenseite dem automatischen Ruecksprung zu https://localhost, Cookie bleibt im WebView-Glas, Sensoren laufen nativ weiter. Erfolgreicher Spots-Fetch loescht das Auth-Pending-Flag und meldet AUTH OK im Comms-Terminal.",
+      "usage": "Handy: einmalig E-Mail-OTP im Auth-Fenster, danach autark ueber api.teamigel.com"
     }
   ]
 }
