@@ -24,6 +24,8 @@
         <span class="sq-led" id="led-uap" title="UAP DB Link (Vorbereitung)"></span>
         <span class="sq-led" id="led-ping" title="GPS-Ping: noch nie"></span>
       </div>
+      <div class="data-age mono" id="data-age"
+        title="Alter der angezeigten Wetterdaten (letzter erfolgreicher Abruf)">DATA:&nbsp;--</div>
       <div class="ping-link mono" id="ping-link"
         title="Letzter GPS-Ping (Ampel: gruen &lt;30 min, amber &lt;2 h, rot &gt;2 h)">PING:&nbsp;--</div>
       <div id="freshness" class="freshness mono">lade…</div>
@@ -154,6 +156,51 @@ als Pitch - die Horizontlinie sinkt, je hoeher der Mond steht"></div>
             <span class="guard-off">SAFE</span>
           </span>
         </label>
+        <label class="guard-switch guard-master" title="Datalink: AUTO = 60s-Polling (Netzbetrieb), MAN = stumm, UPLINK-Button holt einmalig">
+          <input type="checkbox" id="datalink-sw">
+          <span class="guard-frame">
+            <span class="guard-on dl-auto">AUTO</span>
+            <svg class="bat-switch" viewBox="0 0 60 90">
+              <defs>
+                <linearGradient id="dl-plate" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stop-color="#3a4147"/>
+                  <stop offset=".5" stop-color="#565f68"/>
+                  <stop offset="1" stop-color="#2a3036"/>
+                </linearGradient>
+                <linearGradient id="dl-nut" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#79838e"/>
+                  <stop offset=".5" stop-color="#4a525a"/>
+                  <stop offset="1" stop-color="#5d666f"/>
+                </linearGradient>
+                <linearGradient id="dl-chrome" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stop-color="#f2f5f8"/>
+                  <stop offset=".35" stop-color="#c3ccd4"/>
+                  <stop offset=".55" stop-color="#8b959e"/>
+                  <stop offset=".8" stop-color="#d8dee4"/>
+                  <stop offset="1" stop-color="#6d7680"/>
+                </linearGradient>
+              </defs>
+              <rect x="5" y="4" width="50" height="82" rx="4"
+                fill="url(#dl-plate)" stroke="#14181c" stroke-width="1.5"/>
+              <rect x="9" y="8" width="42" height="74" rx="3" fill="none"
+                stroke="#1d2227" stroke-width="1"/>
+              <polygon points="30,32 42,39 42,53 30,60 18,53 18,39"
+                fill="url(#dl-nut)" stroke="#0d1013" stroke-width="1.2"/>
+              <circle cx="30" cy="46" r="6" fill="#0a0d11"
+                stroke="#2c3136" stroke-width="1"/>
+              <g class="bat-lever">
+                <rect x="26.6" y="15" width="6.8" height="34" rx="3.4"
+                  fill="url(#dl-chrome)" stroke="#3d444b" stroke-width=".8"/>
+                <circle cx="30" cy="13.5" r="5.6" fill="url(#dl-chrome)"
+                  stroke="#3d444b" stroke-width=".8"/>
+                <circle cx="28.4" cy="12" r="1.6" fill="#ffffff" opacity=".75"/>
+                <line x1="28.2" y1="20" x2="28.2" y2="44"
+                  stroke="#ffffff" stroke-width="1" opacity=".55"/>
+              </g>
+            </svg>
+            <span class="guard-off dl-man">MAN</span>
+          </span>
+        </label>
         <div class="guard-caption mono">ASTRO&nbsp;OBSERVATION<br>
           <small>Wetter-Alarme nur wenn gelegt</small></div>
       </div>
@@ -171,6 +218,8 @@ als Pitch - die Horizontlinie sinkt, je hoeher der Mond steht"></div>
         ><input type="range" min="0" max="6" step="1" value="0" id="rg-slider" aria-label="Regen-Prognose Stunden"
         ></div><button id="rg-play" class="hw-btn hw-mini" title="Zeitverlauf abspielen">&#9654;</button></div>
       <span class="tl-label mono" id="rg-label">Jetzt</span>
+      <button class="hw-btn hw-mini uplink-btn" id="uplink-btn"
+        title="UPLINK: einmalig frische Daten holen + GPS-Ping senden">&#9650;UPLINK</button>
       <button class="hw-btn hw-mini" id="left-hud-btn" title="Sensoren-Overlay ein-/ausblenden">&#9668;SENS</button>
       <button class="hw-btn hw-mini" id="right-panel-pin" title="Intel-Panel ein-/ausklappen">INTEL►</button>
     </footer>

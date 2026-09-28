@@ -1071,3 +1071,28 @@ body.night .basemap-tile { filter: none; }
    transform: kollidiert nicht mit der mobilen scale-Positionierung) */
 #flightstick { transition: opacity .25s ease; }
 #flightstick.fs-hidden { opacity: 0; pointer-events: none; }
+
+/* ---- DATALINK: Uplink-Button + Data-Age (Backend-Autonomie) ---- */
+.uplink-btn { color: #ffd24a; border-color: rgba(255,210,74,.5);
+  letter-spacing: .06em; }
+.uplink-btn.uplink-busy { color: #ff8a3d;
+  animation: uplink-pulse .7s ease-in-out infinite; }
+@keyframes uplink-pulse { 50% { box-shadow: 0 0 14px rgba(255,138,61,.55); } }
+.data-age { font-size: 10px; font-weight: 700; letter-spacing: .07em;
+  padding: 3px 7px; white-space: nowrap;
+  border: 1px solid rgba(159,176,192,.3); }
+.data-age.age-fresh { color: #3aff7c;
+  border-color: rgba(58,255,124,.35); }
+.data-age.age-amber { color: #ffd24a; border-color: rgba(255,210,74,.45);
+  animation: age-blink 2.5s ease-in-out infinite; }
+.data-age.age-red { color: #ff5c50; border-color: rgba(255,92,80,.5);
+  animation: age-blink 1.2s ease-in-out infinite; }
+@keyframes age-blink { 50% { opacity: .55; } }
+.guard-frame .dl-auto { color: #3aff7c; }
+.guard-frame .dl-man { color: #9fb0c0; }
+.guard-master input:checked ~ .guard-frame .dl-auto {
+  text-shadow: 0 0 8px rgba(58,255,124,.7); }
+.guard-master input:checked ~ .guard-frame .dl-man { color: #44505c; }
+.guard-master input:not(:checked) ~ .guard-frame .dl-man {
+  text-shadow: 0 0 6px rgba(159,176,192,.6); }
+.guard-master input:not(:checked) ~ .guard-frame .dl-auto { color: #3c5a4a; }

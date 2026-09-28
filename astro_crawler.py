@@ -1866,6 +1866,93 @@ DEVIATION_CLOUD_PP = 30     # Prozentpunkte Ist schlechter als Vorhersage
 DEVIATION_SEEING_ARCSEC = 1.0
 
 
+
+def check_dynamic_abort_alerts():
+    """Server-seitiger DYNAMIC ABORT (Backend-Autonomie): Laeuft bei einem
+    Standort das Golden Window UND kippt die bias-korrigierte Prognose der
+    kommenden Stunden auf NO-GO, gibt es EINEN Telegram-Alarm pro
+    Standort|Nacht (Dedup via State). Die App kann dafür offline sein -
+    der Igel wacht. Gated wie jeder proaktive Wetter-Push."""
+    now = datetime.now()
+    state = load_state()
+    if not weather_pushes_allowed(state):
+        return
+    try:
+        locations = active_locations(DEFAULT_LOCATIONS) + load_watchlist()
+    except Exception as e:  # noqa: BLE001
+        log.warning("[DynAbort] Standorte: %s", type(e).__name__)
+        return
+    try:
+        with open(FORECAST_PATH, "r", encoding="utf-8") as f:
+            fc = json.load(f)
+    except (OSError, ValueError):
+        return
+    bias = {}
+    try:
+        with open(BIAS_PATH, "r", encoding="utf-8") as f:
+            bias = json.load(f)
+    except (OSError, ValueError):
+        pass
+    profile = get_profile(state)
+
+    def _bias_fix(hour: dict) -> dict:
+        """Bias-Delta anwenden (Anzeige-Konvention: clouds/seeing)."""
+        h = dict(hour)
+        ts = h.get("ts") or ""
+        try:
+            lead = ((datetime.fromisoformat(ts[:19]) - now)
+                    .total_seconds() / 3600)
+        except ValueError:
+            lead = 0
+        bucket = "le24" if lead <= 24 else "gt24"
+        for par in ("clouds", "seeing"):
+            b = (bias.get(par) or {}).get(bucket) or {}
+            if b.get("applied") and h.get(par) is not None:
+                h[par] = h[par] - (b.get("bias") or 0)
+        return h
+
+    state.setdefault("abort_alerted", {})
+    for loc in locations:
+        name = loc["name"]
+        entry = fc.get(name) or {}
+        gws = entry.get("golden_windows") or []
+        if not gws:
+            continue
+        gw = gws[0]
+        try:
+            night = datetime.fromisoformat(gw["night"])
+            g_start = datetime.combine(night,
+                datetime.strptime(gw["start"], "%H:%M").time())
+        except (ValueError, TypeError):
+            continue
+        g_end = g_start + timedelta(hours=max(1, gw.get("hours", 1)))
+        if not (g_start <= now < g_end):
+            continue
+        key = f"{name}|{gw['night']}"
+        if state["abort_alerted"].get(key):
+            continue  # schon alarmiert diese Nacht
+        for h in (entry.get("series") or []):
+            try:
+                ts = datetime.fromisoformat((h.get("ts") or "")[:19])
+            except ValueError:
+                continue
+            if ts < now or ts >= g_end:
+                continue
+            ok, reasons = _hour_score(_bias_fix(h), profile)
+            if not ok:
+                msg = (f"DYNAMIC ABORT \u2014 {name}\n"
+                       f"Fenster {gw['start']}-{g_end.strftime('%H:%M')} "
+                       f"laeuft, aber um {ts.strftime('%H:%M')} kippt die "
+                       f"Prognose: {', '.join(reasons)}.\n"
+                       f"Abbruch/Umplanung pruefen - Rueckfahrt neu "
+                       f"berechnen (TRANSIT ROUTE).")
+                send_telegram("ASTRO-CRAWLER DYNAMIC ABORT\n"
+                              f"{now:%d.%m. %H:%M}\n\n{msg}")
+                state["abort_alerted"][key] = now.isoformat(timespec="minutes")
+                save_state(state)
+                log.info("[DynAbort] Alarm %s (%s)", name, ", ".join(reasons))
+                break
+
 def check_forecast_deviation(reports: list):
     now = datetime.now()
     state = load_state()
@@ -3847,6 +3934,13 @@ async def run_cycle(locations: list, headless: bool, send_dashboard: bool,
             check_forecast_deviation(reports)
         except Exception as e:
             log.warning("[Abweichung] Pruefung fehlgeschlagen: %s", e)
+
+        # DYNAMIC ABORT serverseitig (Backend-Autonomie): laufendes Fenster
+        # + bias-korrigierter NO-GO-Umschlag -> EIN Telegram-Alarm/Nacht
+        try:
+            check_dynamic_abort_alerts()
+        except Exception as e:
+            log.warning("[DynAbort] Pruefung fehlgeschlagen: %s", e)
 
         # Plausibilitaetsschicht: Wertebereiche, Totlauf-Erkennung,
         # Zwei-Quellen-Abgleich (data_sanity.py, Log-only, kein Telegram)

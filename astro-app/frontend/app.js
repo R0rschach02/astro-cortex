@@ -170,6 +170,9 @@ function initMap() {
     setTimeout(() => map.invalidateSize(), 200);
   });
   $("left-hud-btn")?.addEventListener("click", () => toggleHud("left"));
+  $("uplink-btn")?.addEventListener("click", uplinkNow);
+  $("datalink-sw")?.addEventListener("change", (e) =>
+    setDatalinkMode(e.target.checked ? "auto" : "man"));
   $("right-panel-pin")?.addEventListener("click", () => {
     if (isMobileUI()) return toggleHud("right");
     document.getElementById("cockpit").classList.toggle("collapse-right");
@@ -703,6 +706,8 @@ function renderSpots(data) {
 async function refresh() {
   try {
     const data = await api("/api/spots");
+    localStorage.setItem("astro_last_refresh_ts", String(Date.now()));
+    updateDataAge();
     lastSpots = data;
     localStorage.setItem("astro_last_spots", JSON.stringify(data));
     if (data.profile) {
@@ -801,6 +806,66 @@ function toggleNight() {
   localStorage.setItem("astro_night", document.body.classList.contains("night") ? "1" : "0");
 }
 
+
+
+/* ============================================================
+   DATALINK (Backend-Autonomie): Die App ist Display - der Igel
+   crawlt und warnt allein. AUTO = 60s-Polling (Netzbetrieb),
+   MAN = stumm + UPLINK-Button (einmalig holen + GPS-Ping).
+   Standard: MAN auf schmalen Viewports (Batterie), AUTO am Desktop.
+   ============================================================ */
+let refreshTimer = null;
+
+function datalinkMode() {
+  return localStorage.getItem("astro_datalink")
+    || (window.matchMedia("(max-width: 980px)").matches ? "man" : "auto");
+}
+
+function applyDatalinkMode() {
+  const mode = datalinkMode();
+  const sw = document.getElementById("datalink-sw");
+  if (sw) sw.checked = mode === "auto";
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+  if (mode === "auto") {
+    refreshTimer = setInterval(refresh, REFRESH_MS);
+    commsLog("DATALINK AUTO - 60s TICK");
+  } else {
+    commsLog("DATALINK MANUAL - UPLINK fuer Daten", "alert");
+  }
+  updateDataAge();
+}
+
+function setDatalinkMode(mode) {
+  localStorage.setItem("astro_datalink", mode);
+  applyDatalinkMode();
+}
+
+async function uplinkNow() {
+  const btn = document.getElementById("uplink-btn");
+  if (btn) btn.classList.add("uplink-busy");
+  commsLog("UPLINK: hole Daten + GPS-Ping...");
+  try { await refresh(); } catch (e) { /* refresh loggt selbst */ }
+  try { if (!(pingBusy)) await gpsWatch(); } catch (e) { /* LED zeigt Fehler */ }
+  if (btn) btn.classList.remove("uplink-busy");
+}
+
+/* Data Freshness: Alter der ANGEZEIGTEN Daten (Letztabruf),
+   Amber ab 30 min, Rot ab 2 h - aktualisiert ohne Netz-Traffic */
+function updateDataAge() {
+  const el = document.getElementById("data-age");
+  if (!el) return;
+  const ts = +(localStorage.getItem("astro_last_refresh_ts") || 0);
+  if (!ts) {
+    el.textContent = "DATA: --";
+    el.className = "data-age mono age-red";
+    return;
+  }
+  const min = Math.floor((Date.now() - ts) / 60000);
+  const label = min < 60 ? min + " MIN" : (min / 60).toFixed(1) + " H";
+  el.textContent = "DATA: " + label;
+  el.className = "data-age mono "
+    + (min < 30 ? "age-fresh" : min < 120 ? "age-amber" : "age-red");
+}
 
 /* ============================================================
    GPS-PING (Phase 2): ein Tap = eine Messung. Native nutzt das vom
@@ -959,7 +1024,8 @@ window.addEventListener("DOMContentLoaded", () => {
   $("tab-now").onclick = () => showTab("now");
   $("tab-fc").onclick = () => showTab("fc");
   refresh();
-  setInterval(refresh, REFRESH_MS);
+  applyDatalinkMode();
+  setInterval(updateDataAge, 60_000);   // nur Anzeige, kein Traffic
   if ("serviceWorker" in navigator) {
     // Native (Capacitor): KEIN Service Worker - Assets kommen gebuendelt
     // aus der APK; ein SW-Cache wuerde bei App-Updates veraltete
