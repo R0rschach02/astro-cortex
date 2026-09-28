@@ -171,6 +171,15 @@ function initMap() {
   });
   $("left-hud-btn")?.addEventListener("click", () => toggleHud("left"));
   $("uplink-btn")?.addEventListener("click", uplinkNow);
+  // Mobile: Das DATALINK-Dock lebt IM <SENS-Overlay (die linke Spalte
+  // ist auf dem Handy das Slide-in, nicht dauerhaft sichtbar wie am
+  // Desktop) - kompakt am Panel-Ende, spiegelbildlich zum OBS-Dock rechts.
+  if (isMobileUI()) {
+    const dock = document.getElementById("datalink-dock");
+    const left = document.getElementById("left-panel");
+    if (dock && left && dock.parentElement !== left)
+      left.appendChild(dock);
+  }
   $("datalink-sw")?.addEventListener("change", (e) =>
     setDatalinkMode(e.target.checked ? "auto" : "man"));
   $("right-panel-pin")?.addEventListener("click", () => {

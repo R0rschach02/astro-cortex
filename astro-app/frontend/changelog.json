@@ -438,6 +438,12 @@
       "title": "DATALINK-Dock komprimiert: Compact Block statt Banner",
       "detail": "Das linke DATALINK-Modul ist kein breites Banner mehr: vertikales Stacking (Schalter oben, Text zentriert darunter, spiegelbildlich zum OBS-Modul), harte Breitenkappe (130px Desktop / 112px mobil - deutlich schmaler als das 322px-Seitenmenue), bündig mit der linken Panelkante abschliessend (left:0, borderlos zur Seite). Cockpit-Brevity: Titel DATALINK MODE, Sub-Label SYNC: ON-DEMAND / CONT in 8px. Mobil sitzt der Kasten wieder direkt ueber dem Track - so schmal, dass der zentrierte Flightstick unberuehrt bleibt.",
       "usage": "Schmales Warnstreifen-Kae stchen links, kein Karten-Overreach mehr"
+    },
+    {
+      "date": "2026-09-28",
+      "title": "DATALINK-Dock mobil ins SENS-Overlay verlagert",
+      "detail": "Auf dem Handy lebt das DATALINK-Modul nicht mehr fixiert ueber dem T-Track, sondern IM <SENS-Slide-in-Overlay am Panel-Ende (spiegelbildlich zum OBS-Dock rechts) - die linke Spalte ist auf dem Handy das Overlay, nicht wie am Desktop dauerhaft sichtbar. JS zieht das Dock bei mobilen Viewports ins Panel (DOM-Umzug, IDs/Logik unveraendert), CSS macht es dort static/vollbreit mit margin-top:auto. Desktop unberuehrt: fixiertes Dock ueber dem Track bleibt.",
+      "usage": "Handy: ◄SENS oeffnen -> DATALINK-Schalter unten im Panel"
     }
   ]
 }

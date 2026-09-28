@@ -1113,9 +1113,10 @@ body.night .basemap-tile { filter: none; }
 #datalink-dock .guard-caption small { font-size: 8px;
   color: var(--dim); letter-spacing: 1px; }
 @media (max-width: 980px) {
-  /* Mobil: kompakt, bündig über dem Track - das Dock ist jetzt so
-     schmal, dass der zentrierte Flightstick frei bleibt */
-  #datalink-dock { left: 0; bottom: 54px; padding: 6px 4px 5px;
-    max-width: 112px; }
+  /* Mobil: DATALINK-Dock sitzt IM <SENS-Overlay unten (JS zieht es
+     dort hinein) - Panel-Ende, spiegelbildlich zum OBS-Dock rechts */
+  #left-panel { display: flex; flex-direction: column; }
+  #datalink-dock { position: static; width: 100%; max-width: none;
+    margin-top: auto; border-left: 1px solid var(--line); }
   #datalink-dock .bat-switch { width: 42px; height: 62px; }
 }
