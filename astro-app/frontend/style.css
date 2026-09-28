@@ -1100,14 +1100,22 @@ body.night .basemap-tile { filter: none; }
 /* DATALINK-Dock (links, ueber dem T-Track): gleiche Bauweise wie das
    ASTRO-OBSERVATION-Dock rechts - aber Warnstreifen schwarz-gelb statt
    der roten OBS-Symbolik. Beschriftung analog rechts. */
-#datalink-dock { position: fixed; left: 12px; bottom: 58px; z-index: 960;
-  display: flex; align-items: center; gap: 10px; padding: 10px 10px;
-  border: 1px solid var(--line);
+#datalink-dock { position: fixed; left: 0; bottom: 54px; z-index: 960;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 4px; padding: 8px 6px 6px;
+  max-width: 130px; text-align: center;
+  border: 1px solid var(--line); border-left: none;
   background: repeating-linear-gradient(-45deg,
     rgba(255,210,74,.16) 0 10px, rgba(0,0,0,.55) 10px 20px), var(--panel2);
   box-shadow: 0 4px 14px rgba(0,0,0,.55), inset 0 0 10px rgba(0,0,0,.5);
   border-top: 2px solid #4a3f14; }
+#datalink-dock .guard-caption { line-height: 1.5; }
+#datalink-dock .guard-caption small { font-size: 8px;
+  color: var(--dim); letter-spacing: 1px; }
 @media (max-width: 980px) {
-  #datalink-dock { left: 8px; bottom: 60px; padding: 8px 8px; }
-  #datalink-dock .bat-switch { width: 44px; height: 66px; }
+  /* Mobil: kompakt, bündig über dem Track - das Dock ist jetzt so
+     schmal, dass der zentrierte Flightstick frei bleibt */
+  #datalink-dock { left: 0; bottom: 54px; padding: 6px 4px 5px;
+    max-width: 112px; }
+  #datalink-dock .bat-switch { width: 42px; height: 62px; }
 }
