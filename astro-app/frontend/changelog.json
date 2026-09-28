@@ -426,6 +426,12 @@
       "title": "Ergonomie: DATALINK-Schalter in den T-Track verlagert",
       "detail": "Der DATALINK AUTO/MAN-Kippschalter verlaesst das rechte Master-Switch-Dock (Ballung mit OBS-Schalter, UPLINK und INTEL-Toggle) und sitzt jetzt ganz links in der T-Track-Leiste - Kommunikation links, Sensoren/OBS rechts, weniger Fehlklicks im Feld. Kompakte Bauform (40x62px Desktop, 34x52px mobil mit kleineren AUTO/MAN-Labels), Funktionsweise und Persistenz unveraendert.",
       "usage": "DATALINK-Hebel jetzt links unten neben T-TRACK"
+    },
+    {
+      "date": "2026-09-28",
+      "title": "DATALINK-Dock: dediziertes linkes Modul ueber dem T-Track",
+      "detail": "Der AUTO/MAN-Kippschalter verlaesst die T-Track-Leiste wieder und bekommt ein eigenes, fest verankertes Dock auf der linken Seite direkt ueber der Leiste - spiegelbildliche Bauweise zum rechten ASTRO-OBSERVATION-Dock (Schalter + technische Caption), aber mit schwarz-gelben Warnstreifen statt der roten OBS-Symbolik. Caption: DATALINK/UPLINK MODE - FETCH ON DEMAND <-> CONTINUOUS SYNC. Kommunikation links, Sensoren/OBS rechts; T-Track und Master-Switch-Dock wieder entzuerrt.",
+      "usage": "Schwarzigelbes DATALINK-Modul links unten; OBS rechts allein"
     }
   ]
 }
