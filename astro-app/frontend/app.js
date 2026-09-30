@@ -125,6 +125,15 @@ function initMap() {
   buildLunar();
   initFlightstick();
   pingLedState();
+  // Build-Diagnose (eine Zeile Comms): welcher Stand laeuft und wie
+  // die App ihren Kontext sieht (Support-Fallstricke einsparen)
+  commsLog("BUILD 2026-09-29C \u00b7 ORIGIN " + location.origin
+    + " \u00b7 BASE " + (BASE || "(same-origin)")
+    + " \u00b7 NATIVE " + isNativeApp());
+  if (!isNativeApp()) {
+    const lb = document.getElementById("cf-login-btn");
+    if (lb) lb.style.display = "none";
+  }
   initInfoWidget();
   initCockpitStatus();
   // Grid-Layout mit minmax kann die Map-Groesse nach dem ersten Render
@@ -209,6 +218,10 @@ function initMap() {
   });
   $("left-hud-btn")?.addEventListener("click", () => toggleHud("left"));
   $("uplink-btn")?.addEventListener("click", uplinkNow);
+  $("cf-login-btn")?.addEventListener("click", () => {
+    localStorage.removeItem("astro_auth_pending");
+    startCfAuthFlow();
+  });
   // Mobile: Das DATALINK-Dock lebt IM <SENS-Overlay (die linke Spalte
   // ist auf dem Handy das Slide-in, nicht dauerhaft sichtbar wie am
   // Desktop) - kompakt am Panel-Ende, spiegelbildlich zum OBS-Dock rechts.
@@ -964,10 +977,14 @@ async function handlePingResult(lat, lon) {
   pingLedState();
   commsLog("GPS-PING: " + lat.toFixed(4) + " / " + lon.toFixed(4));
   try {
-    const headers = {"Content-Type": "application/json"};
+    // Cloudflare Access blockt CORS-Preflights (POST+JSON wuerde einen
+    // ausloesen) -> SIMPLE REQUEST: text/plain ohne Custom-Header.
+    // Der Body bleibt JSON, das Backend parst ihn tolerant; ein Token
+    // geht per Query statt Header (Query loest keinen Preflight aus).
     const tok = localStorage.getItem("astro_api_token");
-    if (tok) headers["x-api-token"] = tok;
-    const r = await api("/api/watch", {method: "POST", headers,
+    const r = await api("/api/watch" + (tok ? "?token=" +
+      encodeURIComponent(tok) : ""), {method: "POST",
+      headers: {"Content-Type": "text/plain"},
       body: JSON.stringify({lat, lon, hours: 2})});
     commsLog("WATCHPOINT 2H AKTIV: " + (r.name || "Live"));
     refresh();

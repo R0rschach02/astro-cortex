@@ -196,11 +196,19 @@ class WatchBody(BaseModel):
 
 
 @app.post("/api/watch")
-async def api_watch(body: WatchBody, request: Request):
+async def api_watch(request: Request):
     """Live-Standort auf die Watchlist (Pendant zu /watch per Telegram).
-    Nutzt denselben fcntl-Lock wie der Bot - keine lost updates."""
-    if API_TOKEN and request.headers.get("x-api-token") != API_TOKEN:
+    Nutzt denselben fcntl-Lock wie der Bot - keine lost updates.
+    Cloudflare-Access blockt CORS-Preflights (403, nie mit Cookie) -
+    der native Ping kommt deshalb als SIMPLE REQUEST: Content-Type
+    text/plain ohne Custom-Header (Body bleibt JSON), Token optional
+    per Query-Parameter. Das JSON-Parsing passiert hier manuell."""
+    if API_TOKEN and request.headers.get("x-api-token") != API_TOKEN             and request.query_params.get("token") != API_TOKEN:
         raise HTTPException(401, "Ungueltiger API-Token")
+    try:
+        body = WatchBody(**(await request.json()))
+    except Exception as e:
+        raise HTTPException(400, f"Ungueltiger Body: {type(e).__name__}")
     if not (-90 <= body.lat <= 90 and -180 <= body.lon <= 180):
         raise HTTPException(400, "Koordinaten ausserhalb des Bereichs")
     name = body.name or f"Live {body.lat:.4f}/{body.lon:.4f}"

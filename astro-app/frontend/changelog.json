@@ -456,6 +456,12 @@
       "title": "CF-Auth-Robustheit: Origin-Erkennung + Third-Party-Cookies + Uplink-Retry",
       "detail": "Erste Handy-Reports zeigten LINK LOST ohne Login-Fenster - zwei gefundene Ursachen: (1) Capacitor 6 aktiviert Third-Party-Cookies im Haupt-WebView nicht (nur im Cordova-Manager) - CF_Authorization waere nach dem OTP nie mitgesendet worden; MainActivity aktiviert sie jetzt explizit (onCreate+onStart). (2) Die Native-Erkennung hing am window.Capacitor-Flag - fehlt die Injection, bliebe BASE leer und der Call ging an https://localhost statt zum Tunnel (genau das Fehlerbild). isNativeApp() prueft jetzt zusaetzlich die Origin (https://localhost / capacitor:), gegen Bridge-Ausfall unempfindlich. UPLINK loest das Auth-Pending-Flag und dient damit als Login-Retry, falls die erste Navigation nicht ans Ziel kam.",
       "usage": "Handy: APK neu installieren, App oeffnen -> Login-Fenster kommt, OTP, zurueck zur App"
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Watch-Simple-Request, Comms-Umbruch, PRIME-WINDOW-Fruehwarnung",
+      "detail": "(1) WATCH-POST-FEHLGESCHLAGEN in der App behoben: Cloudflare Access blockt CORS-Preflights mit 403 (Preflights tragen per Spec nie Cookies) - der GPS-Ping ging deshalb als POST+JSON nie durch, waehrend GETs funktionierten. Der Ping ist jetzt ein SIMPLE REQUEST (Content-Type text/plain, kein Custom-Header -> kein Preflight), Body bleibt JSON und das Backend parst tolerant; Token optional per Query statt Header. (2) Comms-Feed mobil: Meldungen brechen um (white-space normal, break-word) statt im Hoch- und Querformat abgeschnitten zu werden. (3) NEU PRIME-WINDOW-Push: Der Heavy-Tick sucht in jedem Lauf Golden Windows in genau 2 Naechten und vergleicht deren Bedingungen (Wolken-/Seeing-Durchschnitt der Fensterstunden) gegen den Schnitt ALLER aktuell bekannten Fenster aller Standorte - 25% unter dem Wolken-Schnitt oder 20% besseres Seeing qualifying als ueberdurchschnittlich. Treffer -> EIN Telegram-Push pro Standort|Nacht (Dedup, 14 Tage State-Historie) mit Location, Datum und genauer Uhrzeit plus Bedingungen und Sessionhinweis. Bewusst IMMER aktiv (nicht an observation_mode gekoppelt, ausdruecklicher Nutzerwunsch), deterministisch getestet (Feuert+Format, Dedup, kein Push ohne Ueberdurchschnitt, un-gated).",
+      "usage": "App: UPLINK-Ping geht durch die CF-Wand; Telegram: PRIME WINDOW 2 Tage im Voraus"
     }
   ]
 }

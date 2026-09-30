@@ -1867,6 +1867,119 @@ DEVIATION_SEEING_ARCSEC = 1.0
 
 
 
+
+def check_prime_window_push():
+    """PRIME-WINDOW-Fruehwarnung (immer, 2 Tage im Voraus): Findet der
+    Heavy-Tick ein Golden Window in genau 2 Naechten, dessen Bedingungen
+    UEBERDURCHSCHNITTLICH sind (Vergleich gegen alle aktuell bekannten
+    Fenster aller Standorte), geht EIN Telegram-Push pro Standort|Nacht
+    heraus - mit Location, Datum und genauer Uhrzeit. Bewusst NICHT an
+    weather_pushes_allowed gekoppelt (Nutzerwunsch: immer senden)."""
+    from datetime import date as _date
+    today = _date.today()
+    target_night = (today + timedelta(days=2)).isoformat()
+    try:
+        with open(FORECAST_PATH, "r", encoding="utf-8") as f:
+            fc = json.load(f)
+    except (OSError, ValueError):
+        return
+    state = load_state()
+    state.setdefault("prime_pushed", {})
+
+    # 1) Fenster-Metriken sammeln: alle Fenster aller Standorte (naechste
+    #    Naechte) fuer den Vergleichsmassstab "Durchschnitt"
+    def _win_metrics(entry, gw):
+        """(clouds_avg, seeing_avg, wind_max, tau_min) der Fensterstunden."""
+        try:
+            start_h = int(gw["start"].split(":")[0])
+        except (KeyError, ValueError):
+            return None
+        cl, se, wi, ta, n = [], [], [], [], 0
+        for h in (entry.get("series") or []):
+            ts = (h.get("ts") or "")[:10]
+            try:
+                hh = int((h.get("ts") or "")[11:13])
+            except ValueError:
+                continue
+            if ts != gw.get("night"):
+                continue
+            # Fensternaehe: Startstunde bis Start+hours (Toleranz +1)
+            if not (start_h - 1 <= hh <= start_h + gw.get("hours", 1)):
+                continue
+            if h.get("clouds") is not None: cl.append(h["clouds"])
+            if h.get("seeing") is not None: se.append(h["seeing"])
+            if h.get("wind") is not None: wi.append(h["wind"])
+            if h.get("tau") is not None: ta.append(h["tau"])
+            n += 1
+        if n == 0:
+            return None
+        return (sum(cl) / len(cl) if cl else None,
+                sum(se) / len(se) if se else None,
+                max(wi) if wi else None,
+                min(ta) if ta else None)
+
+    all_clouds, all_seeing = [], []
+    for entry in fc.values():
+        for gw in (entry.get("golden_windows") or [])[:3]:
+            m = _win_metrics(entry, gw)
+            if m and m[0] is not None: all_clouds.append(m[0])
+            if m and m[1] is not None: all_seeing.append(m[1])
+    avg_clouds = sum(all_clouds) / len(all_clouds) if all_clouds else None
+    avg_seeing = sum(all_seeing) / len(all_seeing) if all_seeing else None
+
+    # 2) Fenster in genau 2 Naechten auf Ueberdurchschnittlichkeit pruefen
+    for name, entry in fc.items():
+        for gw in (entry.get("golden_windows") or []):
+            if gw.get("night") != target_night:
+                continue
+            m = _win_metrics(entry, gw)
+            if not m:
+                continue
+            clouds, seeing, wind, tau = m
+            reasons = []
+            if avg_clouds is not None and clouds is not None \
+                    and clouds <= avg_clouds * 0.75:
+                reasons.append(f"Wolken \u00d8 {clouds:.0f}% "
+                               f"(Schnitt aller Fenster: {avg_clouds:.0f}%)")
+            if avg_seeing is not None and seeing is not None \
+                    and seeing <= avg_seeing * 0.8:
+                reasons.append(f"Seeing \u00d8 {seeing:.1f}\u2033 "
+                               f"(Schnitt: {avg_seeing:.1f}\u2033)")
+            if not reasons:
+                continue   # fenstergut, aber nicht ueberdurchschnittlich
+            key = f"{name}|{target_night}"
+            if state["prime_pushed"].get(key):
+                continue
+            hours = max(1, gw.get("hours", 1))
+            try:
+                end_h = int(gw["start"].split(":")[0]) + hours
+            except ValueError:
+                continue
+            date_de = datetime.strptime(target_night, "%Y-%m-%d")\
+                .strftime("%d.%m.%Y")
+            conds = [f"Wind max {wind:.0f} km/h" if wind is not None else "",
+                     f"Tau min {tau:.0f} K" if tau is not None else ""]
+            msg = (f"PRIME WINDOW \u2014 2 TAGE IM VORAUS\n"
+                   f"{name}\n"
+                   f"Nacht {date_de}, {gw['start']}-"
+                   f"{end_h % 24:02d}:00 Uhr\n"
+                   + "\n".join(r for r in reasons if r) + "\n"
+                   + " \u00b7 ".join(c for c in conds if c) + "\n"
+                   f"Session planen: Transit-Rueckfahrt rechtzeitig sichern.")
+            send_telegram("ASTRO-CRAWLER PRIME WINDOW\n"
+                          f"{datetime.now():%d.%m. %H:%M}\n\n{msg}")
+            state["prime_pushed"][key] = datetime.now()\
+                .isoformat(timespec="minutes")
+            log.info("[PrimeWindow] Push %s (%s)", name,
+                     "; ".join(reasons))
+    # Zustand schlank halten (14 Tage)
+    cutoff = (datetime.now() - timedelta(days=14))\
+        .strftime("%Y-%m-%dT%H:%M")
+    state["prime_pushed"] = {k: v for k, v in
+                             state["prime_pushed"].items() if v >= cutoff}
+    save_state(state)
+
+
 def check_dynamic_abort_alerts():
     """Server-seitiger DYNAMIC ABORT (Backend-Autonomie): Laeuft bei einem
     Standort das Golden Window UND kippt die bias-korrigierte Prognose der
@@ -4010,6 +4123,13 @@ async def run_cycle(locations: list, headless: bool, send_dashboard: bool,
             check_evening_push()
         except Exception as e:
             log.warning("[Abendpush] fehlgeschlagen: %s", e)
+
+        # PRIME-WINDOW-Fruehwarnung: 2 Tage im Voraus bei
+        # ueberdurchschnittlichen Bedingungen (immer, dedupliziert)
+        try:
+            check_prime_window_push()
+        except Exception as e:
+            log.warning("[PrimeWindow] fehlgeschlagen: %s", e)
 
         # Uptime-Ping: Radar-Kern komplett durchgelaufen (Checks inklusive).
         # Bewusst VOR dem Auto-Heavy-Nachzug: Der dauert bis ~7 min und zieht

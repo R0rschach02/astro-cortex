@@ -1120,3 +1120,13 @@ body.night .basemap-tile { filter: none; }
     margin-top: auto; border-left: 1px solid var(--line); }
   #datalink-dock .bat-switch { width: 42px; height: 62px; }
 }
+
+/* CF-LOGIN (nativ sichtbar): manueller Auth-Retry */
+.cf-login-btn { color: #ff8a72; border-color: rgba(255,92,80,.5); }
+
+/* Comms mobil: Meldungen umbrechen statt abschneiden (Report: Zeilen
+   wurden im Hoch- wie Querformat gekappt) */
+@media (max-width: 980px) {
+  #comms-terminal .ct-line { white-space: normal;
+    word-break: break-word; overflow-wrap: anywhere; }
+}
