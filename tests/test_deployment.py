@@ -96,3 +96,38 @@ def test_hinfahrt_mit_steps_pills(gtfs_dir):
     rides = [s for s in steps if s["kind"] == "ride"]
     assert [r["line"] for r in rides] == ["S1", "Bus 421"]
     assert rides[0]["dep"] == "22:00" and rides[0]["arr"] == "22:10"
+
+
+def test_resolve_window_times_vergangenes_fenster():
+    """GW 18:00-20:00, jetzt 22:48 -> Route ab JETZT, keine Historie."""
+    from app.engine.deployment import resolve_window_times
+    now = datetime(2026, 9, 30, 22, 48)
+    gw = {"night": "2026-09-30", "start": "18:00", "hours": 2}
+    gws, gwe, from_now = resolve_window_times(gw, now)
+    assert from_now is True
+    assert gws == now                      # nicht 18:00!
+    assert gwe == now + timedelta(hours=2)
+    # outbound-Suche: arrive_by muss Zukunft sein (sonst historische
+    # Bahnen wie "Abfahrt 17:22")
+    assert gwe > now
+
+
+def test_resolve_window_times_laufendes_fenster():
+    from app.engine.deployment import resolve_window_times
+    now = datetime(2026, 9, 30, 19, 0)
+    gw = {"night": "2026-09-30", "start": "18:00", "hours": 4}
+    gws, gwe, from_now = resolve_window_times(gw, now)
+    assert from_now is False
+    assert gws == now                      # laeuft -> ab jetzt
+    assert gwe == datetime(2026, 9, 30, 22, 0)
+
+
+def test_resolve_window_times_zukuenftiges_und_ohne():
+    from app.engine.deployment import resolve_window_times
+    now = datetime(2026, 9, 30, 12, 0)
+    gw = {"night": "2026-09-30", "start": "20:00", "hours": 3}
+    gws, gwe, from_now = resolve_window_times(gw, now)
+    assert (gws, from_now) == (datetime(2026, 9, 30, 20, 0), False)
+    # gar kein GW -> ab jetzt
+    gws, gwe, from_now = resolve_window_times(None, now)
+    assert from_now is True and gws == now

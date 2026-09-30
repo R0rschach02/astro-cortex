@@ -569,30 +569,26 @@ def api_deployment(id: str, home: str = "Ilvesheim HQ",
         entry = {}
     gws = entry.get("golden_windows") or []
     gw = gws[0] if gws else None
-    if not gw:
-        raise HTTPException(404, f"Kein Golden Window fuer '{obs['name']}' "
-                                 f"- naechster Heavy-Tick liefert nach")
+    # kein GW: Route ab JETZT statt 404 (Fix 30.09.)
 
     now = _dt.now()
-    night = _dt.fromisoformat(gw["night"])
-    gws_dt = _dt.combine(night, _dt.strptime(gw["start"], "%H:%M").time())
-    gwe_dt = gws_dt + _td(hours=max(1, gw.get("hours", 1)))
-    # Wenn Start schon vorbei (Fenster laeuft), heute ab jetzt
-    if gws_dt < now - _td(hours=2):
-        gws_dt = now
+    from app.engine.deployment import resolve_window_times
+    gws_dt, gwe_dt, from_now = resolve_window_times(gw, now)
 
-    # Service-Datum = Abend des Golden Windows (night), nicht der
-    # Kalendertag einer evtl. nach Mitternacht liegenden Abfrage:
-    # Spaetfahrten 24:xx/25:xx gehoeren zum Vorabend-Service.
-    service_day = night.date()
+    # Service-Datum = Abend des Golden Windows; bei Route-ab-jetzt
+    # (Fenster vorbei/kein GW) zaehlt der heutige Abend-Service.
+    service_day = (now if from_now else
+                   _dt.fromisoformat(gw["night"])).date()
     try:
         transit = _transit_source(service_day)
     except GTFSNotAvailableError as e:
         raise HTTPException(503, str(e))
 
+    _night = _dt.fromisoformat(gw["night"]) if gw else now
     log.info("[API] deployment %s: night=%s gw=%s-%s service_day=%s "
-             "home=%s", id, night.date(), gws_dt.strftime("%H:%M"),
-             gwe_dt.strftime("%H:%M"), service_day, home_loc.get("name"))
+             "home=%s from_now=%s", id, _night.date(),
+             gws_dt.strftime("%H:%M"), gwe_dt.strftime("%H:%M"),
+             service_day, home_loc.get("name"), from_now)
     # Dynamic Abort: Wenn das Fenster JETZT laeuft, die bias-korrigierte
     # Prognose der kommenden Stunden im Fenster pruefen. Kippt eine Stunde
     # auf NO-GO (z.B. Wolken ziehen auf), wird die Rueckfahrt-Suche auf
@@ -640,10 +636,13 @@ def api_deployment(id: str, home: str = "Ilvesheim HQ",
         "setup_buffer_min": plan.setup_buffer_min,
         "transit_source": plan.transit_source,
         "home": home_loc.get("name", "?"),
+        "from_now": from_now,
+        **({"note": ("Golden Window liegt zurueck bzw. fehlt - "
+                     "Route ab jetzt berechnet." + (" " + note if note else ""))}
+           if from_now else {"note": note}),
         **({"dynamic_abort": {**plan.dynamic_abort,
                               "reason": abort_reason}}
            if plan.dynamic_abort else {}),
-        **({"note": note} if note else {}),
     }
 
 

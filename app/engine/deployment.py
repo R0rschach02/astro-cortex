@@ -29,6 +29,32 @@ class DeploymentPlan:
     dynamic_abort: Optional[dict] = None
 
 
+
+def resolve_window_times(gw, now, horizon_hours: int = 2):
+    """Zeit-Logik der Transit-Planung (Fix 30.09.: keine historischen
+    Verbindungen mehr).
+
+    Liefert (gws, gwe, from_now):
+    - kein GW ueberliefert              -> Route ab JETZT (now..now+H)
+    - GW komplett vorbei (end <= now)   -> Route ab JETZT (Zeit-Parameter
+      ignorieren - sonst kaeme "Abfahrt 17:22" bei 22:48 heraus)
+    - GW laeuft/lief kuerzlich an       -> (start evtl. auf now) .. end
+    """
+    if not gw:
+        return now, now + timedelta(hours=horizon_hours), True
+    night = datetime.fromisoformat(gw["night"])
+    gws = datetime.combine(night,
+                           datetime.strptime(gw["start"], "%H:%M").time())
+    gwe = gws + timedelta(hours=max(1, gw.get("hours", 1)))
+    if gwe <= now:
+        # Fenster liegt komplett zurueck: naechste Verbindungen ab jetzt
+        return now, now + timedelta(hours=horizon_hours), True
+    if gws < now:
+        # Fenster laeuft: Planung ab jetzt, Ankunft bis Fensterende ok
+        return now, gwe, False
+    return gws, gwe, False
+
+
 def deployment_window(golden_window_start: datetime,
                       golden_window_end: datetime,
                       home_location: dict,
