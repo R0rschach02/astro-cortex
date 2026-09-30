@@ -6,6 +6,10 @@
     "allowMixedContent": false
   },
   "server": {
-    "androidScheme": "https"
+    "androidScheme": "https",
+    "allowNavigation": [
+      "api.teamigel.com",
+      "*.cloudflareaccess.com"
+    ]
   }
 }

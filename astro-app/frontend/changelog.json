@@ -462,6 +462,12 @@
       "title": "Watch-Simple-Request, Comms-Umbruch, PRIME-WINDOW-Fruehwarnung",
       "detail": "(1) WATCH-POST-FEHLGESCHLAGEN in der App behoben: Cloudflare Access blockt CORS-Preflights mit 403 (Preflights tragen per Spec nie Cookies) - der GPS-Ping ging deshalb als POST+JSON nie durch, waehrend GETs funktionierten. Der Ping ist jetzt ein SIMPLE REQUEST (Content-Type text/plain, kein Custom-Header -> kein Preflight), Body bleibt JSON und das Backend parst tolerant; Token optional per Query statt Header. (2) Comms-Feed mobil: Meldungen brechen um (white-space normal, break-word) statt im Hoch- und Querformat abgeschnitten zu werden. (3) NEU PRIME-WINDOW-Push: Der Heavy-Tick sucht in jedem Lauf Golden Windows in genau 2 Naechten und vergleicht deren Bedingungen (Wolken-/Seeing-Durchschnitt der Fensterstunden) gegen den Schnitt ALLER aktuell bekannten Fenster aller Standorte - 25% unter dem Wolken-Schnitt oder 20% besseres Seeing qualifying als ueberdurchschnittlich. Treffer -> EIN Telegram-Push pro Standort|Nacht (Dedup, 14 Tage State-Historie) mit Location, Datum und genauer Uhrzeit plus Bedingungen und Sessionhinweis. Bewusst IMMER aktiv (nicht an observation_mode gekoppelt, ausdruecklicher Nutzerwunsch), deterministisch getestet (Feuert+Format, Dedup, kein Push ohne Ueberdurchschnitt, un-gated).",
       "usage": "App: UPLINK-Ping geht durch die CF-Wand; Telegram: PRIME WINDOW 2 Tage im Voraus"
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Capacitor Routing Fix: Auth-Flow bleibt im App-WebView",
+      "detail": "Screenshots bewiesen: Capacitor uebergab api.teamigel.com/auth/mobile per Intent an den SYSTEM-BROWSER (Brave) - OTP landete im falschen Cookie-Glas, der Rueckredirect auf https://localhost crashte dort mit ERR_CONNECTION_REFUSED (kein lokaler Server fuer den Systembrowser). Fix: server.allowNavigation [api.teamigel.com, *.cloudflareaccess.com] in der capacitor.config - der native WebView laedt Auth- und Cloudflare-Login-Seiten jetzt im App-Kontext statt Intent. Bridge-Rueckziel bleibt https://localhost (die Seite laeuft auf der API-Origin, '/' waere der API-Root; im WebView ist localhost die App). APK mit der Config im Bundle neu gebaut.",
+      "usage": "App: Login-Fenster oeffnet IM APP-WEBVIEW, OTP setzt das Cookie im App-Glas, Ruecksprung zur App"
     }
   ]
 }
