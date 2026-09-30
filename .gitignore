@@ -10,6 +10,7 @@
 !/tests/
 !/LESSONS.md
 !/SYSTEM_AUDIT.md
+!/README.md
 !/messier.csv
 !/.gitignore
 !/.gitattributes
@@ -32,3 +33,10 @@ __pycache__/
 # Equipment-Inventar: echte Datei gitignored, Example committed (wie locations)
 /equipment.json
 !/equipment.json.example
+
+# Native: Build-Artefakte + node_modules nicht ins Repo
+/astro-app/native/node_modules/
+/astro-app/native/android/.gradle/
+/astro-app/native/android/app/build/
+/astro-app/native/android/build/
+/astro-app/native/android/local.properties
