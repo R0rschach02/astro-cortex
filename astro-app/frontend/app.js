@@ -1192,7 +1192,9 @@ function setStickHidden(hide) {
 function commsLog(text, severity) {
   const t = document.getElementById("comms-terminal");
   if (!t) return;
-  const ts = new Date().toISOString().slice(11, 19);
+  // Lokale Geraetezeit (Fix: toISOString lieferte UTC, 2h hinter Berlin)
+  const ts = new Date().toLocaleTimeString("de-DE",
+    {hour: "2-digit", minute: "2-digit", second: "2-digit"});
   const div = document.createElement("div");
   div.className = "ct-line" + (severity === "alert" ? " comms-alert" : "");
   div.innerHTML = `<span class="ct-ts">${ts}</span> ${esc(String(text))}`;

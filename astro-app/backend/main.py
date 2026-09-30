@@ -715,6 +715,9 @@ UPDATES_DIR = os.path.expanduser("~/updates")
 
 @app.middleware("http")
 async def updates_cors(request, call_next):
+    # Muss NACH allen anderen Middlewares registriert werden = aeusserste
+    # Schicht. Setzt Header explizit (ueberschreibt CORSMiddleware fuer
+    # /updates-Pfade, damit der Updater immer ACAO: * sieht).
     """OTA-Routen brauchen bedingungsloses CORS: Der Capacitor-Updater
     laedt bundle.zip ohne unsere Token-Header (CF-Bypass aktiv) und
     blockt ohne Access-Control-Allow-Origin: * den Download."""
@@ -1050,7 +1053,8 @@ app.add_middleware(
                    "https://seriousjoke.tailcc473e.ts.net"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "x-api-token"],
+    allow_headers=["Content-Type", "x-api-token",
+                   "cf-access-client-id", "cf-access-client-secret"],
 )
 
 
