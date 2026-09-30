@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
-"""Astro Command Center - FastAPI-Backend.
+"""
+
+# Zeitzone VOR allen datetime-Nutzungen erzwingen (Fix 30.09.: Timer-
+# Dienste liefen auf UTC - Logs 21:16 vs. Realitaet 23:16, und die
+# Transit-Engine mischte UTC-NOW mit CEST-Golden-Windows, was die
+# Fenster-Logik um 2h verschob).
+import os as _os, time as _time
+_os.environ["TZ"] = "Europe/Berlin"
+_time.tzset()
+Astro Command Center - FastAPI-Backend.
 
 Liest ausschliesslich aus, was der Crawler (astro_crawler.py, systemd-Timer)
 schreibt: SQLite-Historie, State-Datei, Watchlist, Mond-Cache. Einzige
@@ -702,6 +711,27 @@ def api_auth_mobile():
 
 # --- OTA-Live-Updates: Web-Bundle + Manifest fuer die native App ---
 UPDATES_DIR = os.path.expanduser("~/updates")
+
+
+@app.middleware("http")
+async def updates_cors(request, call_next):
+    """OTA-Routen brauchen bedingungsloses CORS: Der Capacitor-Updater
+    laedt bundle.zip ohne unsere Token-Header (CF-Bypass aktiv) und
+    blockt ohne Access-Control-Allow-Origin: * den Download."""
+    if request.url.path.startswith("/updates"):
+        if request.method == "OPTIONS":
+            from fastapi.responses import PlainTextResponse
+            return PlainTextResponse("", headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, OPTIONS",
+                "Access-Control-Allow-Headers": "*",
+                "Access-Control-Max-Age": "600"})
+        resp = await call_next(request)
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = "*"
+        return resp
+    return await call_next(request)
 
 
 @app.get("/updates/latest.json")

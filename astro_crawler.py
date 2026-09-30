@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
 """
+
+# Zeitzone erzwingen (Fix 30.09.): Timer-Dienste liefen auf UTC -
+# Mond-Fenster/Golden Windows/Logs muessen Europe/Berlin sein.
+import os as _os, time as _time
+_os.environ.setdefault("TZ", "Europe/Berlin")
+_time.tzset()
+
 Astro-Crawler: Go/No-Go Entscheidungshilfe für Teleskop-Einsätze.
 
 Datenquellen:
@@ -2395,7 +2402,7 @@ def moon_cached(lat: float, lon: float) -> Optional[dict]:
             cache = json.load(f)
     except (OSError, ValueError):
         pass
-    key = f"v3|{datetime.now():%Y-%m-%d}|{lat:.3f}|{lon:.3f}"
+    key = f"v4|{datetime.now():%Y-%m-%d}|{lat:.3f}|{lon:.3f}"
     if key in cache:
         entry = cache[key]
         try:

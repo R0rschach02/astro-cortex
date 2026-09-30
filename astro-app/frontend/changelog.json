@@ -480,6 +480,12 @@
       "title": "Transit-Fix: keine historischen Verbindungen bei vorbei liegendem Golden Window",
       "detail": "Logikfehler behoben: War das Golden Window komplett vorbei (z.B. GW 18-20 Uhr, abgefragt 22:48), fiel arrive_by auf das vergangene Fensterende und die Suche lieferte historische Bahnen (Abfahrt 17:22). Neue Funktion resolve_window_times() in der Transit-Engine: kein GW oder Ende <= jetzt -> Zeit-Parameter werden ignoriert und die Route wird zwingend ab JETZT berechnet (Horizont now+2h fuer Hin- und Rueckfahrt); laufendes Fenster plant ab jetzt mit Ankunft bis Fensterende. Kein GW ist kein 404 mehr - die Route kommt trotzdem (Response-Kennzeichnung from_now + Hinweistext). Sechs deterministische Tests decken vergangen/laufend/zukuenftig/ohne ab. Ausgeliefert als OTA-Bundle.",
       "usage": "Transit-Button nach Fensterende: naechste Verbindungen ab jetzt statt Historie"
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Feld-Feedback-Runde: Zeitzonen-Fix, OTA-CORS, 24h-Drossel, Doku",
+      "detail": "(1) KRITISCH UTC-BUG: Die Timer-Dienste (Radar/Crawler) liefen auf UTC waehrend Golden Windows CEST sind - die Transit-Engine mischte 21:16-NOW mit 23:16-Fenstern (2h Versatz, historische Verbindungen als Symptom). Fix dreifach: TZ=Europe/Berlin erzwungen per systemd-Drop-in fuer alle drei Dienste UND als tzset() als erste Anweisung in main.py und astro_crawler.py. Mond-Cache v3->v4 (UTC-vergiftete Fenster erzwingen Neuberechnung). (2) OTA-CORS-BLOCKER: /updates-Routen haengen jetzt bedingungslos Access-Control-Allow-Origin * an (inkl. OPTIONS-Preflight-Antwort) - der Capacitor-Updater laedt ohne Token-Header und blockte sonst den ZIP-Download. (3) OTA-Check gedrosselt: max 1x/24h (astro_ota_last_check in localStorage) statt bei jedem Kaltstart. (4) Doku: README.md neu mit Zugriffsmodell (Desktop=Tailscale erlauben, Laptop/Tablet/Handy=zwingend native App/Cloudflare) und docs/EPIC_RESPONSIVE_UI.md als offenes Frontend-Epic fuer vollstaendig responsives Design ueber alle Geraeteklassen. APK ein letztes Mal neu gebaut um das defekte OTA-Modul zu ueberschreiben.",
+      "usage": "Logs/Zeiten jetzt durchgaengig Berlin-Zeit; OTA-Download geht durch; App prueft Updates 1x/Tag"
     }
   ]
 }

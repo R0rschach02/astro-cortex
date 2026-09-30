@@ -75,6 +75,10 @@ async function api(path, opts = {}) {
 async function checkOtaUpdate() {
   if (!isNativeApp() || !window.Capacitor?.Plugins?.CapacitorUpdater)
     return;
+  // max. 1x pro 24 h (Feld-Feedback): Kaltstart-Check, aber gedrosselt
+  const last = +(localStorage.getItem("astro_ota_last_check") || 0);
+  if (Date.now() - last < 24 * 3600 * 1000) return;
+  localStorage.setItem("astro_ota_last_check", String(Date.now()));
   try {
     const m = await api("/updates/latest.json");
     const cur = localStorage.getItem("astro_bundle_version");
