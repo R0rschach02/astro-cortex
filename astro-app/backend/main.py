@@ -700,6 +700,33 @@ def api_auth_mobile():
     return HTMLResponse(AUTH_BRIDGE_HTML)
 
 
+
+# --- OTA-Live-Updates: Web-Bundle + Manifest fuer die native App ---
+UPDATES_DIR = os.path.expanduser("~/updates")
+
+
+@app.get("/updates/latest.json")
+def api_ota_manifest():
+    """OTA-Manifest (Version + Bundle-URL). Erzeugt vom Deploy-Skript
+    nach jedem Frontend-Deploy; Cloudflare Access schuetzt den Pfad."""
+    mf = os.path.join(UPDATES_DIR, "latest.json")
+    if not os.path.exists(mf):
+        raise HTTPException(404, "kein OTA-Bundle deployt")
+    return FileResponse(mf, media_type="application/json",
+                        headers={"Cache-Control": "no-store"})
+
+
+@app.get("/updates/bundle.zip")
+def api_ota_bundle():
+    """Aktuelles Frontend-Bundle (ZIP, Wurzel = Web-Assets) fuer den
+    @capgo/capacitor-updater."""
+    zp = os.path.join(UPDATES_DIR, "bundle.zip")
+    if not os.path.exists(zp):
+        raise HTTPException(404, "kein OTA-Bundle deployt")
+    return FileResponse(zp, media_type="application/zip",
+                        headers={"Cache-Control": "no-store"})
+
+
 class ObsModeBody(BaseModel):
     active: bool
 

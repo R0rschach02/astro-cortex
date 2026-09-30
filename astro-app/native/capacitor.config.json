@@ -11,5 +11,13 @@
       "api.teamigel.com",
       "*.cloudflareaccess.com"
     ]
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    },
+    "CapacitorUpdater": {
+      "autoUpdate": false
+    }
   }
 }

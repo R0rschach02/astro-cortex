@@ -77,6 +77,22 @@ echo "== 5/5 Live-Beweis gegen die laufende API =="
 curl -sf --max-time 15 http://127.0.0.1:8000/api/spots \
   | /usr/bin/python3 -c 'import json,sys; d=json.load(sys.stdin); print("Spots:", len(d["spots"]), "|", ", ".join(s["name"] for s in d["spots"]))'
 
+# == 5b/5 OTA-Live-Bundle: Frontend als ZIP + Manifest fuer die App ==
+# Zukuenftige UI-Aenderungen fliegen so ohne APK-Rebuild in die App
+# (@capgo/capacitor-updater zieht /updates/latest.json beim Kaltstart).
+mkdir -p "$HOME/updates"
+(cd "$APP_DIR/frontend" && zip -qr "$HOME/updates/bundle.zip" . \
+  -x "*.DS_Store" ".*" 2>/dev/null) || \
+  (cd "$APP_DIR/frontend" && /usr/bin/python3 -m zipfile -c \
+    "$HOME/updates/bundle.zip" .)
+OTA_VER="$(git rev-parse --short HEAD)-$(date +%m%d%H%M)"
+/usr/bin/python3 - "$OTA_VER" << 'OTAEOF'
+import json, sys
+json.dump({"version": sys.argv[1], "url": "/updates/bundle.zip"},
+          open("/home/enigma/updates/latest.json", "w"))
+OTAEOF
+echo "OTA-Bundle: Version $OTA_VER ($HOME/updates/bundle.zip)"
+
 echo "ExecStart-Pfade zur Referenz:"
 for s in astro-crawler astro-radar astro-app; do
   systemctl --user show "$s.service" -p ExecStart | sed 's/ ; .*//;s/ExecStart={ path=/  /' 

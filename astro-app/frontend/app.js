@@ -11,6 +11,15 @@
 /* Cloudflare-Tunnel-Endpoint (Access-geschuetzt). Nativ ist er der
    Default; alte Tailscale-Konfigurationen wandern einmalig um. */
 const CF_API = "https://api.teamigel.com";
+/* Cloudflare-Access M2M-Service-Token (maschinelle Auth, kein OTP/
+   Cookie noetig). Ueberschreibbar via localStorage fuer Rotation ohne
+   APK-Rebuild (astro_cf_id / astro_cf_secret). */
+const CF_ACCESS = {
+  id: localStorage.getItem("astro_cf_id")
+    || "2cf0ebe34375ac9e58cd1aef99cb31d6.access",
+  secret: localStorage.getItem("astro_cf_secret")
+    || "cfast_u1pe4fQKo8pOoQKgv0lhmy1gQvruihuAfUr8Vat65f85f9c0"
+};
 const isNativeApp = () => !!(window.Capacitor
   && window.Capacitor.isNativePlatform
   && window.Capacitor.isNativePlatform())
@@ -45,36 +54,43 @@ function ratingColor(rating) {
 }
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 
-/* Cloudflare-Access-Login-Flow: prallt der Call an der Wand (CORS-
-   TypeError, HTML-Antwort oder 401/403), oeffnet die App IM SELBEN
-   WebView BASE/auth/mobile - dort Email-OTP, danach Brueckenseite
-   zurueck zu https://localhost (Cookie bleibt im WebView-Glas,
-   Custom-Tabs waeren ein fremdes Cookie-Glas!). */
-function startCfAuthFlow() {
-  if (localStorage.getItem("astro_auth_pending")) return;
-  localStorage.setItem("astro_auth_pending", "1");
-  commsLog("CF-ACCESS: LOGIN ERFORDERLICH - oeffne Auth-Fenster", "alert");
-  window.location.href = BASE + "/auth/mobile";
+/* M2M-Auth: Jeder API-Call traegt die CF-Access-Service-Token-Header.
+   Nativ laeuft fetch ueber CapacitorHttp (native HTTP-Schicht) - kein
+   CORS, keine Preflights, kein Cookie-Handling. Der alte OTP-WebView-
+   Flow ist entfernt. */
+async function api(path, opts = {}) {
+  opts.headers = Object.assign({
+    "CF-Access-Client-Id": CF_ACCESS.id,
+    "CF-Access-Client-Secret": CF_ACCESS.secret
+  }, opts.headers || {});
+  const res = await fetch(BASE + path, opts);
+  if (!res.ok) throw new Error(path + " -> HTTP " + res.status);
+  return res.json();
 }
 
-async function api(path, opts = {}) {
-  opts.credentials = "include";   // CF_Authorization-Cookie mitsenden
-  let res;
+/* OTA-Live-Update (nativ): Kaltstart-Check gegen /updates/latest.json;
+   neuere Version -> Bundle laden, entpacken, WebView umschalten
+   (@capgo/capacitor-updater). Web/Browser identifiziert sich ueber
+   die gleiche Origin und braucht kein OTA. */
+async function checkOtaUpdate() {
+  if (!isNativeApp() || !window.Capacitor?.Plugins?.CapacitorUpdater)
+    return;
   try {
-    res = await fetch(BASE + path, opts);
+    const m = await api("/updates/latest.json");
+    const cur = localStorage.getItem("astro_bundle_version");
+    if (!m || !m.version || m.version === cur) return;
+    const CU = window.Capacitor.Plugins.CapacitorUpdater;
+    commsLog("OTA: Lade Bundle " + m.version + "...");
+    const done = await CU.download({
+      url: BASE + m.url, version: m.version,
+      headers: {"CF-Access-Client-Id": CF_ACCESS.id,
+                "CF-Access-Client-Secret": CF_ACCESS.secret}});
+    localStorage.setItem("astro_bundle_version", m.version);
+    await CU.set(done);
+    commsLog("OTA: Bundle " + m.version + " aktiv");
   } catch (e) {
-    // Netzwerk-/CORS-Fehler = Wand (nativ); Browser zeigt Fehler wie bisher
-    if (isNativeApp()) startCfAuthFlow();
-    throw e;
+    commsLog("OTA-Check fehlgeschlagen: " + (e.message || e));
   }
-  const ct = res.headers.get("content-type") || "";
-  if (!res.ok || ct.includes("text/html")) {
-    if (isNativeApp() && (res.status === 401 || res.status === 403
-        || ct.includes("text/html")))
-      startCfAuthFlow();
-    throw new Error(path + " -> HTTP " + res.status);
-  }
-  return res.json();
 }
 
 /* ---------- Karte ---------- */
@@ -127,7 +143,8 @@ function initMap() {
   pingLedState();
   // Build-Diagnose (eine Zeile Comms): welcher Stand laeuft und wie
   // die App ihren Kontext sieht (Support-Fallstricke einsparen)
-  commsLog("BUILD 2026-09-29C \u00b7 ORIGIN " + location.origin
+  checkOtaUpdate();
+  commsLog("BUILD 2026-09-30D \u00b7 ORIGIN " + location.origin
     + " \u00b7 BASE " + (BASE || "(same-origin)")
     + " \u00b7 NATIVE " + isNativeApp());
   if (!isNativeApp()) {
@@ -218,10 +235,6 @@ function initMap() {
   });
   $("left-hud-btn")?.addEventListener("click", () => toggleHud("left"));
   $("uplink-btn")?.addEventListener("click", uplinkNow);
-  $("cf-login-btn")?.addEventListener("click", () => {
-    localStorage.removeItem("astro_auth_pending");
-    startCfAuthFlow();
-  });
   // Mobile: Das DATALINK-Dock lebt IM <SENS-Overlay (die linke Spalte
   // ist auf dem Handy das Slide-in, nicht dauerhaft sichtbar wie am
   // Desktop) - kompakt am Panel-Ende, spiegelbildlich zum OBS-Dock rechts.
@@ -766,10 +779,6 @@ function renderSpots(data) {
 async function refresh() {
   try {
     const data = await api("/api/spots");
-    if (localStorage.getItem("astro_auth_pending")) {
-      localStorage.removeItem("astro_auth_pending");
-      commsLog("CF-ACCESS: AUTH OK - Sensoren online");
-    }
     localStorage.setItem("astro_last_refresh_ts", String(Date.now()));
     updateDataAge();
     lastSpots = data;

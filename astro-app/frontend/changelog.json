@@ -468,6 +468,12 @@
       "title": "Capacitor Routing Fix: Auth-Flow bleibt im App-WebView",
       "detail": "Screenshots bewiesen: Capacitor uebergab api.teamigel.com/auth/mobile per Intent an den SYSTEM-BROWSER (Brave) - OTP landete im falschen Cookie-Glas, der Rueckredirect auf https://localhost crashte dort mit ERR_CONNECTION_REFUSED (kein lokaler Server fuer den Systembrowser). Fix: server.allowNavigation [api.teamigel.com, *.cloudflareaccess.com] in der capacitor.config - der native WebView laedt Auth- und Cloudflare-Login-Seiten jetzt im App-Kontext statt Intent. Bridge-Rueckziel bleibt https://localhost (die Seite laeuft auf der API-Origin, '/' waere der API-Root; im WebView ist localhost die App). APK mit der Config im Bundle neu gebaut.",
       "usage": "App: Login-Fenster oeffnet IM APP-WEBVIEW, OTP setzt das Cookie im App-Glas, Ruecksprung zur App"
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Architektur-Switch: M2M-Service-Tokens + OTA-Live-Updates",
+      "detail": "(1) AUTH: Der Cloudflare-Email-OTP-WebView-Flow ist komplett entfernt (Interceptor, LOGIN-Button, /auth/mobile-Navigation) - die App authentifiziert sich maschinell mit CF-Access-Service-Token-Headern auf JEDEM API-Call (Token in app.js als Konstante, per localStorage fuer Rotation ueberschreibbar). Nativ laeuft fetch ueber CapacitorHttp (native HTTP-Schicht): kein CORS, keine Preflights, kein Cookie-Handling - die 403-Preflight-Wand ist gegenstandslos, Simple-Requests obsolet. (2) OTA: @capgo/capacitor-updater (autoUpdate aus, App fuehrt). Kaltstart-Check gegen /updates/latest.json; neuere Version -> Bundle via download() mit Token-Headern laden, set() schaltet den WebView um. Backend liefert /updates/latest.json + /updates/bundle.zip (no-store); das Deploy-Skript erzeugt nach JEDEM Deploy automatisch Bundle-ZIP + Manifest (Version = Git-SHA+Zeitstempel) - kuenftige UI/Logic-Commits erreichen die App beim naechsten Start ohne APK-Rebuild. Hinweis: CF-Access-Policy muss den Service-Auth noch akzeptieren (Token-GET aktuell 302).",
+      "usage": "App authetniziert sich still per Token; Updates kommen beim App-Start automatisch"
     }
   ]
 }
