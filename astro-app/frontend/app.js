@@ -749,6 +749,7 @@ function panelHtml(s) {
     </div>
     <div class="grp mono"><b>Planeten &gt; 30°</b><span class="age">de421 · lokal</span></div>
     <div class="kv mono">${planetRows || row("Planeten", "keine Daten")}</div>
+    ${groundTruthHtml()}
     <button class="transit-btn" onclick="fetchTransitRoute('${esc(s.id || s.name)}', ${s.lat}, ${s.lon})" title="OePNV-Einsatzweg vom HQ (Ilvesheim) zu diesem Standort">&#128646; TRANSIT ROUTE</button>
     <div id="transit-result" class="transit-result"></div>
     <div class="sub" style="margin-top:10px">

@@ -759,6 +759,101 @@ def api_ota_bundle():
                         headers={"Cache-Control": "no-store"})
 
 
+
+# --- Ground Truth: menschliche Bodenbeobachtung (Datenhoheit Phase 2) ---
+class GroundTruthBody(BaseModel):
+    timestamp: Optional[str] = None   # ISO; Default = Server-Jetztzeit
+    reporter: str = "balkon"          # Anonymisiert (keine echten Namen)
+    actual_clouds: int                # 0-100
+    location_name: Optional[str] = None
+    note: Optional[str] = None        # z.B. "Inversion", "Rauchschicht"
+
+
+@app.post("/api/telemetry/ground_truth")
+def api_ground_truth(body: GroundTruthBody):
+    """Menschliche Bodenwahrheit (bricht die zirkulaere DWD-Verifikation).
+    Speichert den Report UND matcht sofort gegen die letzte Prognose,
+    um das Delta sichtbar zu machen. Keine extra Auth noetig - der
+    Request kommt durch CF Service Tokens."""
+    import sqlite3 as _sql
+    from datetime import datetime as _dt
+
+    ts = body.timestamp or _dt.now().isoformat(timespec="seconds")
+    # Coverage-Wert klemmen
+    clouds = max(0, min(100, body.actual_clouds))
+
+    # SQLite: Tabelle anlegen + einfuegen
+    conn = _sql.connect("/home/enigma/.astro_crawler.db")
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS ground_truth_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ts TEXT NOT NULL,
+                reporter TEXT NOT NULL DEFAULT 'balkon',
+                actual_clouds INTEGER NOT NULL,
+                location_name TEXT,
+                note TEXT,
+                matched_forecast_clouds INTEGER,
+                delta INTEGER,
+                created_at TEXT NOT NULL
+            )""")
+        # Sofortiges Matching: letzte Prognose fuer diese Stunde/Ort
+        matched_fc = None
+        delta = None
+        hour_key = ts[:13]
+        if body.location_name:
+            row = conn.execute("""
+                SELECT clouds_total FROM forecast_log
+                WHERE location_name = ? AND target_ts LIKE ?
+                ORDER BY lead_hours ASC LIMIT 1
+            """, (body.location_name, hour_key + "%")).fetchone()
+            if row and row[0] is not None:
+                matched_fc = row[0]
+                delta = round(matched_fc - clouds, 1)
+        created = _dt.now().isoformat(timespec="seconds")
+        conn.execute("""
+            INSERT INTO ground_truth_log
+                (ts, reporter, actual_clouds, location_name, note,
+                 matched_forecast_clouds, delta, created_at)
+            VALUES (?,?,?,?,?,?,?,?)
+        """, (ts, body.reporter, clouds, body.location_name, body.note,
+              matched_fc, delta, created))
+        conn.commit()
+        gt_id = conn.execute(
+            "SELECT last_insert_rowid()").fetchone()[0]
+    finally:
+        conn.close()
+
+    log.info("[GroundTruth] #%d: %s%% von %s%s%s", gt_id, clouds,
+             body.reporter,
+             f" @ {body.location_name}" if body.location_name else "",
+             f" (Prognose war {matched_fc}%, Delta {delta:+.0f})"
+             if matched_fc is not None else "")
+    return {
+        "ok": True, "id": gt_id, "actual_clouds": clouds,
+        "matched_forecast": matched_fc, "delta": delta,
+        "reporter": body.reporter}
+
+
+@app.get("/api/telemetry/ground_truth")
+def api_ground_truth_list(limit: int = 100):
+    """Letzte Ground-Truth-Reports fuer Transparenz/Analyse."""
+    import sqlite3 as _sql
+    conn = _sql.connect("/home/enigma/.astro_crawler.db")
+    try:
+        conn.row_factory = _sql.Row
+        rows = conn.execute("""
+            SELECT id, ts, reporter, actual_clouds, location_name, note,
+                   matched_forecast_clouds, delta
+            FROM ground_truth_log ORDER BY id DESC LIMIT ?
+        """, (min(limit, 500),)).fetchall()
+        return {"reports": [dict(r) for r in rows]}
+    except _sql.OperationalError:
+        return {"reports": []}
+    finally:
+        conn.close()
+
+
 class ObsModeBody(BaseModel):
     active: bool
 

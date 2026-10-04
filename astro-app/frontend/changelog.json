@@ -498,6 +498,12 @@
       "title": "Wissenschaftliche Fehleranalyse: Bias-Deckel gegen zirkulaere Verifikation",
       "detail": "Feld-Report (App sagte stark bewölkt, Realität sternenklar) löste eine Analyse von 305.502 verifizierten Prognosen aus. ROOT CAUSE: Die Bias-Korrektur blähte Wolkenwerte um bis zu +15,6 pp auf (50% raw -> 65% angezeigt), weil die Verifikation zirkulär ist (Prognose UND Ist-Daten stammen aus DWD-Modellen). Bei Herbst-Inversionswetterlagen im Rheingraben modelliert DWD Niederschlag/Feuchte als Wolkendecke, die real nicht existiert. MAE <=24h: 24,0 pp; RMSE: 36,5 pp; Bias: -8,3 pp (zuletzt -15,7 pp). Tageszeit-Anomalie: 02-03 Uhr zeigt den schlechtesten Bias (-12,3 pp), konsistent über alle Vorlaufzeiten. Fix: Bias-Korrektur auf max ±10 pp gedeckelt (BIAS_CAP_CLOUDS), Seeing auf ±0,30\"; korrigierte Werte tragen jetzt _bias_applied und _raw für Transparenz. Vollständige Analyse in FORECAST_ANALYSIS_2026-10-04.md.",
       "usage": "App zeigt jetzt max 10 pp Korrektur statt 15,6 — realitäts näher bei Klarnächten"
+    },
+    {
+      "date": "2026-10-04",
+      "title": "Phase 2 Datenhoheit: Ground-Truth-Bodenwahrheit-Panel",
+      "detail": "Vier-Button-Panel (KLAR 5%, LUECKEN 40%, DICHT 95%, NEBEL 100% + Inversions-Anomalie-Markierung) im Standort-Panel unter den Wetterdaten. Ein Klick sendet POST /api/telemetry/ground_truth mit Timestamp, cloud_cover und optionalem Standort. Das Backend legt die Tabelle ground_truth_log in SQLite an UND matcht sofort gegen die letzte Prognose fur diese Stunde — das Delta (Prognose - Ist) wird im Comms-Feed sichtbar (mit Warnung bei >15pp Abweichung). Diese menschlichen Messungen brechen die zirkulare DWD-Verifikation und sind die Trainingsgrundlage fuer das spaetere LLM zur Rheingraben-Inversions-Erkennung. GET /api/telemetry/ground_truth liefert die Reports zurueck. Responsive: Buttons flexen auf 60px min mobil, Panel-Design im Cockpit-Stil (gruener Rahmen fuer Sensorik).",
+      "usage": "Balkon-Blick nach oben -> 1 Klick -> Delta zur Prognose erscheint im Comms"
     }
   ]
 }
