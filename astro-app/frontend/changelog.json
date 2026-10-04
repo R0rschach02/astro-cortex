@@ -492,6 +492,12 @@
       "title": "Comms-Lokalzeit + OTA-Download-Haertung",
       "detail": "(1) Comms-Timestamps: toISOString (UTC, 2h hinter Berlin) -> toLocaleTimeString de-DE - der Feed zeigt jetzt die echte Geraetezeit. (2) OTA-Download-Haertung: Token-Header waren bereits im CapacitorUpdater.download() (Fix B bestand); CORSMiddleware gibt jetzt zusaetzlich die CF-Token-Header frei (cf-access-client-id/secret) und die /updates-CORS-Schicht ist als aeusserste Middleware dokumentiert (ueberschreibt fuer /updates-Pfade immer mit ACAO * + Allow-Headers *). Beide Wege (Bypass UND Token-Injection) parallell nutzbar.",
       "usage": "Comms zeigt Geraetezeit; OTA-Download sollte durchgehen"
+    },
+    {
+      "date": "2026-10-04",
+      "title": "Wissenschaftliche Fehleranalyse: Bias-Deckel gegen zirkulaere Verifikation",
+      "detail": "Feld-Report (App sagte stark bewölkt, Realität sternenklar) löste eine Analyse von 305.502 verifizierten Prognosen aus. ROOT CAUSE: Die Bias-Korrektur blähte Wolkenwerte um bis zu +15,6 pp auf (50% raw -> 65% angezeigt), weil die Verifikation zirkulär ist (Prognose UND Ist-Daten stammen aus DWD-Modellen). Bei Herbst-Inversionswetterlagen im Rheingraben modelliert DWD Niederschlag/Feuchte als Wolkendecke, die real nicht existiert. MAE <=24h: 24,0 pp; RMSE: 36,5 pp; Bias: -8,3 pp (zuletzt -15,7 pp). Tageszeit-Anomalie: 02-03 Uhr zeigt den schlechtesten Bias (-12,3 pp), konsistent über alle Vorlaufzeiten. Fix: Bias-Korrektur auf max ±10 pp gedeckelt (BIAS_CAP_CLOUDS), Seeing auf ±0,30\"; korrigierte Werte tragen jetzt _bias_applied und _raw für Transparenz. Vollständige Analyse in FORECAST_ANALYSIS_2026-10-04.md.",
+      "usage": "App zeigt jetzt max 10 pp Korrektur statt 15,6 — realitäts näher bei Klarnächten"
     }
   ]
 }

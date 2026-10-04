@@ -853,13 +853,26 @@ def _load_bias() -> dict:
         return {}
 
 
+# Fehleranalyse 2026-10-04: Die Verifikation ist zirkulaer (Prognose und
+# "Realitaet" stammen beide aus DWD-Modellen). Ein negativer Bias (System
+# "optimistisch") blaeht die Wolken-Anzeige auf (Korrektur = raw - bias =
+# raw + |bias|). Ohne Deckel: 50% raw + 15,6 = 65,6% angezeigt.
+BIAS_CAP_CLOUDS = 10.0   # pp — Deckel gegen zirkulaere Aufschaukelung
+BIAS_CAP_SEEING = 0.30   # Bogner-Sekunden — gleiche Logik
+
+
 def _apply_bias_to_series(series: list, bias: dict,
                           now) -> tuple[list, dict]:
     """Wendet die Bias-Korrektur NUR auf die Anzeigewerte einer Stunde an
     (clouds/seeing); ok/reasons/Golden-Window sind mit den Rohwerten
     bewertet und bleiben unveraendert - bewusste Vorgabe (Kalibrierung
     der Anzeige vor einer etwaigen spaeteren Bewertungskalierung).
-    Rueckgabe: (series, angewandte-Korrekturen-Uebersicht)."""
+    Rueckgabe: (series, angewandte-Korrekturen-Uebersicht).
+
+    Fix 04.10.: Bias-Korrektur gedeckelt (BIAS_CAP_CLOUDS/SEEING) —
+    die zirkulaere Verifikation (DWD-Modell gegen DWD-Modell) kann
+    systematische Fehler verstaerken statt korrigieren, besonders im
+    Herbst bei Inversionswetterlagen im Rheingraben."""
     import datetime as _dt
     applied = {}
     if not bias:
@@ -874,15 +887,21 @@ def _apply_bias_to_series(series: list, bias: dict,
         except (ValueError, TypeError):
             lead_h = None
         bucket = "le24" if (lead_h is not None and lead_h <= 24) else "gt24"
-        for param, lo, hi in (("clouds", 0, 100), ("seeing", 0.05, 20)):
+        for param, lo, hi, cap in (("clouds", 0, 100, BIAS_CAP_CLOUDS),
+                                   ("seeing", 0.05, 20, BIAS_CAP_SEEING)):
             b = ((bias.get(param) or {}).get(bucket) or {}).get("bias")
             if b is None or h.get(param) is None:
                 continue
+            # Deckel: verhindert dass zirkulaere Bias-Werte die Anzeige
+            # massiv verschieben (Feld-Report: 50% raw -> 65% angezeigt)
+            b_capped = max(-cap, min(cap, b))
             h[f"{param}_raw"] = h[param]
+            h[f"{param}_bias_applied"] = b_capped
             # err = vorhergesagt - Ist; positives err = Uberschaetzung
             # -> Korrektur vom Prognosewert ABZIEHEN, dann klemmen
-            h[param] = round(min(hi, max(lo, h[param] - b)), 1)
-            applied[f"{param}_{bucket}"] = {"bias": b, "n":
+            h[param] = round(min(hi, max(lo, h[param] - b_capped)), 1)
+            applied[f"{param}_{bucket}"] = {"bias": b_capped,
+                "bias_raw": b, "n":
                 (bias.get(param) or {}).get(bucket, {}).get("n")}
         out.append(h)
     return out, applied

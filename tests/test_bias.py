@@ -78,7 +78,9 @@ def test_bias_endpoint_wendet_korrektur_an(forecast_env):
     assert s[0]["clouds"] == 12 and s[0]["clouds_raw"] == 20
     assert "seeing_raw" not in s[0]                      # kein Seeing-Bias
     assert s[1]["clouds"] == 95 and "clouds_raw" not in s[1]  # >24h: keine
-    assert body["bias_applied"]["clouds_le24"] == {"bias": 8.0, "n": 900}
+    ba = body["bias_applied"]["clouds_le24"]
+    assert ba["bias"] == 8.0 and ba["n"] == 900
+    assert "bias_raw" in ba   # Deckel-Transparenz (Fix 04.10.)
 
 
 def test_bias_clamping_an_den_grenzen(forecast_env):
@@ -93,12 +95,12 @@ def test_bias_clamping_an_den_grenzen(forecast_env):
         {"ts": (now + timedelta(hours=1)).strftime("%Y-%m-%dT%H:00"),
          "clouds": 10, "seeing": 1.0},   # 10-30 -> klemmt bei 0
         {"ts": (now + timedelta(hours=3)).strftime("%Y-%m-%dT%H:00"),
-         "clouds": 98, "seeing": 1.0}]   # 98-30 -> 68 (normal)
+         "clouds": 98, "seeing": 1.0}]   # 98 - min(30,10) = 88 (Deckel)
     json.dump(data, open(be.ac.FORECAST_PATH, "w"))
     body = forecast_env.get("/api/forecast",
                             params={"id": "ellerstadt_east"}).json()
     assert body["series"][0]["clouds"] == 0
-    assert body["series"][1]["clouds"] == 68
+    assert body["series"][1]["clouds"] == 88  # Bias 30 -> Deckel 10
 
 
 # ---------- V1: /api/bias-stats ----------
