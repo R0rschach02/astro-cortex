@@ -504,6 +504,12 @@
       "title": "Phase 2 Datenhoheit: Ground-Truth-Bodenwahrheit-Panel",
       "detail": "Vier-Button-Panel (KLAR 5%, LUECKEN 40%, DICHT 95%, NEBEL 100% + Inversions-Anomalie-Markierung) im Standort-Panel unter den Wetterdaten. Ein Klick sendet POST /api/telemetry/ground_truth mit Timestamp, cloud_cover und optionalem Standort. Das Backend legt die Tabelle ground_truth_log in SQLite an UND matcht sofort gegen die letzte Prognose fur diese Stunde — das Delta (Prognose - Ist) wird im Comms-Feed sichtbar (mit Warnung bei >15pp Abweichung). Diese menschlichen Messungen brechen die zirkulare DWD-Verifikation und sind die Trainingsgrundlage fuer das spaetere LLM zur Rheingraben-Inversions-Erkennung. GET /api/telemetry/ground_truth liefert die Reports zurueck. Responsive: Buttons flexen auf 60px min mobil, Panel-Design im Cockpit-Stil (gruener Rahmen fuer Sensorik).",
       "usage": "Balkon-Blick nach oben -> 1 Klick -> Delta zur Prognose erscheint im Comms"
+    },
+    {
+      "date": "2026-10-04",
+      "title": "OTA-Sofortmassnahmen: UPLINK erzwingt Update-Check",
+      "detail": "Der UPLINK-Button loest jetzt auch einen erzwungenen OTA-Check aus (24h-Drossel umgangen). Fehlermeldungen im OTA-Check enthalten jetzt die aktuelle Bundle-Version fuer Ferndiagnose. Gedrosselte Checks melden sich im Comms mit Stundenangabe. Grund: Das letzte APK war 4 Tage alt und die GT-Buttons erreichten das Handy nicht — mit dem UPLINK-Force kann der Nutzer Updates sofort ziehen.",
+      "usage": "UPLINK druecken = Daten + GPS + OTA-Update in einem"
     }
   ]
 }

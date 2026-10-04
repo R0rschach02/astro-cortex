@@ -72,13 +72,20 @@ async function api(path, opts = {}) {
    neuere Version -> Bundle laden, entpacken, WebView umschalten
    (@capgo/capacitor-updater). Web/Browser identifiziert sich ueber
    die gleiche Origin und braucht kein OTA. */
-async function checkOtaUpdate() {
+async function checkOtaUpdate(force) {
   if (!isNativeApp() || !window.Capacitor?.Plugins?.CapacitorUpdater)
     return;
-  // max. 1x pro 24 h (Feld-Feedback): Kaltstart-Check, aber gedrosselt
-  const last = +(localStorage.getItem("astro_ota_last_check") || 0);
-  if (Date.now() - last < 24 * 3600 * 1000) return;
+  // max. 1x pro 24 h — ausser force=true (UPLINK-Button oder manuell)
+  if (!force) {
+    const last = +(localStorage.getItem("astro_ota_last_check") || 0);
+    if (Date.now() - last < 24 * 3600 * 1000) {
+      commsLog("OTA: gedrosselt (max 1x/24h, letzter Check "
+        + Math.round((Date.now() - last) / 3600000) + "h her)");
+      return;
+    }
+  }
   localStorage.setItem("astro_ota_last_check", String(Date.now()));
+  commsLog("OTA: Pruefe Manifest...");
   try {
     const m = await api("/updates/latest.json");
     const cur = localStorage.getItem("astro_bundle_version");
@@ -93,7 +100,8 @@ async function checkOtaUpdate() {
     await CU.set(done);
     commsLog("OTA: Bundle " + m.version + " aktiv");
   } catch (e) {
-    commsLog("OTA-Check fehlgeschlagen: " + (e.message || e));
+    commsLog("OTA-FEHLER: " + (e.message || e)
+      + " | Version: " + localStorage.getItem("astro_bundle_version"), "alert");
   }
 }
 
@@ -684,6 +692,65 @@ function moonNightsRows(nights) {
   return lines.join("");
 }
 
+/* ============================================================
+   GROUND TRUTH (Phase 2: Datenhoheit): Menschliche Bodenwahrheit
+   bricht die zirkulaere DWD-Verifikation. Vier Quick-Buttons im
+   Standort-Panel senden cloud_cover-Schaetzwerte ans Backend.
+   ============================================================ */
+const GT_BUTTONS = [
+  {icon: "\uD83C\uDF0C", label: "KLAR", clouds: 5,
+   note: null, cls: "gt-klar"},
+  {icon: "\u26C5", label: "L\u00DCCKEN", clouds: 40,
+   note: null, cls: "gt-luecken"},
+  {icon: "\u2601\uFE0F", label: "DICHT", clouds: 95,
+   note: null, cls: "gt-dicht"},
+  {icon: "\uD83C\uDF2B\uFE0F", label: "NEBEL", clouds: 100,
+   note: "Inversions-Anomalie", cls: "gt-nebel"},
+];
+
+async function sendGroundTruth(gt) {
+  commsLog("GROUND TRUTH: " + gt.label + " (" + gt.clouds + "%)");
+  try {
+    const payload = {
+      timestamp: new Date().toISOString(),
+      reporter: "balkon",
+      actual_clouds: gt.clouds,
+      note: gt.note || null,
+    };
+    if (currentSpot) payload.location_name = currentSpot.name;
+    const r = await api("/api/telemetry/ground_truth", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload)});
+    if (r.delta != null) {
+      commsLog("GT #" + r.id + ": " + gt.label + " " + gt.clouds + "%"
+        + " \u2192 Delta: " + (r.delta > 0 ? "+" : "")
+        + r.delta.toFixed(0) + " pp"
+        + (r.delta > 15 ? " \u26A0 Modell deutlich daneben!"
+           : r.delta < -15 ? " \u26A0 Modell zu optimistisch!" : " \u2713"),
+        r.delta > 15 || r.delta < -15 ? "alert" : undefined);
+    } else {
+      commsLog("GT #" + r.id + ": " + gt.label + " gespeichert");
+    }
+  } catch (e) {
+    commsLog("GT-FEHLER: " + (e.message || e), "alert");
+  }
+}
+
+function groundTruthHtml() {
+  const btns = GT_BUTTONS.map(gt =>
+    `<button class="gt-btn ${gt.cls}" onclick='sendGroundTruth(${
+      JSON.stringify({clouds: gt.clouds, label: gt.label, note: gt.note})
+    })' title="${gt.label} (${gt.clouds}%)${
+      gt.note ? " \u2014 " + gt.note : ""}">${gt.icon}<br>${gt.label}</button>`
+  ).join("");
+  return `<div class="gt-panel">
+    <div class="gt-hdr mono">UPLINK: GROUND TRUTH</div>
+    <div class="gt-hint">Blick nach oben \u2014 wie ist es wirklich?</div>
+    <div class="gt-row">${btns}</div>
+  </div>`;
+}
+
 function panelHtml(s) {
   const m = s.moon || {};
   const isPlanet = CURRENT_PROFILE === "planet";
@@ -922,6 +989,7 @@ function setDatalinkMode(mode) {
 
 async function uplinkNow() {
   localStorage.removeItem("astro_auth_pending");   // Auth-Retry erlauben
+  checkOtaUpdate(true);   // OTA-Check erzwingen (24h-Drossel umgehen)
   const btn = document.getElementById("uplink-btn");
   if (btn) btn.classList.add("uplink-busy");
   commsLog("UPLINK: hole Daten + GPS-Ping...");
