@@ -854,6 +854,108 @@ def api_ground_truth_list(limit: int = 100):
         conn.close()
 
 
+
+# --- Push-Benachrichtigungen: anstehende PRIME WINDOWs als JSON ---
+@app.get("/api/notifications/upcoming")
+def api_notifications_upcoming(hours_ahead: int = 48):
+    """PRIME-WINDOW-Ereignisse der naechsten N Stunden fuer die App-
+    Benachrichtigung (Local Notifications). Nutzt dieselbe Logik wie
+    check_prime_window_push(): Fenster mit ueberdurchschnittlichen
+    Bedingungen. Die App pollt hier bei jedem Oeffnen/Refresh."""
+    import datetime as _dt
+    from datetime import timedelta as _td
+
+    now = _dt.datetime.now()
+    fc = {}
+    try:
+        with open(ac.FORECAST_PATH, "r", encoding="utf-8") as f:
+            fc = json.load(f)
+    except (OSError, ValueError):
+        pass
+
+    def _win_metrics(entry, gw):
+        try:
+            start_h = int(gw["start"].split(":")[0])
+        except (KeyError, ValueError):
+            return None
+        cl, se, wi, ta, n = [], [], [], [], 0
+        for h in (entry.get("series") or []):
+            ts = (h.get("ts") or "")[:10]
+            try:
+                hh = int((h.get("ts") or "")[11:13])
+            except ValueError:
+                continue
+            if ts != gw.get("night"):
+                continue
+            if not (start_h - 1 <= hh <= start_h + gw.get("hours", 1)):
+                continue
+            if h.get("clouds") is not None: cl.append(h["clouds"])
+            if h.get("seeing") is not None: se.append(h["seeing"])
+            if h.get("wind") is not None: wi.append(h["wind"])
+            if h.get("tau") is not None: ta.append(h["tau"])
+            n += 1
+        if n == 0:
+            return None
+        return (sum(cl) / len(cl) if cl else None,
+                sum(se) / len(se) if se else None,
+                max(wi) if wi else None,
+                min(ta) if ta else None)
+
+    # Durchschnitt aller Fenster als Vergleichsmassstab
+    all_c, all_s = [], []
+    for entry in fc.values():
+        for gw in (entry.get("golden_windows") or [])[:3]:
+            m0 = _win_metrics(entry, gw)
+            if m0 and m0[0] is not None: all_c.append(m0[0])
+            if m0 and m0[1] is not None: all_s.append(m0[1])
+    avg_c = sum(all_c) / len(all_c) if all_c else None
+    avg_s = sum(all_s) / len(all_s) if all_s else None
+
+    events = []
+    for name, entry in fc.items():
+        for gw in (entry.get("golden_windows") or []):
+            try:
+                night = _dt.datetime.fromisoformat(gw["night"])
+                gws = _dt.datetime.combine(night.date(),
+                    _dt.datetime.strptime(gw["start"], "%H:%M").time())
+            except (ValueError, KeyError):
+                continue
+            gwe = gws + _td(hours=max(1, gw.get("hours", 1)))
+            # Nur Fenster in den naechsten N Stunden
+            hours_until = (gws - now).total_seconds() / 3600
+            if not (0 <= hours_until <= hours_ahead):
+                continue
+            m0 = _win_metrics(entry, gw)
+            if not m0:
+                continue
+            clouds, seeing, wind, tau = m0
+            # Ueberdurchschnittlich?
+            premium = False
+            conditions = []
+            if avg_c is not None and clouds is not None and clouds <= avg_c * 0.75:
+                premium = True
+                conditions.append(f"Wolken \u00d8 {clouds:.0f}% (Schnitt {avg_c:.0f}%)")
+            if avg_s is not None and seeing is not None and seeing <= avg_s * 0.8:
+                premium = True
+                conditions.append(f"Seeing \u00d8 {seeing:.1f}\u2033")
+            if not premium:
+                continue
+            events.append({
+                "location": name,
+                "night": gw["night"],
+                "start": gw["start"],
+                "end": f"{(gwe.hour):02d}:{(gwe.minute):02d}",
+                "hours_until_start": round(hours_until, 1),
+                "clouds_avg": round(clouds, 0) if clouds is not None else None,
+                "seeing_avg": round(seeing, 1) if seeing is not None else None,
+                "wind_max": round(wind, 0) if wind is not None else None,
+                "conditions": conditions,
+                "type": "PRIME_WINDOW",
+            })
+    events.sort(key=lambda e: e["hours_until_start"])
+    return {"events": events, "generated_at": now.isoformat(timespec="seconds")}
+
+
 class ObsModeBody(BaseModel):
     active: bool
 

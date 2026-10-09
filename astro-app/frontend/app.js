@@ -156,6 +156,7 @@ function initMap() {
   // Build-Diagnose (eine Zeile Comms): welcher Stand laeuft und wie
   // die App ihren Kontext sieht (Support-Fallstricke einsparen)
   checkOtaUpdate();
+  checkPrimeWindowNotifications();
   commsLog("BUILD 2026-09-30D \u00b7 ORIGIN " + location.origin
     + " \u00b7 BASE " + (BASE || "(same-origin)")
     + " \u00b7 NATIVE " + isNativeApp());
@@ -690,6 +691,62 @@ function moonNightsRows(nights) {
       n.colong.toFixed(1) + "° · lib " + fmtSigned(n.lib_l)
       + "/" + fmtSigned(n.lib_b) + "°"));
   return lines.join("");
+}
+
+
+/* ============================================================
+   PRIME-WINDOW-BENACHTIGUNGEN: Proaktive lokale Push-Meldungen
+   mit Teleskop-Icon, 1-2 Tage im Voraus.
+   ============================================================ */
+let notifiedWindows = new Set(
+  (localStorage.getItem("astro_notified_windows") || "").split(",")
+    .filter(Boolean));
+
+function _notifSchedule(d) {
+  return {year: d.getFullYear(), month: d.getMonth() + 1,
+          day: d.getDate(), hour: d.getHours(),
+          minute: d.getMinutes(), second: d.getSeconds()};
+}
+
+async function checkPrimeWindowNotifications() {
+  if (!isNativeApp() || !window.Capacitor?.Plugins
+      ?.LocalNotifications) return;
+  try {
+    const data = await api("/api/notifications/upcoming?hours_ahead=48");
+    if (!data || !data.events || !data.events.length) return;
+    const LN = window.Capacitor.Plugins.LocalNotifications;
+    const perm = await LN.requestPermissions();
+    if (!perm || perm.display !== "granted") return;
+
+    const toSchedule = [];
+    for (const ev of data.events) {
+      const key = ev.location + "|" + ev.night + "|" + ev.start;
+      if (notifiedWindows.has(key)) continue;
+      const scheduleAt = new Date(Date.now() + 1000);
+      const dateStr = new Date(ev.night + "T" + ev.start).toLocaleDateString(
+        "de-DE", {weekday: "short", day: "2-digit", month: "2-digit"});
+      const body = ev.location + "\n" + dateStr + ", "
+        + ev.start + "-" + ev.end + " Uhr\n"
+        + ev.conditions.join(" \u00b7 ");
+      toSchedule.push({
+        id: Date.now() + Math.floor(Math.random() * 10000),
+        title: "\uD83C\uDF0C PRIME WINDOW",
+        body: body,
+        schedule: {at: _notifSchedule(scheduleAt)},
+        extra: {type: "prime_window", location: ev.location},
+      });
+      notifiedWindows.add(key);
+      commsLog("NOTIF: PRIME WINDOW " + ev.location + " " + ev.night
+        + " " + ev.start + " geplant");
+    }
+    if (toSchedule.length) {
+      await LN.schedule({notifications: toSchedule});
+      const arr = [...notifiedWindows].slice(-50);
+      localStorage.setItem("astro_notified_windows", arr.join(","));
+    }
+  } catch (e) {
+    commsLog("NOTIF-Check: " + (e.message || e));
+  }
 }
 
 /* ============================================================
