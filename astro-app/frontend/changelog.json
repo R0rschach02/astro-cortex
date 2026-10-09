@@ -516,6 +516,12 @@
       "title": "PRIME-WINDOW-Push: Lokale Benachrichtigungen mit Teleskop-Icon",
       "detail": "Proaktive Benachrichtigungen 1-2 Tage vor Golden Windows mit ueberdurchschnittlichen Bedingungen. Neue Route GET /api/notifications/upcoming liefert PRIME-WINDOW-Ereignisse der naechsten 48h als JSON (dieselbe Ueberdurchschnittlichkeits-Logik wie check_prime_window_push). Die App pollt bei jedem Kaltstart und plant lokale Push-Meldungen via @capacitor/local-notifications — sofort beim Erkennen, nicht erst beim Fensterbeginn. Titel: PRIME WINDOW, Body: Location + Datum + Uhrzeit + Bedingungen. Dedup via localStorage (astro_notified_windows, max 50). Benachrichtigungserlaubnis wird beim ersten Aufruf angefragt. App-Icon (Teleskop) erscheint als Small-Icon in der Statusleiste.",
       "usage": "App oeffnen -> bei bevorstehendem Top-Fenster erscheint Push mit Teleskop"
+    },
+    {
+      "date": "2026-10-10",
+      "title": "Datenwirt-Erinnerung + OTA-Diagnose-Verbesserung",
+      "detail": "(1) Taegliche Pop-up-Erinnerung um 19:30 Uhr fuer den Datenwirt: Bitte Wolkenlage bewerten (Blick nach oben, Astro CC > Standort > GROUND TRUTH Buttons). Dedup pro Tag via localStorage. (2) OTA-Diagnose: Der Check meldet jetzt die installierte Version VOR dem Vergleich, bestaetigt bei aktueller Version (OTA: aktuell), und zeigt bei Aktivierung den Versionswechsel explizit an (alt -> neu — App startet neu). Bei Fehlern erscheint die Version plus Fehlermeldung im Comms-Feed.",
+      "usage": "Abends um 19:30 Uhr kommt die Datenwirt-Erinnerung; OTA-Status im Comms sichtbar"
     }
   ]
 }

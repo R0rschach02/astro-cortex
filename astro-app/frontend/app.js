@@ -89,7 +89,8 @@ async function checkOtaUpdate(force) {
   try {
     const m = await api("/updates/latest.json");
     const cur = localStorage.getItem("astro_bundle_version");
-    if (!m || !m.version || m.version === cur) return;
+    if (!m || !m.version) { commsLog("OTA: Manifest ungueltig"); return; }
+    if (m.version === cur) { commsLog("OTA: aktuell (" + cur + ")"); return; }
     const CU = window.Capacitor.Plugins.CapacitorUpdater;
     commsLog("OTA: Lade Bundle " + m.version + "...");
     const done = await CU.download({
@@ -157,6 +158,7 @@ function initMap() {
   // die App ihren Kontext sieht (Support-Fallstricke einsparen)
   checkOtaUpdate();
   checkPrimeWindowNotifications();
+  scheduleDailyReminders();
   commsLog("BUILD 2026-09-30D \u00b7 ORIGIN " + location.origin
     + " \u00b7 BASE " + (BASE || "(same-origin)")
     + " \u00b7 NATIVE " + isNativeApp());
@@ -693,6 +695,44 @@ function moonNightsRows(nights) {
   return lines.join("");
 }
 
+
+
+/* ============================================================
+   ERINNERUNGEN: Taegliche Pop-up-Meldungen (Datenwirt)
+   ============================================================ */
+async function scheduleDailyReminders() {
+  if (!isNativeApp() || !window.Capacitor?.Plugins
+      ?.LocalNotifications) return;
+  try {
+    const LN = window.Capacitor.Plugins.LocalNotifications;
+    const perm = await LN.requestPermissions();
+    if (!perm || perm.display !== "granted") return;
+    const today = new Date().toISOString().slice(0, 10);
+    const rk = "datenwirt_" + today;
+    if (localStorage.getItem("astro_reminder_" + rk)) return;
+    const now = new Date();
+    const rt = new Date(now);
+    rt.setHours(19, 30, 0, 0);
+    if (rt <= now) return;
+    await LN.schedule({
+      notifications: [{
+        id: 900001,
+        title: "\uD83D\uDD25 DATENWIRT-ERINNERUNG",
+        body: "Bitte Wolkenlage bewerten \u2014 Blick nach oben!\n"
+          + "Astro CC \u2192 Standort \u2192 GROUND TRUTH\n"
+          + "Jede Bewertung verbessert die Vorhersage.",
+        schedule: {
+          year: rt.getFullYear(), month: rt.getMonth() + 1,
+          day: rt.getDate(), hour: 19, minute: 30, second: 0},
+        extra: {type: "datenwirt_reminder"},
+      }]
+    });
+    localStorage.setItem("astro_reminder_" + rk, "1");
+    commsLog("ERINNERUNG: Datenwirt 19:30 Uhr geplant");
+  } catch (e) {
+    commsLog("Erinnerung-Fehler: " + (e.message || e));
+  }
+}
 
 /* ============================================================
    PRIME-WINDOW-BENACHTIGUNGEN: Proaktive lokale Push-Meldungen
