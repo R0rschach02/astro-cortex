@@ -558,6 +558,12 @@
       "title": "v1.1.2 — Vollstaendiger Code-Restore nach Asset-Verlust",
       "detail": "Der OTA-Error-Handling-Rewrite in d8294b4 loeschte versehentlich initMap + 20 weitere Funktionen (fetchRainGrid, rvFetchFrames, forecastHtml, cell, dot, fetchBortle, fmtSigned, isNativeApp, const $...). Restauriert aus d77b630 (letzter funktionierender Stand). Reapplied: Cache-Busting fuer Manifest-Fetch, Cache-Nuke (3s auf Topbar), Inversions-Comms-Log. Web-Version verifiziert: initMap laeuft, alle Marker/Gauges/Map-Tiles sichtbar.",
       "usage": "v1.1.2 mit vollstaendigem Codebase"
+    },
+    {
+      "date": "2026-10-10",
+      "title": "v1.1.4 — OTA Null-Check + Notification Schedule Fix",
+      "detail": "BUG 1 (OTA-Crash): Der CapacitorUpdater-Download erhielt Version-Strings mit Sonderzeichen (41395d8-10102211) die das Plugin intern ablehnte. Jetzt: (a) Harte Null-Checks auf m.version und m.url mit klaren Comms-Meldungen, (b) Version wird fuer das Plugin sanitiziert (nur [a-zA-Z0-9._]), (c) Fallback mit simpler Timestamp-Version falls der erste Download trotzdem scheitert, (d) CU.set() nur wenn done.version existiert. BUG 2 (Notification-Crash): Das schedule-Objekt war als {at: {year, month...}} verschachtelt, aber das Plugin erwartet die Properties direkt ohne at:-Wrapper — jetzt schedule: _notifSchedule(date). Beide Bugs sind reine Frontend-JavaScript-Fixes.",
+      "usage": "OTA-Download sollte durchgehen; PRIME WINDOW Benachrichtigungen funktionieren"
     }
   ]
 }

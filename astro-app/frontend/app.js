@@ -109,19 +109,52 @@ async function checkOtaUpdate(force) {
           "Cache-Control": "no-cache, no-store, must-revalidate",
           "Pragma": "no-cache"}})).json();
     const cur = localStorage.getItem("astro_bundle_version");
-    if (!m || !m.version) { commsLog("OTA: Manifest ungueltig"); return; }
-    if (m.version === cur) { commsLog("OTA: aktuell (" + cur + ")"); return; }
+    if (!m || !m.version || typeof m.version !== "string") {
+      commsLog("OTA: Manifest ungueltig (version="
+        + (m ? JSON.stringify(m.version) : "null") + ")", "alert");
+      return;
+    }
+    if (m.version === cur) {
+      commsLog("OTA: aktuell (" + cur + ")");
+      return;
+    }
+    if (!m.url || typeof m.url !== "string") {
+      commsLog("OTA: Manifest ungueltig (url=null)", "alert");
+      return;
+    }
     const CU = window.Capacitor.Plugins.CapacitorUpdater;
-    commsLog("OTA: Lade Bundle " + m.version + "...");
-    // Download OHNE Token-Header: Der CF-Bypass fuer /updates ist aktiv
-    // und die Token-Header koennen den Request durch ein anderes
-    // CF-Regelwerk stossen (Feld-Beweis: curl ohne Header = 200,
-    // Updater mit Header = Failed)
-    const done = await CU.download({
-      url: BASE + m.url, version: m.version});
+    commsLog("OTA: Lade Bundle " + m.version + " von " + BASE + m.url);
+    // Version fuer den Plugin sanitizen: nur [a-zA-Z0-9._] erlaubt,
+    // da der Updater Version-Strings mit Sonderzeichen ablehnt
+    const safeVersion = m.version.replace(/[^a-zA-Z0-9._]/g, "_");
+    let done;
+    try {
+      done = await CU.download({
+        url: BASE + m.url, version: safeVersion});
+    } catch (dlErr) {
+      commsLog("OTA-Download Plugin-Fehler: "
+        + (dlErr.message || dlErr), "alert");
+      // Fallback: Version ohne Sonderzeichen nochmal versuchen
+      try {
+        const simpleVer = String(Date.now());
+        done = await CU.download({
+          url: BASE + m.url, version: simpleVer});
+        commsLog("OTA: Fallback mit simpler Version " + simpleVer);
+      } catch (retryErr) {
+        commsLog("OTA-Download endgueltig fehlgeschlagen: "
+          + (retryErr.message || retryErr), "alert");
+        return;
+      }
+    }
+    if (!done || !done.version) {
+      commsLog("OTA: Plugin lieferte keine gueltige Version zurueck",
+        "alert");
+      return;
+    }
     localStorage.setItem("astro_bundle_version", m.version);
     await CU.set(done);
-    commsLog("OTA: Bundle " + m.version + " aktiv");
+    commsLog("OTA AKTIV: " + (cur || "APK") + " \u2192 " + m.version
+      + " \u2014 App startet neu");
   } catch (e) {
     commsLog("OTA-FEHLER: " + (e.message || e)
       + " | Version: " + localStorage.getItem("astro_bundle_version"), "alert");
@@ -182,7 +215,7 @@ function initMap() {
   checkOtaUpdate();
   checkPrimeWindowNotifications();
   scheduleDailyReminders();
-  commsLog("BUILD 2026-09-30D \u00b7 ORIGIN " + location.origin
+  commsLog("BUILD 2026-10-10 (v1.1.4) \u00b7 ORIGIN " + location.origin
     + " \u00b7 BASE " + (BASE || "(same-origin)")
     + " \u00b7 NATIVE " + isNativeApp());
   if (!isNativeApp()) {
@@ -911,7 +944,7 @@ async function checkPrimeWindowNotifications() {
         id: ((Date.now() / 1000) | 0) % 2147483647,
         title: "\uD83C\uDF0C PRIME WINDOW",
         body: body,
-        schedule: {at: _notifSchedule(scheduleAt)},
+        schedule: _notifSchedule(scheduleAt),
         extra: {type: "prime_window", location: ev.location},
       });
       notifiedWindows.add(key);

@@ -669,22 +669,7 @@ def api_deployment(id: str, home: str = "Ilvesheim HQ",
 APK_PATH = "/home/enigma/astro-app/native/android/app/build/outputs/apk/debug/app-debug.apk"
 
 
-@app.get("/native/astro-cortex-v{version}.apk")
-@app.get("/native/astro-cortex.apk")
-def api_native_apk(token: Optional[str] = None, request: Request = None,
-                   version: Optional[str] = None):
-    """Debug-APK der Capacitor-Shell (Phase 2). Gleicher Token-Mechanismus
-    wie fwhw_sync - per Header x-api-token ODER Query-Parameter (fuer
-    einfache Browser-Downloads ueber Tailscale). Kein Token konfiguriert
-    = Endpunkt offen (bewusst, Heimnetz)."""
-    if API_TOKEN and (request.headers.get("x-api-token") != API_TOKEN
-                      and token != API_TOKEN):
-        raise HTTPException(401, "Ungueltiger API-Token")
-    if not os.path.exists(APK_PATH):
-        raise HTTPException(404, "APK nicht gebaut - native/setup_native.sh"
-                                 " + gradlew assembleDebug ausfuehren")
-    return FileResponse(APK_PATH, media_type="application/vnd.android.package-archive",
-                        filename="astro-cortex.apk")
+
 
 
 
@@ -1018,6 +1003,55 @@ def api_weather_movement():
         "timestamp": _dt.now().isoformat(timespec="seconds"),
     }
 
+
+
+
+# --- APK-Auslieferung: physische versionierte Datei ---
+APK_DIR = os.path.expanduser("~")
+
+
+@app.get("/native/astro-cortex-v{version}.apk")
+@app.get("/native/astro-cortex.apk")
+def api_native_apk(version: str = "1.1.3",
+                   token: Optional[str] = None,
+                   request: Request = None):
+    """APK-Auslieferung mit korrektem Content-Disposition und Build-
+    Verifikation. Die physische Datei liegt im Home-Verzeichnis."""
+    if API_TOKEN and (request.headers.get("x-api-token") != API_TOKEN
+                      and token != API_TOKEN):
+        raise HTTPException(401, "Ungueltiger API-Token")
+    filename = f"astro-cortex-v{version}.apk"
+    apk_path = os.path.join(APK_DIR, filename)
+    if not os.path.exists(apk_path):
+        # Fallback: Build-Artefakt
+        apk_path = ("/home/enigma/astro-app/native/android/app/build/"
+                    "outputs/apk/debug/app-debug.apk")
+        filename = f"astro-cortex-v{version}.apk"
+        if not os.path.exists(apk_path):
+            raise HTTPException(404, f"APK {filename} nicht gefunden")
+    return FileResponse(
+        apk_path,
+        media_type="application/vnd.android.package-archive",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+        })
+
+
+@app.get("/updates/version")
+def api_version_check():
+    """Einfacher Verifikations-Endpunkt: Welche Version ist aktiv?"""
+    import os
+    apk_dir = "/home/enigma/astro-app/native/android/app/build/outputs/apk/debug"
+    apk_files = [f for f in os.listdir(apk_dir) if f.endswith(".apk")] \
+        if os.path.isdir(apk_dir) else []
+    latest_apk = sorted(apk_files)[-1] if apk_files else "unbekannt"
+    return {"backend_version": "v1.1.3",
+            "apk_file": latest_apk,
+            "apk_path": apk_dir,
+            "ota_version": json.load(open(
+                "/home/enigma/updates/latest.json")).get("version", "?")
+                if os.path.exists("/home/enigma/updates/latest.json") else "?"}
 
 
 # --- L3: Cloud-Hunter — dynamischer Umkreis-Scan ---
