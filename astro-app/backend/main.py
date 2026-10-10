@@ -760,14 +760,23 @@ def api_ota_manifest():
 
 
 @app.get("/updates/bundle.zip")
+@app.head("/updates/bundle.zip")
 def api_ota_bundle():
     """Aktuelles Frontend-Bundle (ZIP, Wurzel = Web-Assets) fuer den
-    @capgo/capacitor-updater."""
+    @capgo/capacitor-updater. Content-Length MUSS gesetzt sein,
+    sonst koennen native Plugins keinen Fortschritt berechnen."""
     zp = os.path.join(UPDATES_DIR, "bundle.zip")
     if not os.path.exists(zp):
         raise HTTPException(404, "kein OTA-Bundle deployt")
-    return FileResponse(zp, media_type="application/zip",
-                        headers={"Cache-Control": "no-store"})
+    file_size = os.path.getsize(zp)
+    return FileResponse(
+        zp,
+        media_type="application/zip",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Content-Length": str(file_size),
+            "Accept-Ranges": "bytes",
+        })
 
 
 

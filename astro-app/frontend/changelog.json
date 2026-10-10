@@ -570,6 +570,12 @@
       "title": "Dual-Profile Notifications: LUNAR + DEEP SKY",
       "detail": "GET /api/notifications/upcoming liefert jetzt zwei getrennte Einsatz-Profile statt des alten generischen PRIME WINDOW: LUNAR WINDOW (Mond >15°, Wolken <30%, Seeing <2.0″, Bortle irrelevant) und DEEP SKY WINDOW (Mond unter Horizont ODER <15% illuminiert, Wolken <20%, Bortle ≤6 bevorzugt, Seeing zweitrangig). Mondhoehe/-illumination kommen aus dem Mond-Tages-Cache (skyfield). Die App zeigt unterschiedliche Notification-Titel und -Body je Profil: LUNAR mit Altitude/Illumination, DEEP SKY mit Moon-Status (Set/Under horizon/Crescent) und Bortle-Klasse. Beide Profile koennen fuer dasselbe Fenster gleichzeitig feuern (z.B. klarer Himmel mit untergehendem Mond = DEEP SKY, danach LUNAR beim Mondaufstieg). Kein APK-Rebuild noetig — reine Backend-Logik + OTA-Bundle fuer Frontend-Texte.",
       "usage": "Push zeigt LUNAR oder DEEP SKY mit zielgerechten Bedingungen"
+    },
+    {
+      "date": "2026-10-10",
+      "title": "v1.1.6 — OTA Pre-Flight-Check",
+      "detail": "Vor jedem CapacitorUpdater.download() laeuft jetzt ein Pre-Flight-Check: fetch() mit Range-Header auf die ZIP-URL loggt HTTP-Status, Content-Type und Content-Length ins Comms-Feed (OTA-Precheck: HTTP 200 | CT: application/zip | CL: 164846). Bei Nicht-200 wird der Plugin-Download uebersprungen. Backend: bundle.zip-Route sendet jetzt explizit Content-Length und Accept-Ranges: bytes. BUILD-String auf v1.1.6 aktualisiert, versionCode 10102106.",
+      "usage": "OTA-Precheck zeigt HTTP-Status bevor der Plugin startet"
     }
   ]
 }

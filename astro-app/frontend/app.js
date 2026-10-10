@@ -127,6 +127,30 @@ async function checkOtaUpdate(force) {
     // Version fuer den Plugin sanitizen: nur [a-zA-Z0-9._] erlaubt,
     // da der Updater Version-Strings mit Sonderzeichen ablehnt
     const safeVersion = m.version.replace(/[^a-zA-Z0-9._]/g, "_");
+    // PRE-FLIGHT: HTTP-Status der ZIP-URL pruefen BEVOR der Plugin
+    // download startet. Nutzt fetch() (nicht HEAD — FastAPI 404t HEAD).
+    // Wir laden nur die ersten Bytes um den Status zu sehen.
+    try {
+      const pfUrl = BASE + m.url + "?preflight=" + Date.now();
+      const pfRes = await fetch(pfUrl, {
+        method: "GET",
+        headers: {"Range": "bytes=0-1023",
+          "CF-Access-Client-Id": CF_ACCESS.id,
+          "CF-Access-Client-Secret": CF_ACCESS.secret}});
+      commsLog("OTA-Precheck: HTTP " + pfRes.status
+        + " | CT: " + (pfRes.headers.get("content-type") || "?")
+        + " | CL: " + (pfRes.headers.get("content-length") || "?"));
+      if (!pfRes.ok) {
+        commsLog("OTA-Precheck: Server nicht bereit (HTTP "
+          + pfRes.status + ") — Download uebersprungen", "alert");
+        return;
+      }
+      pfRes.body?.cancel();  // Body nicht komplett lesen
+    } catch (pfErr) {
+      commsLog("OTA-Precheck: Netzwerkfehler ("
+        + (pfErr.message || pfErr) + ")", "alert");
+    }
+
     let done;
     try {
       done = await CU.download({
@@ -215,7 +239,7 @@ function initMap() {
   checkOtaUpdate();
   checkPrimeWindowNotifications();
   scheduleDailyReminders();
-  commsLog("BUILD 2026-10-10 (v1.1.4) \u00b7 ORIGIN " + location.origin
+  commsLog("BUILD 2026-10-10 (v1.1.6) \u00b7 ORIGIN " + location.origin
     + " \u00b7 BASE " + (BASE || "(same-origin)")
     + " \u00b7 NATIVE " + isNativeApp());
   if (!isNativeApp()) {
