@@ -940,16 +940,35 @@ async function checkPrimeWindowNotifications() {
       const body = ev.location + "\n" + dateStr + ", "
         + ev.start + "-" + ev.end + " Uhr\n"
         + ev.conditions.join(" \u00b7 ");
+      const isLunar = ev.type === "LUNAR_WINDOW";
+      const title = isLunar
+        ? "\uD83C\uDF19 LUNAR WINDOW"
+        : "\uD83C\uDF0C DEEP SKY WINDOW";
+      const notifBody = isLunar
+        ? ev.location + "\n" + dateStr + ", " + ev.start + "-" + ev.end
+          + " Uhr\n" + "Alt: " + (ev.moon_alt || 0).toFixed(0)
+          + "\u00b0, Illum: " + (ev.moon_illum || 0).toFixed(0) + "%"
+          + "\n" + ev.conditions.filter(Boolean).join(" \u00b7 ")
+        : ev.location + "\n" + dateStr + ", " + ev.start + "-" + ev.end
+          + " Uhr\n" + "Moon: " + (ev.moon_status || "Set")
+          + "\n" + ev.conditions.filter(Boolean).join(" \u00b7 ");
+
       toSchedule.push({
         id: ((Date.now() / 1000) | 0) % 2147483647,
-        title: "\uD83C\uDF0C PRIME WINDOW",
-        body: body,
+        title: title,
+        body: notifBody,
         schedule: _notifSchedule(scheduleAt),
         extra: {type: "prime_window", location: ev.location},
       });
       notifiedWindows.add(key);
-      commsLog("NOTIF: PRIME WINDOW " + ev.location + " " + ev.night
-        + " " + ev.start + " geplant");
+      const notifLabel = ev.type === "LUNAR_WINDOW"
+        ? "LUNAR WINDOW" : "DEEP SKY WINDOW";
+      const notifDetail = ev.type === "LUNAR_WINDOW"
+        ? " (Alt: " + (ev.moon_alt || 0).toFixed(0)
+          + "\u00b0, Illum: " + (ev.moon_illum || 0).toFixed(0) + "%)"
+        : " (Moon: " + (ev.moon_status || "Set") + ")";
+      commsLog("NOTIF: " + notifLabel + " " + ev.location
+        + " " + ev.night + " " + ev.start + notifDetail + " geplant");
     }
     if (toSchedule.length) {
       await LN.schedule({notifications: toSchedule});

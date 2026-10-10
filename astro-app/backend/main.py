@@ -1309,10 +1309,14 @@ def _inversion_adjusted(spot: dict, clouds: float, tau: float,
 # --- Push-Benachrichtigungen: anstehende PRIME WINDOWs als JSON ---
 @app.get("/api/notifications/upcoming")
 def api_notifications_upcoming(hours_ahead: int = 48):
-    """PRIME-WINDOW-Ereignisse der naechsten N Stunden fuer die App-
-    Benachrichtigung (Local Notifications). Nutzt dieselbe Logik wie
-    check_prime_window_push(): Fenster mit ueberdurchschnittlichen
-    Bedingungen. Die App pollt hier bei jedem Oeffnen/Refresh."""
+    """Zwei getrennte Einsatz-Profile fuer Push-Benachrichtigungen:
+
+    LUNAR WINDOW: Mond > 15deg, Wolken < 30%, Seeing < 2.0", Bortle egal
+    DEEP SKY WINDOW: Mond unter Horizont ODER < 15% illum, Wolken < 20%,
+    Bortle < 6 bevorzugt, Seeing zweitrangig
+
+    Die App pollt hier bei jedem Oeffnen/Refresh und plant lokale
+    Notifications via @capacitor/local-notifications."""
     import datetime as _dt
     from datetime import timedelta as _td
 
@@ -1324,7 +1328,29 @@ def api_notifications_upcoming(hours_ahead: int = 48):
     except (OSError, ValueError):
         pass
 
+    # Mond-Daten pro Standort abrufen (aus dem Tages-Cache)
+    def _moon_info(name, target_dt):
+        """Mondhoehe/-illumination zur Zielzeit via Mond-Cache."""
+        try:
+            m = ac.moon_cached(*next(
+                (l["lat"], l["lon"]) for l in
+                ac.active_locations(ac.DEFAULT_LOCATIONS)
+                + ac.load_watchlist()
+                if l["name"] == name))
+            if not m:
+                return None
+            # Interpolation: max_alt als Peak, illum als Konstante der Nacht
+            return {"max_alt": m.get("moon", {}).get("max_alt", 0),
+                    "illum": m.get("moon", {}).get("illum", 0),
+                    "culm": m.get("moon", {}).get("culm", "?"),
+                    "rise": m.get("moon", {}).get("rise"),
+                    "set": m.get("moon", {}).get("set"),
+                    "dark": m.get("dark_window")}
+        except (StopIteration, Exception):
+            return None
+
     def _win_metrics(entry, gw):
+        """Ø-Wolken, Ø-Seeing, max-Wind, min-Tau der Fensterstunden."""
         try:
             start_h = int(gw["start"].split(":")[0])
         except (KeyError, ValueError):
@@ -1352,18 +1378,19 @@ def api_notifications_upcoming(hours_ahead: int = 48):
                 max(wi) if wi else None,
                 min(ta) if ta else None)
 
-    # Durchschnitt aller Fenster als Vergleichsmassstab
-    all_c, all_s = [], []
-    for entry in fc.values():
-        for gw in (entry.get("golden_windows") or [])[:3]:
-            m0 = _win_metrics(entry, gw)
-            if m0 and m0[0] is not None: all_c.append(m0[0])
-            if m0 and m0[1] is not None: all_s.append(m0[1])
-    avg_c = sum(all_c) / len(all_c) if all_c else None
-    avg_s = sum(all_s) / len(all_s) if all_s else None
-
     events = []
     for name, entry in fc.items():
+        # Standort-Metadaten (Bortle, Hoehe) fuer DEEP SKY Filter
+        loc_meta = {}
+        try:
+            for l in ac.active_locations(ac.DEFAULT_LOCATIONS):
+                if l["name"] == name:
+                    loc_meta = {"bortle": l.get("bortle_class", 9),
+                                "elevation_m": l.get("elevation_m", 100)}
+                    break
+        except Exception:
+            pass
+
         for gw in (entry.get("golden_windows") or []):
             try:
                 night = _dt.datetime.fromisoformat(gw["night"])
@@ -1372,39 +1399,95 @@ def api_notifications_upcoming(hours_ahead: int = 48):
             except (ValueError, KeyError):
                 continue
             gwe = gws + _td(hours=max(1, gw.get("hours", 1)))
-            # Nur Fenster in den naechsten N Stunden
             hours_until = (gws - now).total_seconds() / 3600
             if not (0 <= hours_until <= hours_ahead):
                 continue
+
             m0 = _win_metrics(entry, gw)
             if not m0:
                 continue
             clouds, seeing, wind, tau = m0
-            # Ueberdurchschnittlich?
-            premium = False
-            conditions = []
-            if avg_c is not None and clouds is not None and clouds <= avg_c * 0.75:
-                premium = True
-                conditions.append(f"Wolken \u00d8 {clouds:.0f}% (Schnitt {avg_c:.0f}%)")
-            if avg_s is not None and seeing is not None and seeing <= avg_s * 0.8:
-                premium = True
-                conditions.append(f"Seeing \u00d8 {seeing:.1f}\u2033")
-            if not premium:
+            if clouds is None:
                 continue
-            events.append({
-                "location": name,
-                "night": gw["night"],
-                "start": gw["start"],
-                "end": f"{(gwe.hour):02d}:{(gwe.minute):02d}",
-                "hours_until_start": round(hours_until, 1),
-                "clouds_avg": round(clouds, 0) if clouds is not None else None,
-                "seeing_avg": round(seeing, 1) if seeing is not None else None,
-                "wind_max": round(wind, 0) if wind is not None else None,
-                "conditions": conditions,
-                "type": "PRIME_WINDOW",
-            })
-    events.sort(key=lambda e: e["hours_until_start"])
-    return {"events": events, "generated_at": now.isoformat(timespec="seconds")}
+
+            # Mond-Status fuer dieses Fenster
+            moon = _moon_info(name, gws)
+            moon_alt = moon["max_alt"] if moon else 0
+            moon_illum = moon["illum"] if moon else 50
+            moon_set = moon.get("set") if moon else None
+            moon_rise = moon.get("rise") if moon else None
+
+            # === PROFIL 1: LUNAR WINDOW ===
+            # Mond > 15° + Wolken < 30% + Seeing < 2.0" + Bortle egal
+            lunar_ok = (
+                moon_alt > 15
+                and clouds < 30
+                and (seeing is None or seeing < 2.0)
+            )
+            if lunar_ok:
+                events.append({
+                    "location": name,
+                    "night": gw["night"],
+                    "start": gw["start"],
+                    "end": f"{gwe.hour:02d}:{gwe.minute:02d}",
+                    "hours_until_start": round(hours_until, 1),
+                    "type": "LUNAR_WINDOW",
+                    "clouds_avg": round(clouds, 0),
+                    "seeing_avg": round(seeing, 1) if seeing else None,
+                    "wind_max": round(wind, 0) if wind else None,
+                    "moon_alt": moon_alt,
+                    "moon_illum": moon_illum,
+                    "conditions": [
+                        f"Mond Alt {moon_alt:.0f}\u00b0",
+                        f"Illum {moon_illum:.0f}%",
+                        f"Wolken \u00d8 {clouds:.0f}%",
+                        f"Seeing {seeing:.1f}\u2033" if seeing else "",
+                    ],
+                })
+
+            # === PROFIL 2: DEEP SKY WINDOW ===
+            # Mond < 0° ODER Illum < 15% + Wolken < 20% + Bortle < 7
+            moon_down = moon_alt < 0 or moon_illum < 15
+            bortle = loc_meta.get("bortle", 9)
+            dark_ok = moon_down
+            bortle_ok = bortle <= 6  # Bortle 7+ ist fuer DSO zu hell
+            clouds_ok = clouds < 20
+
+            if dark_ok and clouds_ok:
+                events.append({
+                    "location": name,
+                    "night": gw["night"],
+                    "start": gw["start"],
+                    "end": f"{gwe.hour:02d}:{gwe.minute:02d}",
+                    "hours_until_start": round(hours_until, 1),
+                    "type": "DEEP_SKY_WINDOW",
+                    "clouds_avg": round(clouds, 0),
+                    "seeing_avg": round(seeing, 1) if seeing else None,
+                    "wind_max": round(wind, 0) if wind else None,
+                    "moon_alt": moon_alt,
+                    "moon_illum": moon_illum,
+                    "bortle": bortle,
+                    "moon_status": (
+                        "Set" if moon_set and not moon_rise else
+                        "Under horizon" if moon_alt < 0 else
+                        f"Crescent {moon_illum:.0f}%"),
+                    "conditions": [
+                        f"Moon: {'Set' if moon_set else 'Below horizon'}"
+                            if moon_alt < 0 else
+                            f"Moon: Crescent {moon_illum:.0f}%",
+                        f"Wolken \u00d8 {clouds:.0f}%",
+                        f"Bortle {bortle}",
+                        f"Seeing {seeing:.1f}\u2033"
+                            if seeing and seeing < 2.5 else "",
+                    ],
+                })
+
+    events.sort(key=lambda e: (e.get("type", ""), e["hours_until_start"]))
+    return {"events": events, "generated_at": now.isoformat(timespec="seconds"),
+            "profiles": {
+                "LUNAR_WINDOW": "Mond >15\u00b0, Wolken <30%, Seeing <2.0\u2033",
+                "DEEP_SKY_WINDOW": "Mond <0\u00b0 oder <15% illum, Wolken <20%, Bortle \u22646",
+            }}
 
 
 class ObsModeBody(BaseModel):
