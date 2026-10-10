@@ -40,3 +40,4 @@ __pycache__/
 /astro-app/native/android/app/build/
 /astro-app/native/android/build/
 /astro-app/native/android/local.properties
+!/APP_CAPABILITIES.md
