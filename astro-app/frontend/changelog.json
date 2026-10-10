@@ -534,6 +534,12 @@
       "title": "L3+L4: Cloud-Hunter + Departure-Optimizer + Katzenbuckel",
       "detail": "L3 (CLOUD-HUNTER): Neuer HUNTER-Button in der Sensorleiste startet einen dynamischen Umkreis-Scan (50km, 10km-Raster) via Open-Meteo Batch-API (bis zu 100 Grid-Punkte in EINEM Call). Punkte in lichtverschmutzten Gebieten werden per statischer Bortle-Maske gefiltert (max Bortle 6). Die Karte zeigt eine Heatmap aus farbcodierten Kreis-Markern (gruen=klar bis rot=dicht) mit Tooltips. Der klarste+dunkelste+windstillste Spot erhaelt einen pulsierenden OPTIMUM-Marker mit Wolken%, Bortle und Distanz. L4 (DEPARTURE-OPTIMIZER): GET /api/departure-optimizer koppelt Golden Windows mit Transit-Zeiten: Fenster-Start - 45min Ruestzeit - distanzbasierte Transitzeit (40km/h) = Latest Departure. Das linke Panel zeigt Countdowns: GO (gruen), DEPARTURE IMMINENT (amber blinkend, <15min), MISSED (rot, ausgeblendet). Update im 60s-Takt. NEU: Katzenbuckel (Odenwald) als 9. Standort — 626m Hoehe, Bortle 4, Top-Ausweichspot bei Inversionswetterlagen, profitiert automatisch vom Inversions-Detektor (L1).",
       "usage": "HUNTER-Button druecken -> klarsten Himmel im 50km-Radius sehen; Countdowns im linken Panel zeigen Abfahrtszeiten"
+    },
+    {
+      "date": "2026-10-10",
+      "title": "v1.1.0 — OTA-Fix + Notification-ID-Fix + Feature-Konsolidierung",
+      "detail": "RELEASE-BUILD v1.1.0 (Build 10102100). OTA-Fix: Der Bundle-Download sends keine Service-Token-Header mehr — der CF-Bypass fuer /updates ist aktiv und die Token-Header feuerten den Request durch ein anderes CF-Regelwerk (curl ohne Header = 200, Updater mit Header = Failed to download). Notification-ID-Fix: Date.now() ueberschritt die 32-bit Integer-Grenze von Android — jetzt (Date.now()/1000)|0 % 2147483647. Alle Features konsolidiert: Cloud-Hunter (50km-Scan), Departure-Optimizer (Countdown), Inversions-Detektor, Bewegungsvektor, GT-Panel, PRIME-WINDOW-Push, Datenwirt-Erinnerung, Katzenbuckel (9. Standort, 626m).",
+      "usage": "v1.1.0 mit allen L1-L4 Features"
     }
   ]
 }

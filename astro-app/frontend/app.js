@@ -93,10 +93,12 @@ async function checkOtaUpdate(force) {
     if (m.version === cur) { commsLog("OTA: aktuell (" + cur + ")"); return; }
     const CU = window.Capacitor.Plugins.CapacitorUpdater;
     commsLog("OTA: Lade Bundle " + m.version + "...");
+    // Download OHNE Token-Header: Der CF-Bypass fuer /updates ist aktiv
+    // und die Token-Header koennen den Request durch ein anderes
+    // CF-Regelwerk stossen (Feld-Beweis: curl ohne Header = 200,
+    // Updater mit Header = Failed)
     const done = await CU.download({
-      url: BASE + m.url, version: m.version,
-      headers: {"CF-Access-Client-Id": CF_ACCESS.id,
-                "CF-Access-Client-Secret": CF_ACCESS.secret}});
+      url: BASE + m.url, version: m.version});
     localStorage.setItem("astro_bundle_version", m.version);
     await CU.set(done);
     commsLog("OTA: Bundle " + m.version + " aktiv");
@@ -884,7 +886,7 @@ async function checkPrimeWindowNotifications() {
         + ev.start + "-" + ev.end + " Uhr\n"
         + ev.conditions.join(" \u00b7 ");
       toSchedule.push({
-        id: Date.now() + Math.floor(Math.random() * 10000),
+        id: ((Date.now() / 1000) | 0) % 2147483647,
         title: "\uD83C\uDF0C PRIME WINDOW",
         body: body,
         schedule: {at: _notifSchedule(scheduleAt)},
