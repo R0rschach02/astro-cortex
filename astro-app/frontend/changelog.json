@@ -528,6 +528,12 @@
       "title": "Luecke 1+2 geschlossen: Inversions-Erkennung + Wetter-Bewegungsvektor",
       "detail": "LUECKE 1 (HOEHEN-DIFFERENZIERUNG): Jeder Standort traegt jetzt elevation_m (Koenigsstuhl 550m bis Neckarplatten 95m). Der neue Inversions-Detektor _inversion_adjusted() erkennt Rheingraben-Inversionswetterlagen (Wolken>70% + Taupunkt-Spread<3K + Wind<10km/h + Hoehe>200m) und reduziert die Wolkenprognose fuer hochgelegene Standorte um bis zu 60pp (Koenigsstuhl: 100% -> 55%). Das Standort-Panel zeigt ein pulsierendes Badge UEBER INVERSION mit dem korrigierten Wert. 8 deterministische Tests decken alle Kombinationen ab. LUECKE 2 (BEWEGUNGSVEKTOR): Neuer Endpoint GET /api/weather/movement vergleicht die Gesamtbewoelkung jetzt vs. +2h (Open-Meteo), nutzt die Windrichtung als Bewegungsproxy und klassifiziert den Trend (Aufklarend/Eintruebend/Stabil). Die Top-Bar zeigt ein Bewegungs-Widget mit Icon, Richtungspfeil, Windgeschwindigkeit und — bei aufklarendem Trend — welche Standorte in der Clearing-Bahn liegen mit geschaetzter Zeit bis Klarung. Update im 60s-Refresh-Takt.",
       "usage": "Koenigsstuhl zeigt jetzt 55% statt 100% bei Inversion; Top-Bar zeigt Aufklarend + Richtung"
+    },
+    {
+      "date": "2026-10-10",
+      "title": "L3+L4: Cloud-Hunter + Departure-Optimizer + Katzenbuckel",
+      "detail": "L3 (CLOUD-HUNTER): Neuer HUNTER-Button in der Sensorleiste startet einen dynamischen Umkreis-Scan (50km, 10km-Raster) via Open-Meteo Batch-API (bis zu 100 Grid-Punkte in EINEM Call). Punkte in lichtverschmutzten Gebieten werden per statischer Bortle-Maske gefiltert (max Bortle 6). Die Karte zeigt eine Heatmap aus farbcodierten Kreis-Markern (gruen=klar bis rot=dicht) mit Tooltips. Der klarste+dunkelste+windstillste Spot erhaelt einen pulsierenden OPTIMUM-Marker mit Wolken%, Bortle und Distanz. L4 (DEPARTURE-OPTIMIZER): GET /api/departure-optimizer koppelt Golden Windows mit Transit-Zeiten: Fenster-Start - 45min Ruestzeit - distanzbasierte Transitzeit (40km/h) = Latest Departure. Das linke Panel zeigt Countdowns: GO (gruen), DEPARTURE IMMINENT (amber blinkend, <15min), MISSED (rot, ausgeblendet). Update im 60s-Takt. NEU: Katzenbuckel (Odenwald) als 9. Standort — 626m Hoehe, Bortle 4, Top-Ausweichspot bei Inversionswetterlagen, profitiert automatisch vom Inversions-Detektor (L1).",
+      "usage": "HUNTER-Button druecken -> klarsten Himmel im 50km-Radius sehen; Countdowns im linken Panel zeigen Abfahrtszeiten"
     }
   ]
 }

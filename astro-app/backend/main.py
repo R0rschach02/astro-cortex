@@ -1002,6 +1002,221 @@ def api_weather_movement():
     }
 
 
+
+# --- L3: Cloud-Hunter — dynamischer Umkreis-Scan ---
+CLOUD_HUNTER_CENTER = (49.48, 8.63)   # Mannheim/Heidelberg
+LIGHT_POLLUTION_SOURCES = [
+    # (lat, lon, radius_km, bortle_max) — Staedte mit Lichtglocke
+    (49.488, 8.466, 8, 8),   # Mannheim/Ludwigshafen
+    (49.588, 8.664, 5, 7),   # Weinheim
+    (49.526, 8.572, 4, 7),   # Viernheim
+    (49.401, 8.676, 5, 7),   # Heidelberg
+    (49.634, 8.357, 4, 7),   # Worms
+]
+
+
+def _estimate_bortle(lat, lon):
+    """Schaetzt Bortle-Klasse nach Distanz zu Lichtquellen."""
+    worst = 3   # ländlicher Standard
+    for src_lat, src_lon, radius, bortle in LIGHT_POLLUTION_SOURCES:
+        d = _haversine_km(lat, lon, src_lat, src_lon)
+        if d < radius:
+            worst = max(worst, bortle)
+        elif d < radius * 2:
+            worst = max(worst, bortle - 1)
+    return worst
+
+
+def _haversine_km(lat1, lon1, lat2, lon2):
+    import math
+    r = 6371.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = p2 - p1
+    dl = math.radians(lon2 - lon1)
+    a = math.sin(dp / 2) ** 2 + \
+        math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(a))
+
+
+@app.get("/api/cloud-hunter")
+def api_cloud_hunter(radius_km: int = 50, hours_ahead: int = 3,
+                     max_bortle: int = 6):
+    """Dynamischer Umkreis-Scan: Wo ist der klarste Himmel in den
+    naechsten N Stunden? Ein Batch-Call an Open-Meteo mit bis zu 100
+    Grid-Punkten (10km Raster), gefiltert nach Lichtverschmutzung.
+    Liefert Grid + besten Spot (DYNAMIC OPTIMUM)."""
+    import math
+    import urllib.request
+    import json as _json
+    from datetime import datetime as _dt, timedelta as _td
+
+    center_lat, center_lon = CLOUD_HUNTER_CENTER
+
+    # Grid: ~10km Raster im Umkreis
+    lat_step = 10 / 111.0
+    lon_step = 10 / (111.0 * math.cos(math.radians(center_lat)))
+    n_lat = int(radius_km / 10) * 2 + 1
+    n_lon = int(radius_km / (10 * math.cos(math.radians(center_lat)))) * 2 + 1
+
+    points = []
+    for i in range(n_lat):
+        for j in range(n_lon):
+            lat = center_lat + (i - n_lat // 2) * lat_step
+            lon = center_lon + (j - n_lon // 2) * lon_step
+            dist = _haversine_km(center_lat, center_lon, lat, lon)
+            if dist > radius_km:
+                continue
+            bortle = _estimate_bortle(lat, lon)
+            if bortle > max_bortle:
+                continue
+            points.append({"lat": round(lat, 3), "lon": round(lon, 3),
+                           "bortle": bortle, "dist_km": round(dist, 1)})
+    # Auf 100 begrenzen (Open-Meteo Batch-Limit)
+    points = points[:100]
+    if not points:
+        return {"grid": [], "best": None,
+                "reason": "Keine Punkte im Umkreis mit Bortle<=" + str(max_bortle)}
+
+    # Batch-Call an Open-Meteo
+    lats = ",".join(str(p["lat"]) for p in points)
+    lons = ",".join(str(p["lon"]) for p in points)
+    url = (f"https://api.open-meteo.com/v1/forecast"
+           f"?latitude={lats}&longitude={lons}"
+           f"&hourly=cloud_cover,wind_speed_10m"
+           f"&forecast_hours={hours_ahead}&timezone=auto")
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "astro-cc"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = _json.loads(r.read())
+    except Exception as e:
+        return {"grid": [], "best": None, "reason": f"Open-Meteo: {e}"}
+
+    # Antwort kann ein Objekt (1 Location) oder Array sein
+    results = data if isinstance(data, list) else [data]
+    grid = []
+    now_hour = _dt.now().strftime("%Y-%m-%dT%H:00")
+    for idx, point in enumerate(points):
+        if idx >= len(results):
+            break
+        hourly = results[idx].get("hourly", {})
+        times = hourly.get("time", [])
+        clouds = hourly.get("cloud_cover", [])
+        winds = hourly.get("wind_speed_10m", [])
+        # Mittel ueber die naechsten N Stunden
+        start_i = next((i for i, t in enumerate(times)
+                       if t >= now_hour), 0)
+        window_clouds = [c for c in clouds[start_i:start_i + hours_ahead]
+                        if c is not None]
+        window_winds = [w for w in winds[start_i:start_i + hours_ahead]
+                       if w is not None]
+        if not window_clouds:
+            continue
+        avg_clouds = sum(window_clouds) / len(window_clouds)
+        avg_wind = sum(window_winds) / len(window_winds) if window_winds else 0
+        grid.append({**point,
+                     "clouds_avg": round(avg_clouds, 0),
+                     "wind_avg": round(avg_wind, 1),
+                     "score": round(avg_clouds + point["bortle"] * 3
+                                    + avg_wind * 0.5, 1)})
+
+    # Besten Spot finden (niedrigster Score = klar + dunkel + windstill)
+    best = min(grid, key=lambda g: g["score"]) if grid else None
+    return {
+        "grid": grid,
+        "best": best,
+        "parameters": {"radius_km": radius_km, "hours_ahead": hours_ahead,
+                       "max_bortle": max_bortle,
+                       "center": {"lat": center_lat, "lon": center_lon}},
+        "timestamp": _dt.now().isoformat(timespec="seconds"),
+    }
+
+
+# --- L4: Departure-Optimizer — Time-to-Target Deadline-Engine ---
+@app.get("/api/departure-optimizer")
+def api_departure_optimizer(setup_minutes: int = 45):
+    """Koppelt Golden Windows mit Transit-Zeiten. Fuer jeden Standort:
+    Fenster-Start -> Ruestzeit abziehen -> Transitzeit abziehen ->
+    Latest Departure. Liefert Countdown + Erreichbarkeit."""
+    from datetime import datetime as _dt, timedelta as _td
+    import math
+
+    now = _dt.now()
+    HQ_LAT, HQ_LON = 49.4783726, 8.5662896
+
+    try:
+        with open(ac.FORECAST_PATH, "r", encoding="utf-8") as f:
+            fc = json.load(f)
+    except (OSError, ValueError):
+        fc = {}
+
+    try:
+        locations = ac.active_locations(ac.DEFAULT_LOCATIONS)
+    except Exception:
+        locations = []
+
+    results = []
+    for loc in locations:
+        name = loc["name"]
+        entry = fc.get(name) or {}
+        gws = entry.get("golden_windows") or []
+        if not gws:
+            continue
+        gw = gws[0]
+        try:
+            night = _dt.fromisoformat(gw["night"])
+            gws_dt = _dt.combine(night,
+                _dt.strptime(gw["start"], "%H:%M").time())
+            hours = max(1, gw.get("hours", 1))
+        except (ValueError, KeyError):
+            continue
+
+        # Wenn Fenster vorbei -> skip
+        if gws_dt < now - _td(hours=1):
+            continue
+
+        # Ruestzeit abziehen (Teleskop-Auskuehlung, Polausrichtung)
+        arrival_deadline = gws_dt - _td(minutes=setup_minutes)
+
+        # Transit-Schaetzung: Distanzbasiert (40 km/h Mischgeschwindigkeit
+        # fuer OPNV; GTFS-Router ist fuer den konkreten Fall da)
+        dist_km = _haversine_km(HQ_LAT, HQ_LON, loc["lat"], loc["lon"])
+        transit_min = round(dist_km / 40 * 60)  # 40 km/h inkl. Umstiege
+        latest_departure = arrival_deadline - _td(minutes=transit_min)
+
+        # Erreichbarkeit
+        time_to_departure = (latest_departure - now).total_seconds() / 60
+        if time_to_departure > 15:
+            status = "GO"
+            status_detail = (f"Abfahrt in {time_to_departure / 60:.0f}h "
+                             f"{time_to_departure % 60:.0f}m")
+        elif time_to_departure > 0:
+            status = "DEPARTURE_IMMINENT"
+            status_detail = f"ABFAHRT IN {time_to_departure:.0f} MINUTEN!"
+        else:
+            status = "MISSED"
+            status_detail = "Nicht mehr rechtzeitig erreichbar"
+
+        results.append({
+            "location": name,
+            "elevation_m": loc.get("elevation_m", 100),
+            "bortle": loc.get("bortle_class"),
+            "window_start": gw["start"],
+            "window_hours": hours,
+            "night": gw["night"],
+            "arrival_deadline": arrival_deadline.strftime("%H:%M"),
+            "latest_departure": latest_departure.strftime("%H:%M"),
+            "transit_minutes": transit_min,
+            "distance_km": round(dist_km, 1),
+            "time_to_departure_min": round(time_to_departure, 0),
+            "status": status,
+            "status_detail": status_detail,
+        })
+
+    results.sort(key=lambda r: r.get("time_to_departure_min", 9999))
+    return {"results": results, "now": now.isoformat(timespec="seconds"),
+            "setup_minutes": setup_minutes, "hq": "Ilvesheim"}
+
+
 # --- Luecke 1: Hoehen-Differenzierung / Inversions-Erkennung ---
 def _inversion_adjusted(spot: dict, clouds: float, tau: float,
                         wind: float) -> dict:

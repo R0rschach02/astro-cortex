@@ -698,6 +698,75 @@ function moonNightsRows(nights) {
 
 
 
+
+/* ============================================================
+   L3+L4: CLOUD-HUNTER (Umkreis-Scan) + DEPARTURE-OPTIMIZER
+   ============================================================ */
+let cloudHunterLayer = null;
+let hunterActive = false;
+
+async function toggleCloudHunter() {
+  hunterActive = !hunterActive;
+  if (hunterActive) {
+    await fetchCloudHunter();
+    commsLog("CLOUD-HUNTER: Scan aktiv");
+  } else if (cloudHunterLayer) {
+    map.removeLayer(cloudHunterLayer);
+    cloudHunterLayer = null;
+  }
+}
+
+async function fetchCloudHunter() {
+  try {
+    const d = await api("/api/cloud-hunter?radius_km=50&hours_ahead=3");
+    if (!d || !d.grid || !d.grid.length) return;
+    if (cloudHunterLayer) map.removeLayer(cloudHunterLayer);
+    cloudHunterLayer = L.layerGroup();
+    for (const g of d.grid) {
+      const color = g.clouds_avg < 20 ? "#3aff7c" :
+                    g.clouds_avg < 40 ? "#ffd24a" :
+                    g.clouds_avg < 70 ? "#ff8a3d" : "#ff4b3e";
+      L.circleMarker([g.lat, g.lon], {
+        radius: 14, color: color, fillColor: color,
+        fillOpacity: 0.15 + (g.clouds_avg / 100) * 0.35, weight: 1,
+      }).addTo(cloudHunterLayer)
+        .bindTooltip("Wolken " + g.clouds_avg + "% B" + g.bortle
+          + " " + g.dist_km + "km");
+    }
+    if (d.best) {
+      const bestIcon = L.divIcon({className: "hunter-best",
+        html: "<div class='hb-ring'></div><div class='hb-label'>"
+          + "\uD83C\uDF1F OPTIMUM<br>" + d.best.clouds_avg + "% B"
+          + d.best.bortle + " " + d.best.dist_km + "km</div>",
+        iconSize: [0, 0]});
+      L.marker([d.best.lat, d.best.lon],
+        {icon: bestIcon, interactive: false}).addTo(cloudHunterLayer);
+      commsLog("CLOUD-HUNTER Optimum: " + d.best.clouds_avg
+        + "% Wolken, " + d.best.dist_km + "km entfernt");
+    }
+    cloudHunterLayer.addTo(map);
+  } catch (e) {
+    commsLog("CLOUD-HUNTER Fehler: " + (e.message || e), "alert");
+  }
+}
+
+async function updateDepartureOptimizer() {
+  try {
+    const d = await api("/api/departure-optimizer?setup_minutes=45");
+    if (!d || !d.results || !d.results.length) return;
+    const el = document.getElementById("lh-departure");
+    if (!el) return;
+    el.innerHTML = d.results.slice(0, 4).map(r => {
+      const icon = r.status === "GO" ? "\uD83D\uDFE9" :
+        r.status === "DEPARTURE_IMMINENT" ? "\uD83D\uDFE5" : "\uD83D\uDD34";
+      return "<div class='dep-line dep-" + r.status + "'>" + icon + " "
+        + r.location.split(",")[0] + ": " + r.status_detail
+        + " <small>(Abfahrt " + r.latest_departure + ", "
+        + r.transit_minutes + "min)</small></div>";
+    }).join("");
+  } catch (e) {}
+}
+
 /* ============================================================
    LUECKE 1+2: Inversions-Badge + Wetter-Bewegungsanalyse
    ============================================================ */
@@ -1628,6 +1697,7 @@ function setGaugeVal(id, txt, cls) {
 function updateAstroInstruments(data) {
   pingLedState();   // Freshness-Ampel im bestaehenden 60s-Takt
   updateWeatherMovement();   // Luecke 2: Bewegungstrend
+  updateDepartureOptimizer(); // Luecke 4: Countdown
   const s = telemetrySpot(data);
   if (!s) return;
   setTelemetry(s.name, true);   // Link-Label synchron halten
