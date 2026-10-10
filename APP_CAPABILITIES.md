@@ -131,3 +131,110 @@
 | `/updates/manifest.json` | GET | OTA-Manifest (Alias) |
 | `/updates/bundle.zip` | GET | OTA-Bundle |
 | `/native/astro-cortex.apk` | GET | APK-Download |
+
+---
+
+## Infrastruktur & OTA-Pipeline (v1.1.4)
+
+### Cloudflare-Konfiguration (Dashboard)
+
+| Regel | Pfad | Aktion | Status |
+|---|---|---|---|
+| Cache Rule #1 | URI Path starts with `/native/` | **Bypass cache** | Aktiv |
+| Cache Rule #2 | URI Path starts with `/updates/` | **Bypass cache** | Aktiv |
+| Access Policy | api.teamigel.com | **Service Auth** (M2M Tokens) | Aktiv |
+
+Ohne diese Regeln cached Cloudflare die APK mit `max-age=14400` (4 Stunden) und blockt OTA-Downloads mit 403 auf CORS-Preflights.
+
+### Serverseitige Headers (FastAPI Middleware)
+
+Alle `/native/` und `/updates/` Routen senden:
+```
+Cache-Control: no-store, no-cache, must-revalidate, max-age=0
+Pragma: no-cache
+Expires: 0
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Methods: GET, OPTIONS
+Access-Control-Allow-Headers: *
+```
+
+APK-Download zusätzlich:
+```
+Content-Type: application/vnd.android.package-archive
+Content-Disposition: attachment; filename="astro-cortex-v{version}.apk"
+```
+
+### OTA-Pipeline (dreistufiges Error-Handling)
+
+```
+Kaltstart / UPLINK-Button
+    ↓
+checkOtaUpdate(force?)
+    ↓ [24h-Drossel — force=true umgeht]
+fetch /updates/latest.json?t=Date.now()  ← Cache-Buster + No-Cache-Header
+    ↓ [404/Netzwerk → "Manifest nicht erreichbar" → sauberer Abbruch]
+    ↓ [version=null → "Manifest ungueltig" → sauberer Abbruch]
+Version-Vergleich mit localStorage (astro_bundle_version)
+    ↓ [identisch → "OTA: aktuell" → Ende]
+CapacitorUpdater.download()
+    ↓ [Version wird sanitiziert: nur [a-zA-Z0-9._] erlaubt]
+    ↓ [Download-Fehler → Fallback mit Timestamp-Version]
+    ↓ [immer noch Fehler → "OTA-Download fehlgeschlagen" + Installationsversion]
+CapacitorUpdater.set(done)
+    ↓ [App-Neustart mit neuem Bundle]
+```
+
+### Cache-Buster im Manifest-Fetch
+
+```javascript
+const m = await (await fetch(BASE + "/updates/latest.json?t=" + Date.now(), {
+    headers: {
+        "CF-Access-Client-Id": CF_ACCESS.id,
+        "CF-Access-Client-Secret": CF_ACCESS.secret,
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache"
+    }
+})).json();
+```
+
+Der `?t=Date.now()` Parameter erzwingt eine eindeutige URL pro Request — Cloudflare kann diese nicht aus dem Edge-Cache bedienen.
+
+### Nuke-Cache (Notfall-Ausweg)
+
+**3 Sekunden auf die Top-Bar drücken** löst aus:
+1. Alle `localStorage`-Keys werden gelöscht
+2. `CapacitorUpdater.deleteAll()` leert den OTA-Cache
+3. App startet neu (`location.reload()`)
+
+Comms-Meldung: `CACHE-NUKE: Loesche alles...`
+
+### UPLINK-Button = Force-OTA
+
+`uplinkNow()` ruft `checkOtaUpdate(true)` auf — der Parameter `force=true` **umgeht die 24h-Drossel** und erzwingt einen sofortigen OTA-Check. Der Nutzer kann also jederzeit manuell nach Updates suchen, ohne auf den nächsten Kaltstart zu warten.
+
+### Version-Verifikation
+
+```
+GET https://api.teamigel.com/updates/version
+→ {"backend_version": "v1.1.4", "ota_version": "e07811e-..."}
+```
+
+Dies erlaubt die Server-Version im Browser zu prüfen, bevor ein 7MB-Download gestartet wird.
+
+### APK-Build-Prozess
+
+```bash
+cd ~/astro-app/native
+bash build_apk.sh              # cap sync + gradlew assembleDebug
+cp android/app/build/outputs/apk/debug/app-debug.apk ~/astro-cortex-v1.1.4.apk
+```
+
+**WICHTIG:** Nach jedem Frontend-Deploy muss `npx cap sync android` laufen, bevor die APK gebaut wird — sonst landen alte Dateien im Bundle (Feld-Report vom 10.10.2026: BUILD 2026-09-30D in einer v1.1.2-APK, weil cap sync nicht lief).
+
+### OTA vs. APK-Wann-was
+
+| Szenario | Lösung |
+|---|---|
+| Frontend-Änderung (JS/CSS/HTML) | `astro_deploy.sh` → OTA-Bundle → App zieht beim nächsten Start |
+| Native-Änderung (Plugins, Config, Manifest) | `build_apk.sh` → neue APK → manueller Download nötig |
+| Beides | Erst deployen (OTA-Bundle), dann APK bauen (damit neue Installationen aktuell sind) |
