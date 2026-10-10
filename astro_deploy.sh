@@ -87,9 +87,18 @@ mkdir -p "$HOME/updates"
     "$HOME/updates/bundle.zip" .)
 OTA_VER="$(git rev-parse --short HEAD)-$(date +%m%d%H%M)"
 /usr/bin/python3 - "$OTA_VER" << 'OTAEOF'
-import json, sys
-json.dump({"version": sys.argv[1], "url": "/updates/bundle.zip"},
-          open("/home/enigma/updates/latest.json", "w"))
+import hashlib, json, sys, os
+ver = sys.argv[1]
+zp = "/home/enigma/updates/bundle.zip"
+sha = hashlib.sha256(open(zp, "rb").read()).hexdigest()[:16] \
+    if os.path.exists(zp) else None
+manifest = {"version": ver, "url": "/updates/bundle.zip"}
+if sha:
+    manifest["sha256"] = sha
+    manifest["size"] = os.path.getsize(zp)
+for name in ("latest.json", "manifest.json"):
+    json.dump(manifest, open(f"/home/enigma/updates/{name}", "w"),
+              indent=1)
 OTAEOF
 echo "OTA-Bundle: Version $OTA_VER ($HOME/updates/bundle.zip)"
 

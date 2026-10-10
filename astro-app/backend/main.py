@@ -746,6 +746,7 @@ async def updates_cors(request, call_next):
     return await call_next(request)
 
 
+@app.get("/updates/manifest.json")
 @app.get("/updates/latest.json")
 def api_ota_manifest():
     """OTA-Manifest (Version + Bundle-URL). Erzeugt vom Deploy-Skript

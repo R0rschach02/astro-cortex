@@ -540,6 +540,12 @@
       "title": "v1.1.0 — OTA-Fix + Notification-ID-Fix + Feature-Konsolidierung",
       "detail": "RELEASE-BUILD v1.1.0 (Build 10102100). OTA-Fix: Der Bundle-Download sends keine Service-Token-Header mehr — der CF-Bypass fuer /updates ist aktiv und die Token-Header feuerten den Request durch ein anderes CF-Regelwerk (curl ohne Header = 200, Updater mit Header = Failed to download). Notification-ID-Fix: Date.now() ueberschritt die 32-bit Integer-Grenze von Android — jetzt (Date.now()/1000)|0 % 2147483647. Alle Features konsolidiert: Cloud-Hunter (50km-Scan), Departure-Optimizer (Countdown), Inversions-Detektor, Bewegungsvektor, GT-Panel, PRIME-WINDOW-Push, Datenwirt-Erinnerung, Katzenbuckel (9. Standort, 626m).",
       "usage": "v1.1.0 mit allen L1-L4 Features"
+    },
+    {
+      "date": "2026-10-10",
+      "title": "OTA-Haertung: Manifest-Alias, robustes Error-Handling, Feature-Logging, APP_CAPABILITIES.md",
+      "detail": "(1) TASK1: /updates/manifest.json als Alias-Route (neben latest.json), Deploy-Skript erzeugt jetzt beide Dateien mit SHA-256-Hash und Dateigroesse. (2) TASK2: OTA-Client mit vollstaendigem Error-Handling — Manifest-Fetch-Fehler wird als lesbare Meldung ausgegeben (OTA: Manifest nicht erreichbar), Download-Fehler zeigt Installationsversion, Version=null bleibt bei unbekannter APK-Basis nicht mehr haengen. (3) TASK3: APP_CAPABILITIES.md mit technischer Dokumentation aller 9 Feature-Bereiche (Schwellenwerte, Endpoints, Comms-Log-Formate, Plugins). Comms-Logging fuer Inversions-Detektor ([INVERSION DETECTED]), Bewegungsvektor ([MOVEMENT]), Cloud-Hunter ([CLOUD-HUNTER]) ergaenzt — jedes Feature meldet sich jetzt im Comms-Feed wenn es triggert.",
+      "usage": "OTA-Fehler sind jetzt diagnosebar; APP_CAPABILITIES.md dokumentiert alle Features"
     }
   ]
 }
