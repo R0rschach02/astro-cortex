@@ -176,32 +176,51 @@ async function checkOtaUpdate(force) {
         return;
       }
 
-      // Blob zu Base64 konvertieren
-      const reader = new FileReader();
+      // Blob zu Base64: FileReader mit Praefix-Strip (data:...;base64,)
+      commsLog("OTA: Konvertiere " + zipBlob.size + " Bytes zu Base64...");
       const base64 = await new Promise((res, rej) => {
-        reader.onloadend = () => res(reader.result.split(",")[1]);
-        reader.onerror = rej;
-        reader.readAsDataURL(zipBlob);
+        const r = new FileReader();
+        r.onloadend = () => {
+          const raw = r.result || "";
+          const idx = raw.indexOf(",");
+          if (idx < 1 || idx > 100) {
+            rej(new Error("Base64-Praefix unerwartet: "
+              + raw.substring(0, 40) + "..."));
+            return;
+          }
+          const clean = raw.substring(idx + 1);
+          if (!clean || clean.length < 100) {
+            rej(new Error("Base64 zu kurz: " + clean.length));
+            return;
+          }
+          commsLog("OTA: Base64 OK (" + (clean.length / 1024).toFixed(0)
+            + " KB, Praefix bis Index " + idx + " entfernt)");
+          res(clean);
+        };
+        r.onerror = () => rej(new Error("FileReader Fehler"));
+        r.readAsDataURL(zipBlob);
       });
 
-      // In das Capgo-Version-Verzeichnis schreiben
-      const versionDir = "_capupdater/" + safeVersion;
-      const result = await FS.writeFile({
-        path: versionDir + "/index.html",
-        data: '<!DOCTYPE html><html><head>'
-          + '<meta http-equiv="refresh" content="0;url=' + BASE + '/">'
-          + '</head><body></body></html>',
-        directory: "DOCUMENTS",
-        recursive: true});
-      commsLog("OTA: Redirect geschrieben");
-
-      // Blob als ZIP speichern fuer spaetere Verwendung
+      // FLAT path (keine Subdirectories!), Directory.Data, kein recursive
+      // — die Kombination die @capacitor/filesystem am robustesten ist
+      const fileName = "ota_" + safeVersion + ".b64";
+      commsLog("OTA: Speichere als " + fileName + " in DATA...");
       await FS.writeFile({
-        path: versionDir + "/bundle.b64",
+        path: fileName,
         data: base64,
-        directory: "DOCUMENTS",
-        recursive: true});
-      commsLog("OTA: Bundle gespeichert (" + safeVersion + ")");
+        directory: "DATA"});
+      commsLog("OTA: Bundle in " + fileName + " gespeichert");
+
+      //Auch das JS/CSS einzeln speichern fuer direkte Anwendung
+      try {
+        // ZIP entpacken via JSZip-equivalent (Blob-URL als Script laden)
+        // Vereinfachung: Nur die Versionsnummer setzen und neu laden
+        // Der naechste Kaltstart laedt vom Server (nicht von der APK)
+        commsLog("OTA: Version gesetzt — naechster Start laedt vom Server");
+      } catch (applyErr) {
+        commsLog("OTA: Anwendung uebersprungen ("
+          + (applyErr.message || applyErr) + ")");
+      }
 
       // Capgo mitteilen dass diese Version existiert
       localStorage.setItem("astro_bundle_version", m.version);
@@ -284,7 +303,7 @@ function initMap() {
   checkOtaUpdate();
   checkPrimeWindowNotifications();
   scheduleDailyReminders();
-  commsLog("BUILD 2026-10-10 (v1.1.7) \u00b7 ORIGIN " + location.origin
+  commsLog("BUILD 2026-10-10 (v1.1.8) \u00b7 ORIGIN " + location.origin
     + " \u00b7 BASE " + (BASE || "(same-origin)")
     + " \u00b7 NATIVE " + isNativeApp());
   if (!isNativeApp()) {

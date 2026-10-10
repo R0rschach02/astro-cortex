@@ -582,6 +582,12 @@
       "title": "v1.1.7 — OTA Capgo-Bypass: fetch() + Filesystem",
       "detail": "Der Pre-Flight-Check lud das Bundle als Range-Request (bytes=0-1023) und erhielt 206 Partial Content — der Capgo-Updater crashte darauf. Jetzt: (1) Pre-Flight ohne Range-Header, laedt das komplette Bundle als Blob in einem Durchgang (durch CapacitorHttp = native, bekannte funktionierende Pipeline). (2) Capgo-Download komplett umgangen: fetch() laedt das ZIP, Blob wird zu Base64 konvertiert und via @capacitor/filesystem im _capupdater-Verzeichnis gespeichert. (3) Backend: Accept-Ranges: none auf bundle.zip (keine 206-Antworten mehr). (4) Drei-Wege-Fallback: Bypass → Capgo download() → Fehlermeldung.",
       "usage": "OTA-Download laeuft jetzt durch CapacitorHttp statt durch Capgo-Plugin"
+    },
+    {
+      "date": "2026-10-10",
+      "title": "v1.1.8 — Filesystem-Fix: Flat Path + Directory.DATA",
+      "detail": "writeFile-Parameter korrigiert: (1) Base64-Praefix-Validierung mit indexOf statt split (prueft dass Praefix existiert und Base64 lang genug ist). (2) FLAT path ohne Subdirectories (ota_VERSION.b64 statt _capupdater/VERSION/bundle.b64) — Subdirectories mit recursive:true waren die Ursache fuer Invalid input parameters. (3) directory: DATA statt DOCUMENTS — robuster auf Android. (4) HTML-Redirect-Datei entfernt (war ein Hack). Detaillierte Comms-Logs bei jedem Konvertierungs-Schritt.",
+      "usage": "OTA-Speicherung sollte jetzt durchgehen"
     }
   ]
 }
