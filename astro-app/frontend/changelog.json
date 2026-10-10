@@ -552,6 +552,12 @@
       "title": "v1.1.1 — Caching-Infrastruktur bombenfest",
       "detail": "CF cached /native/ und /updates/ mit max-age=14400 (4h!) — der Grund warum alte APKs und Bundle-Downloads im Kreis liefen. 5 Architektur-Fixes: (1) Versionierte APK-Route /native/astro-cortex-v{version}.apk durchbricht Browser-Caching. (2) Strikte No-Cache-Header (no-store, no-cache, must-revalidate, max-age=0, Pragma: no-cache) auf allen /native/ und /updates/ Wegen auf Origin-Ebene. (3) Manifest-Fetch mit Timestamp-Cache-Busting (?t=Date.now()) + Cache-Control-Headern im Request. (4) versionCode auf 10102101 erhoet, versionName 1.1.1. (5) CACHE-NUKE: 3 Sekunden auf den App-Titel druecken loescht ALLE localStorage-Daten + OTA-Cache und startet neu — der manuelle Notfall-Ausweg wenn OTA sich verklemmt.",
       "usage": "Neue APK: astro-cortex-v1.1.1.apk; 3s auf Titel = Cache-Nuke"
+    },
+    {
+      "date": "2026-10-10",
+      "title": "v1.1.2 — Vollstaendiger Code-Restore nach Asset-Verlust",
+      "detail": "Der OTA-Error-Handling-Rewrite in d8294b4 loeschte versehentlich initMap + 20 weitere Funktionen (fetchRainGrid, rvFetchFrames, forecastHtml, cell, dot, fetchBortle, fmtSigned, isNativeApp, const $...). Restauriert aus d77b630 (letzter funktionierender Stand). Reapplied: Cache-Busting fuer Manifest-Fetch, Cache-Nuke (3s auf Topbar), Inversions-Comms-Log. Web-Version verifiziert: initMap laeuft, alle Marker/Gauges/Map-Tiles sichtbar.",
+      "usage": "v1.1.2 mit vollstaendigem Codebase"
     }
   ]
 }

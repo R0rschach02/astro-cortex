@@ -1,3 +1,19 @@
+
+function initNukeCache() {
+  let t = null;
+  document.body?.addEventListener("pointerdown", (e) => {
+    if (e.target.closest("#topbar")) {
+      t = setTimeout(() => {
+        commsLog("CACHE-NUKE: Loesche alles...", "alert");
+        Object.keys(localStorage).forEach(k => localStorage.removeItem(k));
+        if (window.Capacitor?.Plugins?.CapacitorUpdater)
+          window.Capacitor.Plugins.CapacitorUpdater.deleteAll().catch(()=>{});
+        setTimeout(() => location.reload(), 1000);
+      }, 3000);
+    }
+  });
+  document.body?.addEventListener("pointerup", () => { if (t) clearTimeout(t); });
+}
 /* Astro Command Center - Frontend-Logik (vanilla JS, keine Build-Tools).
  *
  * Backend-Adresse konfigurierbar (Capacitor-sicher): BASE_URL liegt im
@@ -72,28 +88,10 @@ async function api(path, opts = {}) {
    neuere Version -> Bundle laden, entpacken, WebView umschalten
    (@capgo/capacitor-updater). Web/Browser identifiziert sich ueber
    die gleiche Origin und braucht kein OTA. */
-
-function initNukeCache() {
-  const title = document.getElementById("title");
-  if (!title) return;
-  let t = null;
-  title.addEventListener("pointerdown", () => {
-    t = setTimeout(() => {
-      commsLog("CACHE-NUKE: Loesche alles...", "alert");
-      Object.keys(localStorage).forEach(k => localStorage.removeItem(k));
-      if (window.Capacitor?.Plugins?.CapacitorUpdater)
-        window.Capacitor.Plugins.CapacitorUpdater.deleteAll().catch(()=>{});
-      setTimeout(() => location.reload(), 1000);
-    }, 3000);
-  });
-  title.addEventListener("pointerup", () => { if (t) clearTimeout(t); });
-  title.addEventListener("pointerleave", () => { if (t) clearTimeout(t); });
-  title.title = "3s halten = Cache leeren + Neustart";
-}
-
 async function checkOtaUpdate(force) {
   if (!isNativeApp() || !window.Capacitor?.Plugins?.CapacitorUpdater)
     return;
+  // max. 1x pro 24 h — ausser force=true (UPLINK-Button oder manuell)
   if (!force) {
     const last = +(localStorage.getItem("astro_ota_last_check") || 0);
     if (Date.now() - last < 24 * 3600 * 1000) {
@@ -103,54 +101,626 @@ async function checkOtaUpdate(force) {
     }
   }
   localStorage.setItem("astro_ota_last_check", String(Date.now()));
-  const currentVersion = localStorage.getItem("astro_bundle_version")
-    || "APK-Basis (" + (document.querySelector("[title*=BUILD]")
-      ? "unbekannt" : "v1.1.0") + ")";
-  commsLog("OTA: Pruefe... (installiert: " + currentVersion + ")");
+  commsLog("OTA: Pruefe Manifest...");
   try {
-    const CU = window.Capacitor.Plugins.CapacitorUpdater;
-    let m;
-    try {
-      m = await (await fetch(BASE + "/updates/latest.json?t=" + Date.now(),
+    const m = await (await fetch(BASE + "/updates/latest.json?t=" + Date.now(),
         {headers: {"CF-Access-Client-Id": CF_ACCESS.id,
           "CF-Access-Client-Secret": CF_ACCESS.secret,
           "Cache-Control": "no-cache, no-store, must-revalidate",
           "Pragma": "no-cache"}})).json();
-    } catch (manifestErr) {
-      commsLog("OTA: Manifest nicht erreichbar ("
-        + (manifestErr.message || "Netzwerk") + ") "
-        + "- ueberspringe Update", "alert");
-      return;
-    }
-    if (!m || !m.version) {
-      commsLog("OTA: Manifest ungueltig (keine Version)", "alert");
-      return;
-    }
-    if (m.version === currentVersion || m.version === localStorage
-        .getItem("astro_bundle_version")) {
-      commsLog("OTA: aktuell (" + m.version + ")");
-      return;
-    }
+    const cur = localStorage.getItem("astro_bundle_version");
+    if (!m || !m.version) { commsLog("OTA: Manifest ungueltig"); return; }
+    if (m.version === cur) { commsLog("OTA: aktuell (" + cur + ")"); return; }
+    const CU = window.Capacitor.Plugins.CapacitorUpdater;
     commsLog("OTA: Lade Bundle " + m.version + "...");
-    let done;
-    try {
-      done = await CU.download({
-        url: BASE + m.url, version: m.version});
-    } catch (dlErr) {
-      commsLog("OTA-Download fehlgeschlagen: "
-        + (dlErr.message || dlErr)
-        + " | Installiert: " + currentVersion, "alert");
-      return;
-    }
+    // Download OHNE Token-Header: Der CF-Bypass fuer /updates ist aktiv
+    // und die Token-Header koennen den Request durch ein anderes
+    // CF-Regelwerk stossen (Feld-Beweis: curl ohne Header = 200,
+    // Updater mit Header = Failed)
+    const done = await CU.download({
+      url: BASE + m.url, version: m.version});
     localStorage.setItem("astro_bundle_version", m.version);
     await CU.set(done);
-    commsLog("OTA AKTIV: " + currentVersion + " \u2192 " + m.version
-      + " \u2014 App startet neu");
+    commsLog("OTA: Bundle " + m.version + " aktiv");
   } catch (e) {
     commsLog("OTA-FEHLER: " + (e.message || e)
-      + " | Installiert: " + currentVersion, "alert");
+      + " | Version: " + localStorage.getItem("astro_bundle_version"), "alert");
   }
 }
+
+/* ---------- Karte ---------- */
+function initMap() {
+  map = L.map("map", { zoomControl: false, tap: true })
+        .setView([49.54, 8.63], 10);
+
+  // Basiskarte: OSM + CSS-Invert-Filter = tiefschwarz taktisch (LESSONS
+  // Fall 8: CARTODark lieferte in der Praxis doch "API KEY REQUIRED"-
+  // Wasserzeichen obwohl Einzelkacheln 200 lieferten - Live-Beweis immer
+  // gegen die GERENDERTE Karte fahren, nicht gegen Einzelrequests).
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 18, subdomains: "abc", className: "basemap-tile",
+    attribution: '&copy; OpenStreetMap-Mitwirkende',
+  }).addTo(map);
+
+  // Lichtverschmutzung (Lorenz-Atlas via Backend-Proxy, Disk-Cache dort).
+  // maxNativeZoom 6: darueber fragt Leaflet die 6er-Kacheln ab und skaliert.
+  lpLayer = L.tileLayer(BASE + "/api/lp-tiles/{z}/{x}/{y}", {
+    maxNativeZoom: 6, maxZoom: 18, opacity: 0.55,
+    attribution: "Light Pollution: D. Lorenz (VIIRS)",
+  });
+
+  // DWD-Warnpolygone (GeoJSON vom Backend)
+  warnLayer = L.geoJSON(null, {
+    style: (f) => {
+      const k = f.properties.kind;
+      return {
+        color: k === "storm" ? "#ff2a00" : k === "rain" ? "#3fa9f5" : "#9aa5b1",
+        weight: 2, fillOpacity: k === "storm" ? 0.35 : 0.18,
+        dashArray: k === "other" ? "4 6" : null,
+      };
+    },
+    onEachFeature: (f, layer) => layer.bindPopup(
+      `<b>${esc(f.properties.event)}</b><br>${esc(f.properties.description || "")}`),
+  });
+
+  markersLayer = L.layerGroup().addTo(map);
+
+  // Regionales Regen-Icon-Raster (Open-Meteo via /api/rain-grid): die neue
+  // Standard-Regenansicht - klare Wolke/Tropfen-Icons statt Farbflaechen.
+  rainGridLayer = L.layerGroup().addTo(map);
+  rgActive = true;
+
+  // Vorhersage-Zuverlaessigkeit + Bot-Befehle: einklappbares Widget
+  // top-left (data-cached, offline-faehig via localStorage).
+  buildGauges();
+  buildLunar();
+  initFlightstick();
+  pingLedState();
+  initNukeCache();
+  // Build-Diagnose (eine Zeile Comms): welcher Stand laeuft und wie
+  // die App ihren Kontext sieht (Support-Fallstricke einsparen)
+  checkOtaUpdate();
+  checkPrimeWindowNotifications();
+  scheduleDailyReminders();
+  commsLog("BUILD 2026-09-30D \u00b7 ORIGIN " + location.origin
+    + " \u00b7 BASE " + (BASE || "(same-origin)")
+    + " \u00b7 NATIVE " + isNativeApp());
+  if (!isNativeApp()) {
+    const lb = document.getElementById("cf-login-btn");
+    if (lb) lb.style.display = "none";
+  }
+  initInfoWidget();
+  initCockpitStatus();
+  // Grid-Layout mit minmax kann die Map-Groesse nach dem ersten Render
+  // aendern - Leaflet muss den Container neu vermessen
+  setTimeout(() => map.invalidateSize(), 100);
+  setTimeout(() => map.invalidateSize(), 500);
+  // Kartenbox aendert nur ihre Pixelmasse bei echten Viewport-Events -
+  // Overlay-Toggles (Mobile) beruehren sie bewusst NICHT.
+  window.addEventListener("resize", () => map.invalidateSize());
+  window.addEventListener("orientationchange", () => map.invalidateSize());
+  window.visualViewport?.addEventListener("resize",
+    () => map.invalidateSize());
+
+  // Zeitregler sitzt statisch im unteren Cockpit-Panel (Timeline):
+  // nur Listener, kein dynamisches Element mehr.
+  $("rg-slider").addEventListener("input", (e) => {
+    setRgHour(Number(e.target.value));
+  });
+  $("rg-play").addEventListener("click", rgTogglePlay);
+
+  // Cockpit-Hardware-Buttons (linkes Panel) ersetzen die Layer-Dropdown-
+  // Control: massiv, permanent sichtbar, LED-Status. Regen-Icons sind
+  // default scharf (wie bisher Standard-Layer).
+  const hwState = { regen: true, radar: false, satellite: false,
+                    warn: false, lp: false };
+  const hwBtn = document.querySelector('.hw-btn[data-layer="regen"]');
+  if (hwBtn) hwBtn.classList.add("active");
+  document.querySelectorAll("#layer-hw-stack .hw-btn").forEach(b => {
+    b.addEventListener("click", () => {
+      const key = b.dataset.layer;
+      hwState[key] = !hwState[key];
+      b.classList.toggle("active", hwState[key]);
+      if (key === "regen") {
+        rgActive = hwState[key];
+        if (rgActive) { fetchRainGrid(); } else { rainGridLayer.clearLayers(); }
+      } else if (key === "radar") {
+        hwState[key] ? rvStart("radar") : rvStop();
+      } else if (key === "satellite") {
+        hwState[key] ? rvStart("satellite") : rvStop();
+      } else if (key === "warn") {
+        hwState[key] ? map.addLayer(warnLayer) : map.removeLayer(warnLayer);
+      } else if (key === "lp") {
+        hwState[key] ? map.addLayer(lpLayer) : map.removeLayer(lpLayer);
+      }
+      commsLog(`SENSOR ${key.toUpperCase()} ${hwState[key] ? "ON" : "OFF"}`);
+    });
+  });
+  // Zoom + Panel-Pins
+  $("zoom-in")?.addEventListener("click", () => map.zoomIn());
+  $("zoom-out")?.addEventListener("click", () => map.zoomOut());
+
+  /* Mobile: Panels sind exklusive Slide-in-HUD-Overlays ueber der
+     Fullscreen-Map. Toggle aendert NUR die Transform-Klasse - die
+     Karten-Box behaelt ihre Pixelmasse, invalidateSize bleibt an
+     resize/orientationchange/visualViewport gebunden (nicht hier!).
+     Desktop-Pfad (Grid-Spalte auf 0) unveraendert. */
+  const isMobileUI = () => window.matchMedia("(max-width: 980px)").matches;
+  const toggleHud = (side) => {
+    const el = document.getElementById(side === "left"
+      ? "left-panel" : "right-panel");
+    const other = document.getElementById(side === "left"
+      ? "right-panel" : "left-panel");
+    const open = !el.classList.contains("hud-open");
+    el.classList.toggle("hud-open", open);
+    if (open) {   // Exklusivitaet - inkl. Persistenz-Sync
+      other.classList.remove("hud-open");
+      localStorage.setItem("astro_hud_" + (side === "left" ? "right" : "left"), "0");
+    }
+    localStorage.setItem("astro_hud_" + side, open ? "1" : "0");
+  };
+  // Beim Start hoechstens EIN Overlay wiederherstellen
+  if (isMobileUI()) {
+    if (localStorage.getItem("astro_hud_left") === "1")
+      document.getElementById("left-panel")?.classList.add("hud-open");
+    else if (localStorage.getItem("astro_hud_right") === "1")
+      document.getElementById("right-panel")?.classList.add("hud-open");
+  }
+  $("left-panel-pin")?.addEventListener("click", () => {
+    if (isMobileUI()) return toggleHud("left");
+    document.getElementById("cockpit").classList.toggle("collapse-left");
+    setTimeout(() => map.invalidateSize(), 200);
+  });
+  $("left-hud-btn")?.addEventListener("click", () => toggleHud("left"));
+  $("uplink-btn")?.addEventListener("click", uplinkNow);
+  // Mobile: Das DATALINK-Dock lebt IM <SENS-Overlay (die linke Spalte
+  // ist auf dem Handy das Slide-in, nicht dauerhaft sichtbar wie am
+  // Desktop) - kompakt am Panel-Ende, spiegelbildlich zum OBS-Dock rechts.
+  if (isMobileUI()) {
+    const dock = document.getElementById("datalink-dock");
+    const left = document.getElementById("left-panel");
+    if (dock && left && dock.parentElement !== left)
+      left.appendChild(dock);
+  }
+  $("datalink-sw")?.addEventListener("change", (e) =>
+    setDatalinkMode(e.target.checked ? "auto" : "man"));
+  $("right-panel-pin")?.addEventListener("click", () => {
+    if (isMobileUI()) return toggleHud("right");
+    document.getElementById("cockpit").classList.toggle("collapse-right");
+    setTimeout(() => map.invalidateSize(), 200);
+  });
+  // Raster folgt dem Ausschnitt (debounced); Cache im Backend faengt Pan an
+  map.on("moveend zoomend", () => {
+    if (!rgActive) return;
+    clearTimeout(rgDebounce);
+    rgDebounce = setTimeout(fetchRainGrid, 600);
+  });
+}
+
+/* ---------- Ampel-Schwellen (bestätigt 2026-08-15) ----------
+   grün/gelb/rot je Parameter; Rating-Schwellen (Wolken 20/40, Seeing 2.0)
+   stammen 1:1 aus der Crawler-Logik. Rückgabe: 'g' | 'y' | 'r' | null(n/a). */
+const TH = {
+  seeing:    (v) => v == null ? null : v <= 1.0 ? "g" : v <= 2.0 ? "y" : "r",
+  jet:       (v) => v == null ? null : v <= 15  ? "g" : v <= 30  ? "y" : "r",
+  clouds:    (v) => v == null ? null : v <= 20  ? "g" : v <= 40  ? "y" : "r",
+  rain:      (v) => v == null ? null : v <= 10  ? "g" : v <= 30  ? "y" : "r",
+  precip:    (v) => v == null ? null : v <= 0.1 ? "g" : v <= 1.0 ? "y" : "r",
+  wind:      (v) => v == null ? null : v <= 15  ? "g" : v <= 30  ? "y" : "r",
+  gusts:     (v) => v == null ? null : v <= 25  ? "g" : v <= 40  ? "y" : "r",
+  tau:       (v) => v == null ? null : v >= 6   ? "g" : v >= 3   ? "y" : "r",
+  temp:      (v) => v == null ? null : v <= 18  ? "g" : v <= 25  ? "y" : "r",  // 600D ungekuehlt
+  rh:        (v) => v == null ? null : v <= 80  ? "g" : v <= 90  ? "y" : "r",
+  moonIll:   (v) => v == null ? null : v <= 25  ? "g" : v <= 60  ? "y" : "r",
+  moonAlt:   (v) => v == null ? null : v > 30   ? "g" : "r",
+  planetAlt: (v) => v == null ? null : v > 30   ? "g" : "r",
+};
+function dot(cls) {
+  return cls ? `<span class="dot d-${cls}"></span>` : `<span class="dot d-na"></span>`;
+}
+function row(k, v, cls) {
+  return `<div class="k">${k}</div><div class="v ${cls || ""}">${v}</div>`;
+}
+
+/* ---------- Vorausschau-Tab ---------- */
+function cell(v, fmtFn) {
+  const cls = fmtFn(v);
+  return `<td class="${cls ? "c-" + cls : "c-na"}">${v ?? "–"}</td>`;
+}
+
+function nightLabel(night) {
+  // Absolute Datumsangabe statt relativem "Heute/+1/+2": das night-Feld
+  // (YYYY-MM-DD) ist im Forecast-Datensatz vorhanden - reine Anzeige-Sache.
+  const WD = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+  const y = +night.slice(0, 4), m = +night.slice(5, 7), d = +night.slice(8, 10);
+  const dt = new Date(y, m - 1, d);
+  if (isNaN(dt)) return esc(night);
+  return `${WD[dt.getDay()]}, ${String(d).padStart(2, "0")}.${String(m).padStart(2, "0")}.${y}`;
+}
+
+function forecastHtml(fc) {
+  const g = fc.golden;
+  const others = (fc.golden_windows || []).filter(w => w !== g);
+  const goldenCard = g
+    ? `<div class="golden">
+         <div class="g-title">✨ Golden Window ${g.night === new Date().toISOString().slice(0,10) ? "heute Nacht" : ""}</div>
+         <div class="g-time">${esc(g.start)} – ${esc(g.end)} Uhr</div>
+         <div class="g-why">${g.reasons.map(esc).join(" · ")}</div>
+         ${others.length ? `<div class="g-why" style="margin-top:4px">Weitere: ${others.map(w =>
+            `${w.night.slice(5)} ${esc(w.start)}-${esc(w.end)} (${w.hours}h)`).join(" · ")}</div>` : ""}
+       </div>`
+    : `<div class="golden none">
+         <div class="g-title">Kein brauchbares Fenster in den nächsten Nächten</div>
+         <div class="g-why">${esc(CURRENT_PROFILE === "planet"
+              ? "Seeing/Jetstream/Wolken erfüllen nie gleichzeitig die Kriterien"
+              : "Es fehlt vermutlich an Dunkelheit, Wolken oder Seeing")}</div>
+       </div>`;
+  // Stunden nach Nacht gruppieren (Segmente), innerhalb chronologisch
+  const segs = [];
+  for (const h of fc.series) {
+    if (!segs.length || segs[segs.length-1].night !== h.night)
+      segs.push({night: h.night, rows: []});
+    segs[segs.length-1].rows.push(h);
+  }
+  const rows = segs.map(seg => `
+    <tr class="night-sep"><td colspan="8">${nightLabel(seg.night)}</td></tr>` +
+    seg.rows.map(h => `
+    <tr class="${h.ok ? "row-ok" : ""}">
+      <td class="c-h">${esc(h.hhmm)}</td>
+      ${cell(h.clouds, TH.clouds)}
+      ${h.beyond_seeing ? '<td class="c-na" title="Meteoblue-Horizont überschritten">–</td>'
+                        : cell(h.seeing, TH.seeing)}
+      ${cell(h.wind, TH.wind)}
+      ${cell(h.tau, TH.tau)}
+      ${cell(h.rain, TH.rain)}
+      <td class="${h.dark ? "c-g" : "c-na"}">${h.dark ? "🌙" : "☀"}</td>
+      <td class="${h.moon_up ? "c-y" : "c-na"}">${h.moon_up ? "🌕" : ""}</td>
+    </tr>`).join("")).join("");
+  return `
+    <div class="sub mono">Prognose ${esc(fc.ts || "")} · Profil ${esc(fc.profile)} ·
+      Seeing bis ${esc((fc.seeing_horizon || "").slice(11,16) || "Horizont")} ·
+      Wolken: ${esc(fc.sources && fc.sources.clouds || "?")}/OM ·
+      Dunkel heute ${esc(fc.dark_window || "n/a")}</div>
+    ${goldenCard}
+    <table class="fc-table mono">
+      <thead><tr><th>Std</th><th>Wolk%</th><th>See"</th><th>Wind</th>
+        <th>Tau</th><th>Reg%</th><th>🌌</th><th>🌕</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="sub" style="margin-top:8px">
+      Mond: ${fc.moon_illum != null ? fc.moon_illum + "% " : "n/a "}
+      ${esc(fc.moon_window || "")}
+    </div>`;
+}
+
+function showTab(tab) {
+  currentTab = tab;
+  $("tab-now").classList.toggle("active", tab === "now");
+  $("tab-fc").classList.toggle("active", tab === "fc");
+  if (!currentSpot) return;
+  if (tab === "now") {
+    $("panel-content").innerHTML = panelHtml(currentSpot);
+  } else {
+    $("panel-content").innerHTML =
+      '<div class="sub">lade Vorausschau…</div>';
+    api(`/api/forecast?name=${encodeURIComponent(currentSpot.name)}`)
+      .then(fc => {
+        if (currentTab === "fc")
+          $("panel-content").innerHTML = forecastHtml(fc);
+      })
+      .catch(e => {
+        $("panel-content").innerHTML =
+          `<div class="sub">Vorausschau nicht verfügbar: ${esc(e.message)}</div>`;
+      });
+  }
+}
+
+function lpLine(s) {
+  const key = `astro_lp_${s.lat.toFixed(3)},${s.lon.toFixed(3)}`;
+  let b = null;
+  try { b = JSON.parse(localStorage.getItem(key)); } catch (e) { /* noch nicht geladen */ }
+  if (!b) return row("Zenit-Lichtverschm.", "lade…");
+  const cls = b.zone_index <= 4 ? "g" : b.zone_index <= 9 ? "y" : "r";
+  const tip = CURRENT_PROFILE === "planet"
+    ? "Planetarisch: Filter irrelevant"
+    : b.zone_index >= 10 ? "Triband Pflicht · UHC schwach"
+    : b.zone_index >= 8 ? "Antlia Triband empfohlen"
+    : "Himmel dunkel genug · Triband optional";
+  return row(dot(cls) + " Zenit-Lichtverschm.",
+              `Zone ${esc(b.zone)} · ${b.mag} mag/arcsec² <span class='dim'>≈Bortle ${b.bortle}</span>`)
+       + row("Filter-Tipp", tip);
+}
+
+function fetchBortle(s) {
+  const key = `astro_lp_${s.lat.toFixed(3)},${s.lon.toFixed(3)}`;
+  if (localStorage.getItem(key)) return;
+  api(`/api/bortle?lat=${s.lat}&lon=${s.lon}`)
+    .then(b => {
+      localStorage.setItem(key, JSON.stringify(b));
+      if (currentSpot === s && currentTab === "now") showTab("now");
+    }).catch(() => {});
+}
+
+/* ---------- RainViewer: Regenradar + Satellit (animiert, direkt, kein Proxy) */
+const RV_API = "https://api.rainviewer.com/public/weather-maps.json";
+let rvState = { frames: [], layers: [], idx: 0, playing: false,
+                timer: null, refetch: null, kind: null, active: false };
+
+async function rvFetchFrames(kind) {  // kind: 'radar' | 'satellite'
+  const d = await (await fetch(RV_API)).json();
+  if (kind === "radar") {
+    return { host: d.host, frames: [...(d.radar.past || []),
+                                     ...(d.radar.nowcast || [])] };
+  }
+  return { host: d.host, frames: d.satellite?.infrared || [] };
+}
+
+function rvTimestampEl() {
+  let el = document.getElementById("rv-ts");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "rv-ts";
+    el.innerHTML = '<button id="rv-play" class="hbtn rv-btn">&#9654;</button>' +
+                   '<span id="rv-time" class="mono"></span>';
+    document.getElementById("map").appendChild(el);
+    document.getElementById("rv-play").onclick = rvTogglePlay;
+  }
+  return el;
+}
+
+async function rvStart(kind) {
+  rvState.kind = kind; rvState.active = true;
+  let data;
+  try { data = await rvFetchFrames(kind); }
+  catch (e) { rvBail("Radar-API nicht erreichbar"); return; }
+  if (!data.frames.length) {
+    rvBail(kind === "satellite" ? "Satellit: keine Bilder verfuegbar"
+                                : "Radar: keine Frames");
+    return;
+  }
+  const opts = kind === "radar" ? "/2/1_1" : "/0/0_0";  // color/smooth bzw. 0/0
+  rvState.host = data.host;
+  rvState.opts = opts;
+  rvState.frames = data.frames;
+  // LAZY: nur den NEUESTEN Frame sofort laden. Alle 13 Frames vorzuladen
+  // feuert ~300 Kachel-Requests als Burst - RainViewer antwortet mit 429
+  // (Too Many Requests) und gerade der sichtbare Frame bleibt leer.
+  // Aeltere Frames entstehen erst bei ihrem ersten Loop-Auftritt und liegen
+  // danach im Browser-Cache.
+  rvState.layers = data.frames.map(() => null);
+  rvState.idx = rvState.frames.length - 1;
+  rvShow(rvState.idx);
+  rvTimestampEl().style.display = "flex";
+  rvTogglePlay(true);
+  // Frames alle 5 min auffrischen, solange aktiv
+  rvState.refetch = setInterval(async () => {
+    if (!rvState.active) return;
+    try {
+      const nd = await rvFetchFrames(kind);
+      if (nd.frames.length && nd.frames.length !== rvState.frames.length) {
+        rvStop(false); rvStart(kind);
+      }
+    } catch (e) { /* naechster Versuch kommt */ }
+  }, 300000);
+}
+
+function rvLayerFor(i) {
+  if (!rvState.layers[i]) {
+    const f = rvState.frames[i];
+    rvState.layers[i] = L.tileLayer(
+      `${rvState.host}${f.path}/256/{z}/{x}/{y}${rvState.opts}.png`,
+      // RainViewer Free liefert ab z8 nur "Zoom Level Not Supported"-Kacheln;
+      // z7 ist die hoechste Stufe mit echten Daten, darueber skaliert Leaflet hoch.
+      { opacity: 0, className: "rv-tile", zIndex: 350, maxNativeZoom: 7, maxZoom: 18 }
+    ).addTo(map);
+  }
+  return rvState.layers[i];
+}
+
+function rvShow(i) {
+  rvState.idx = i;                      // Loop-Position mitfuehren
+  rvState.layers.forEach((l, j) => {
+    if (l) l.setOpacity(j === i ? rvOpacity() : 0);
+  });
+  rvLayerFor(i).setOpacity(rvOpacity());   // lazy: Layer ggf. erst jetzt erzeugen
+  const f = rvState.frames[i];
+  const t = new Date(f.time * 1000);
+  rvTimestampEl().style.display = "flex";   // Existenz sicherstellen
+  const span = document.getElementById("rv-time");
+  span.textContent =
+    (f.time * 1000 > Date.now() ? "Nowcast " : "") +
+    t.toLocaleTimeString("de-DE", {hour: "2-digit", minute: "2-digit"});
+}
+
+function rvOpacity() {
+  return document.body.classList.contains("night") ? 0.45 : 0.75;
+}
+
+function rvTogglePlay(force) {
+  const want = force === true ? true : !rvState.playing;
+  rvState.playing = want;
+  document.getElementById("rv-play").innerHTML = want ? "&#10074;&#10074;" : "&#9654;";
+  clearTimeout(rvState.timer);
+  clearInterval(rvState.timer);
+  if (want) {
+    // Self-rescheduling Timeout statt setInterval: robust gegen
+    // Timer-Throttling (Frame-Wechsel erst nach Rendering des vorigen)
+    const step = () => {
+      rvShow((rvState.idx + 1) % rvState.frames.length);
+      rvState.timer = setTimeout(step, 700);
+    };
+    rvState.timer = setTimeout(step, 700);
+  }
+}
+
+function rvStop(hideTs = true) {
+  rvState.active = false; rvState.playing = false;
+  clearTimeout(rvState.timer); clearInterval(rvState.timer); clearInterval(rvState.refetch);
+  rvState.layers.forEach(l => map.removeLayer(l));
+  rvState.layers = []; rvState.frames = [];
+  if (hideTs) rvTimestampEl().style.display = "none";
+}
+
+function rvBail(text) {
+  rvStop();
+  alert(text);
+  // Control-Checkbox zuruecksetzen
+  document.querySelectorAll(".leaflet-control-layers-selector").forEach(cb => {
+    if (cb.checked && (cb.closest("label").textContent.includes("Radar") ||
+                       cb.closest("label").textContent.includes("Satellit")))
+      cb.checked = false;
+  });
+}
+
+/* ---------- Regen-Icon-Raster (Open-Meteo, Overworld-Bildsprache) ----------
+   Keine Farbflaechen: pro Gitterpunkt eine Wolke mit 0-3 Tropfen,
+   Groesse/Fuellung nach mm; hohle Wolke = Regen absehbar; Blitz-Symbol,
+   wo der Punkt in einer aktiven DWD-Gewitterwarnung liegt. */
+
+function setRgHour(h) {
+  rgHour = h;
+  $("rg-slider").value = h;
+  $("rg-label").textContent = h === 0 ? "Jetzt" : `+${h} h`;
+  if (rgLastData) renderRainGrid(rgLastData);
+}
+
+ function rgTogglePlay() { 
+  rgPlaying = !rgPlaying; 
+  const btn = $("rg-play");
+   if (rgPlaying) { 
+    btn.textContent = "\u23f8";
+     btn.title = "Regen-Verlauf pausieren";
+      rgAdvance();
+     } else { 
+      btn.textContent = "\u25b6"; 
+      btn.title = "Regen-Verlauf 0-6 h automatisch abspielen"; 
+      clearTimeout(rgTimer);
+       rgTimer = null;
+       } 
+      } 
+      
+      
+      function rgAdvance() { 
+        if (!rgPlaying) 
+          return; 
+        const next = (rgHour + 1) % 7;
+         rgHour = next; 
+         setRgHour(next); 
+         $("rg-slider").value = next; 
+         rgTimer = setTimeout(rgAdvance, 1500); 
+        } 
+
+
+function rgIconHtml(p, storm) {
+  const mm = p.mm ?? 0, prob = p.prob ?? 0;
+  let cls = "", drops = 0;
+  if (mm > 5)        { cls = "rg-4"; drops = 3; }
+  else if (mm > 2)   { cls = "rg-3"; drops = 3; }
+  else if (mm > 0.5) { cls = "rg-2"; drops = 2; }
+  else if (mm > 0)   { cls = "rg-1"; drops = 1; }
+  else if (prob >= 30) cls = "rg-forecast";
+  if (!cls) return null;
+  const when = rgHour === 0 ? "jetzt" : `in +${rgHour} h`;
+  let html = `<div class="rg-icon ${cls}" title="${when}: ${mm.toFixed(1)} mm \u00b7 `
+    + `${prob ?? "?"}% Regenwahrscheinlichkeit">`;
+  html += `<span class="rg-cloud"></span>`;
+  for (let i = 1; i <= drops; i++) html += `<span class="rg-drop rg-d${i}"></span>`;
+  if (storm) html += `<span class="rg-bolt">\u26a1</span>`;
+  return html + "</div>";
+}
+
+function pointInRing(lat, lon, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1];
+    if ((yi > lat) !== (yj > lat) &&
+        lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+function renderRainGrid(data) {
+  rainGridLayer.clearLayers();
+  let shown = 0;
+  for (const p of data.points) {
+    // Zeitregler: Werte der gewaehlten Prognosestunde (Fallback: current)
+    const src = (p.hours && p.hours[rgHour]) || p;
+    const mm = src.mm ?? 0, prob = src.prob ?? 0;
+    const storm = stormRings.some(r => pointInRing(p.lat, p.lon, r));
+    const html = rgIconHtml({ ...p, mm, prob }, storm);
+    if (!html) continue;
+    shown++;
+    L.marker([p.lat, p.lon], {
+      icon: L.divIcon({ className: "", html, iconSize: [38, 34], iconAnchor: [19, 30] }),
+      keyboard: false, zIndexOffset: -500,
+    }).addTo(rainGridLayer);
+  }
+  console.debug(`[RegenIcons] ${shown}/${data.points.length} Gitterpunkte mit Icon (+${rgHour}h)`);
+}
+
+async function fetchRainGrid() {
+  try {
+    const b = map.getBounds();
+    const bbox = [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()]
+      .map(v => v.toFixed(4)).join(",");
+    const data = await api(`/api/rain-grid?bbox=${encodeURIComponent(bbox)}&zoom=${map.getZoom()}`);
+    rgLastData = data;
+    renderRainGrid(data);
+  } catch (e) { console.warn("rain-grid offline:", e); }
+}
+
+/* ---------- Marker + Detail-Panel ---------- */
+// Tropfen-Stufen ankoppelt an die TH.precip-Ampelgrenzen (0.1 / 1.0 mm) + Starkstufe
+const RAIN_STEPS = [
+  { max: 0.1, cls: "rain-1", label: "Nieselregen" },
+  { max: 1.0, cls: "rain-2", label: "leichter Regen" },
+  { max: 2.5, cls: "rain-3", label: "kräftiger Regen" },
+  { max: Infinity, cls: "rain-4", label: "Starkregen" },
+];
+let lastRainMm = {};   // name -> precip_2h des vorherigen Refresh (fuer Regen-Puls)
+
+function rainBadgeHtml(spot, isNew) {
+  const mm = spot.precip_2h, prob = spot.rain_prob || 0;
+  if (mm == null || mm <= 0) {
+    if (prob >= 50)
+      return `<div class="rain-badge rain-forecast" title="Regen absehbar (${prob}% innerhalb 4 h)"></div>`;
+    return "";
+  }
+  const st = RAIN_STEPS.find(x => mm <= x.max);
+  return `<div class="rain-badge ${st.cls}${isNew ? " rain-new" : ""}" title="${st.label}: ${mm.toFixed(1)} mm/2 h"></div>`;
+}
+
+function markerIcon(spot, rainNew) {
+  const rating = spot.rating || "NA";
+  const alertCls = (spot.radar_status || "").includes("Alert") ? " alert" : "";
+  return L.divIcon({
+    className: "",
+    html: `<div class="spot-marker">
+             <div class="spot-dot rating-${esc(rating)}${alertCls}"></div>
+             ${rainBadgeHtml(spot, rainNew)}
+             <div class="spot-label">${esc(spot.name)}</div>
+           </div>`,
+    iconSize: [46, 46], iconAnchor: [23, 23],
+  });
+}
+
+/* Libration/Kolongitude: vorzeichenbehaftete Grad + 2-3-Naechte-Blick */
+function fmtSigned(v) {
+  return (v > 0 ? "+" : "") + (v != null ? v.toFixed(1) : "?");
+}
+
+function moonNightsRows(nights) {
+  if (!nights || !nights.length) return "";
+  const lines = nights.slice(0, 3).map(n =>
+    row("Kolong " + n.night.slice(5),
+      n.colong.toFixed(1) + "° · lib " + fmtSigned(n.lib_l)
+      + "/" + fmtSigned(n.lib_b) + "°"));
+  return lines.join("");
+}
+
+
+
+
 
 /* ============================================================
    L3+L4: CLOUD-HUNTER (Umkreis-Scan) + DEPARTURE-OPTIMIZER
@@ -198,10 +768,6 @@ async function fetchCloudHunter() {
         + "% Wolken, " + d.best.dist_km + "km entfernt");
     }
     cloudHunterLayer.addTo(map);
-    commsLog("[CLOUD-HUNTER] " + d.grid.length
-      + " Punkte, Optimum: "
-      + (d.best ? d.best.clouds_avg + "% bei "
-        + d.best.dist_km + "km" : "kein"));
   } catch (e) {
     commsLog("CLOUD-HUNTER Fehler: " + (e.message || e), "alert");
   }
@@ -230,9 +796,7 @@ async function updateDepartureOptimizer() {
 function inversionBadgeHtml(s) {
   const inv = s.inversion;
   if (!inv || !inv.inversion_likely) return "";
-  commsLog("[INVERSION DETECTED] " + s.name + " (" + inv.elevation_m
-    + "m) Wolken " + s.clouds_total + "% -> "
-    + inv.clouds_adjusted + "%");
+  commsLog("[INVERSION DETECTED] " + s.name + " " + inv.elevation_m + "m " + s.clouds_total + "% -> " + inv.clouds_adjusted + "%");
   const adj = s.clouds_total_adjusted;
   return `<div class="inv-badge" title="Inversions-Erkennung: Talsohle "
     + "bewoelkt, aber ${inv.elevation_m}m Hoehe vermutlich ueber der "
@@ -258,12 +822,6 @@ async function updateWeatherMovement() {
       .map(([n, v]) => `${n.split(",")[0]} (~${v.eta_hours}h)`);
     if (clearing.length && d.trend === "clearing") {
       loc_hint = ` \u00b7 Klart auf: ${clearing.slice(0, 2).join(", ")}`;
-    }
-    if (el.dataset.trend !== d.trend) {
-      commsLog("[MOVEMENT] " + d.trend_text + " | "
-        + d.movement_direction_deg + "deg | "
-        + (d.wind_speed_kmh || "?") + " km/h");
-      el.dataset.trend = d.trend;
     }
     el.innerHTML = `<span class="wm-icon">${icon}</span> `
       + `<span class="wm-trend wm-${d.trend}">${d.trend_text}</span> `
@@ -736,7 +1294,6 @@ async function handlePingResult(lat, lon) {
   localStorage.setItem("astro_last_ping", JSON.stringify({lat, lon, ts}));
   localStorage.removeItem("astro_ping_error");
   pingLedState();
-  initNukeCache();
   commsLog("GPS-PING: " + lat.toFixed(4) + " / " + lon.toFixed(4));
   try {
     // Cloudflare Access blockt CORS-Preflights (POST+JSON wuerde einen
