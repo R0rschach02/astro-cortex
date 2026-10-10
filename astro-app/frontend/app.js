@@ -72,6 +72,25 @@ async function api(path, opts = {}) {
    neuere Version -> Bundle laden, entpacken, WebView umschalten
    (@capgo/capacitor-updater). Web/Browser identifiziert sich ueber
    die gleiche Origin und braucht kein OTA. */
+
+function initNukeCache() {
+  const title = document.getElementById("title");
+  if (!title) return;
+  let t = null;
+  title.addEventListener("pointerdown", () => {
+    t = setTimeout(() => {
+      commsLog("CACHE-NUKE: Loesche alles...", "alert");
+      Object.keys(localStorage).forEach(k => localStorage.removeItem(k));
+      if (window.Capacitor?.Plugins?.CapacitorUpdater)
+        window.Capacitor.Plugins.CapacitorUpdater.deleteAll().catch(()=>{});
+      setTimeout(() => location.reload(), 1000);
+    }, 3000);
+  });
+  title.addEventListener("pointerup", () => { if (t) clearTimeout(t); });
+  title.addEventListener("pointerleave", () => { if (t) clearTimeout(t); });
+  title.title = "3s halten = Cache leeren + Neustart";
+}
+
 async function checkOtaUpdate(force) {
   if (!isNativeApp() || !window.Capacitor?.Plugins?.CapacitorUpdater)
     return;
@@ -92,7 +111,11 @@ async function checkOtaUpdate(force) {
     const CU = window.Capacitor.Plugins.CapacitorUpdater;
     let m;
     try {
-      m = await api("/updates/latest.json");
+      m = await (await fetch(BASE + "/updates/latest.json?t=" + Date.now(),
+        {headers: {"CF-Access-Client-Id": CF_ACCESS.id,
+          "CF-Access-Client-Secret": CF_ACCESS.secret,
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache"}})).json();
     } catch (manifestErr) {
       commsLog("OTA: Manifest nicht erreichbar ("
         + (manifestErr.message || "Netzwerk") + ") "
@@ -713,6 +736,7 @@ async function handlePingResult(lat, lon) {
   localStorage.setItem("astro_last_ping", JSON.stringify({lat, lon, ts}));
   localStorage.removeItem("astro_ping_error");
   pingLedState();
+  initNukeCache();
   commsLog("GPS-PING: " + lat.toFixed(4) + " / " + lon.toFixed(4));
   try {
     // Cloudflare Access blockt CORS-Preflights (POST+JSON wuerde einen

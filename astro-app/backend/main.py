@@ -669,8 +669,10 @@ def api_deployment(id: str, home: str = "Ilvesheim HQ",
 APK_PATH = "/home/enigma/astro-app/native/android/app/build/outputs/apk/debug/app-debug.apk"
 
 
+@app.get("/native/astro-cortex-v{version}.apk")
 @app.get("/native/astro-cortex.apk")
-def api_native_apk(token: Optional[str] = None, request: Request = None):
+def api_native_apk(token: Optional[str] = None, request: Request = None,
+                   version: Optional[str] = None):
     """Debug-APK der Capacitor-Shell (Phase 2). Gleicher Token-Mechanismus
     wie fwhw_sync - per Header x-api-token ODER Query-Parameter (fuer
     einfache Browser-Downloads ueber Tailscale). Kein Token konfiguriert
@@ -720,6 +722,20 @@ def api_auth_mobile():
 
 # --- OTA-Live-Updates: Web-Bundle + Manifest fuer die native App ---
 UPDATES_DIR = os.path.expanduser("~/updates")
+
+
+@app.middleware("http")
+async def no_cache_static(request, call_next):
+    """CF cached /native/ und /updates/ mit max-age=14400. Brechen."""
+    path = request.url.path
+    if path.startswith("/native/") or path.startswith("/updates/"):
+        resp = await call_next(request)
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        resp.headers["Pragma"] = "no-cache"
+        resp.headers["Expires"] = "0"
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp
+    return await call_next(request)
 
 
 @app.middleware("http")

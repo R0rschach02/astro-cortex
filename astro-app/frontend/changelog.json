@@ -546,6 +546,12 @@
       "title": "OTA-Haertung: Manifest-Alias, robustes Error-Handling, Feature-Logging, APP_CAPABILITIES.md",
       "detail": "(1) TASK1: /updates/manifest.json als Alias-Route (neben latest.json), Deploy-Skript erzeugt jetzt beide Dateien mit SHA-256-Hash und Dateigroesse. (2) TASK2: OTA-Client mit vollstaendigem Error-Handling — Manifest-Fetch-Fehler wird als lesbare Meldung ausgegeben (OTA: Manifest nicht erreichbar), Download-Fehler zeigt Installationsversion, Version=null bleibt bei unbekannter APK-Basis nicht mehr haengen. (3) TASK3: APP_CAPABILITIES.md mit technischer Dokumentation aller 9 Feature-Bereiche (Schwellenwerte, Endpoints, Comms-Log-Formate, Plugins). Comms-Logging fuer Inversions-Detektor ([INVERSION DETECTED]), Bewegungsvektor ([MOVEMENT]), Cloud-Hunter ([CLOUD-HUNTER]) ergaenzt — jedes Feature meldet sich jetzt im Comms-Feed wenn es triggert.",
       "usage": "OTA-Fehler sind jetzt diagnosebar; APP_CAPABILITIES.md dokumentiert alle Features"
+    },
+    {
+      "date": "2026-10-10",
+      "title": "v1.1.1 — Caching-Infrastruktur bombenfest",
+      "detail": "CF cached /native/ und /updates/ mit max-age=14400 (4h!) — der Grund warum alte APKs und Bundle-Downloads im Kreis liefen. 5 Architektur-Fixes: (1) Versionierte APK-Route /native/astro-cortex-v{version}.apk durchbricht Browser-Caching. (2) Strikte No-Cache-Header (no-store, no-cache, must-revalidate, max-age=0, Pragma: no-cache) auf allen /native/ und /updates/ Wegen auf Origin-Ebene. (3) Manifest-Fetch mit Timestamp-Cache-Busting (?t=Date.now()) + Cache-Control-Headern im Request. (4) versionCode auf 10102101 erhoet, versionName 1.1.1. (5) CACHE-NUKE: 3 Sekunden auf den App-Titel druecken loescht ALLE localStorage-Daten + OTA-Cache und startet neu — der manuelle Notfall-Ausweg wenn OTA sich verklemmt.",
+      "usage": "Neue APK: astro-cortex-v1.1.1.apk; 3s auf Titel = Cache-Nuke"
     }
   ]
 }
