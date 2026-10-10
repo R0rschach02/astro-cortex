@@ -1046,7 +1046,7 @@ def api_version_check():
     apk_files = [f for f in os.listdir(apk_dir) if f.endswith(".apk")] \
         if os.path.isdir(apk_dir) else []
     latest_apk = sorted(apk_files)[-1] if apk_files else "unbekannt"
-    return {"backend_version": "v1.1.3",
+    return {"backend_version": "v1.1.4",
             "apk_file": latest_apk,
             "apk_path": apk_dir,
             "ota_version": json.load(open(
