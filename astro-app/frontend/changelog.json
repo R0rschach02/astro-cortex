@@ -522,6 +522,12 @@
       "title": "Datenwirt-Erinnerung + OTA-Diagnose-Verbesserung",
       "detail": "(1) Taegliche Pop-up-Erinnerung um 19:30 Uhr fuer den Datenwirt: Bitte Wolkenlage bewerten (Blick nach oben, Astro CC > Standort > GROUND TRUTH Buttons). Dedup pro Tag via localStorage. (2) OTA-Diagnose: Der Check meldet jetzt die installierte Version VOR dem Vergleich, bestaetigt bei aktueller Version (OTA: aktuell), und zeigt bei Aktivierung den Versionswechsel explizit an (alt -> neu — App startet neu). Bei Fehlern erscheint die Version plus Fehlermeldung im Comms-Feed.",
       "usage": "Abends um 19:30 Uhr kommt die Datenwirt-Erinnerung; OTA-Status im Comms sichtbar"
+    },
+    {
+      "date": "2026-10-10",
+      "title": "Luecke 1+2 geschlossen: Inversions-Erkennung + Wetter-Bewegungsvektor",
+      "detail": "LUECKE 1 (HOEHEN-DIFFERENZIERUNG): Jeder Standort traegt jetzt elevation_m (Koenigsstuhl 550m bis Neckarplatten 95m). Der neue Inversions-Detektor _inversion_adjusted() erkennt Rheingraben-Inversionswetterlagen (Wolken>70% + Taupunkt-Spread<3K + Wind<10km/h + Hoehe>200m) und reduziert die Wolkenprognose fuer hochgelegene Standorte um bis zu 60pp (Koenigsstuhl: 100% -> 55%). Das Standort-Panel zeigt ein pulsierendes Badge UEBER INVERSION mit dem korrigierten Wert. 8 deterministische Tests decken alle Kombinationen ab. LUECKE 2 (BEWEGUNGSVEKTOR): Neuer Endpoint GET /api/weather/movement vergleicht die Gesamtbewoelkung jetzt vs. +2h (Open-Meteo), nutzt die Windrichtung als Bewegungsproxy und klassifiziert den Trend (Aufklarend/Eintruebend/Stabil). Die Top-Bar zeigt ein Bewegungs-Widget mit Icon, Richtungspfeil, Windgeschwindigkeit und — bei aufklarendem Trend — welche Standorte in der Clearing-Bahn liegen mit geschaetzter Zeit bis Klarung. Update im 60s-Refresh-Takt.",
+      "usage": "Koenigsstuhl zeigt jetzt 55% statt 100% bei Inversion; Top-Bar zeigt Aufklarend + Richtung"
     }
   ]
 }

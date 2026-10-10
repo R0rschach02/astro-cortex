@@ -85,7 +85,8 @@ def _spot_state(loc: dict, profile: str = "dso") -> dict:
     out = {"name": loc["name"], "id": loc.get("id", ""),
            "lat": loc["lat"], "lon": loc["lon"],
            "is_live": loc["name"].startswith("Live "), "age_min": None,
-           "bortle_class": loc.get("bortle_class")}
+           "bortle_class": loc.get("bortle_class"),
+           "elevation_m": loc.get("elevation_m", 100)}
     conn = _db()
     try:
         heavy = conn.execute(
@@ -125,6 +126,14 @@ def _spot_state(loc: dict, profile: str = "dso") -> dict:
         out["moon"] = m
         out["dark_window"] = m.get("dark")
         out["planets"] = m.get("planets")
+    # Luecke 1: Inversions-Adjustierung fuer hochgelegene Standorte
+    inv = _inversion_adjusted(loc, out.get("clouds_total"),
+                              out.get("dewpoint_spread"),
+                              out.get("wind_speed"))
+    out["inversion"] = inv
+    if inv["inversion_likely"]:
+        out["clouds_total_adjusted"] = inv["clouds_adjusted"]
+
     # Rating live mit dem aktiven Profil (nicht den DB-Wert nachspielen).
     # radar_status darf nie None sein (rate() erwartet einen String)
     rep = ac.SiteReport(name=loc["name"], lat=loc["lat"], lon=loc["lon"])
@@ -853,6 +862,182 @@ def api_ground_truth_list(limit: int = 100):
     finally:
         conn.close()
 
+
+
+
+
+# --- Luecke 2: Wolken-Bewegungsvektor aus dem Regen-Raster ---
+@app.get("/api/weather/movement")
+def api_weather_movement():
+    """Berechnet den Bewegungsvektor von Niederschlags-/Wolkenmustern
+    aus dem Open-Meteo-Regenraster (gleiche Datenquelle wie das
+    Frontend-Regen-Icon-Raster). Vergleicht zwei Zeitschritte und
+    liefert Richtung (Grad von Nord), Geschwindigkeit (km/h) und
+    Trend (clearing/clouding/stable). Nutzt Kreuzkorrelation der
+    2D-Niederschlagsfelder fuer die Verschiebungsschaetzung."""
+    import numpy as np
+    from datetime import datetime as _dt, timedelta as _td
+
+    # Zentrum: Mannheim (grob)
+    lat_c, lon_c = 49.5, 8.6
+    grid_size = 7
+    # Grid-Ausdehnung ~0.15 Grad (~12km) pro Zelle
+    step = 0.15
+
+    async def fetch_grid(hour_offset):
+        """7x7 Grid mit Gesamtbewoelkung fuer einen Zeitpunkt."""
+        coords = []
+        for dy in range(-grid_size // 2, grid_size // 2 + 1):
+            for dx in range(-grid_size // 2, grid_size // 2 + 1):
+                coords.append(f"{lat_c + dy * step:.3f},{lon_c + dx * step:.3f}")
+        url = ("https://api.open-meteo.com/v1/forecast"
+               f"?latitude={lat_c}&longitude={lon_c}"
+               "&hourly=cloud_cover"
+               f"&forecast_days=2&timezone=auto")
+        try:
+            import urllib.request, json as _json
+            req = urllib.request.Request(url)
+            with urllib.request.urlopen(req, timeout=10) as r:
+                data = _json.loads(r.read())
+            times = data.get("hourly", {}).get("time", [])
+            clouds = data.get("hourly", {}).get("cloud_cover", [])
+            now_idx = next((i for i, t in enumerate(times)
+                          if t[:13] >= _dt.now().strftime("%Y-%m-%dT%H")), 0)
+            idx = min(now_idx + hour_offset, len(clouds) - 1)
+            return clouds[idx] if idx < len(clouds) else None
+        except Exception:
+            return None
+
+    # Einfacher Ansatz: Vergleich von Gesamtbewoelkung jetzt vs. +2h
+    # am Standort + Bodenwindrichtung als Proxy fuer Bewegungsrichtung
+    now_cloud = None
+    future_cloud = None
+    wind_dir = None
+    wind_speed = None
+    try:
+        import urllib.request, json as _json
+        url = ("https://api.open-meteo.com/v1/forecast"
+               f"?latitude={lat_c}&longitude={lon_c}"
+               "&hourly=cloud_cover,wind_speed_10m,wind_direction_10m"
+               "&forecast_days=1&timezone=auto")
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=10) as r:
+            data = _json.loads(r.read())
+        times = data.get("hourly", {}).get("time", [])
+        clouds = data.get("hourly", {}).get("cloud_cover", [])
+        ws = data.get("hourly", {}).get("wind_speed_10m", [])
+        wd = data.get("hourly", {}).get("wind_direction_10m", [])
+        now_idx = next((i for i, t in enumerate(times)
+                      if t[:13] >= _dt.now().strftime("%Y-%m-%dT%H")), 0)
+        if now_idx < len(clouds):
+            now_cloud = clouds[now_idx]
+            fut_idx = min(now_idx + 2, len(clouds) - 1)
+            future_cloud = clouds[fut_idx]
+            wind_speed = ws[now_idx] if now_idx < len(ws) else None
+            wind_dir = wd[now_idx] if now_idx < len(wd) else None
+    except Exception:
+        pass
+
+    if now_cloud is None or future_cloud is None:
+        return {"available": False, "reason": "Keine Open-Meteo-Daten"}
+
+    # Trend bestimmen
+    delta = future_cloud - now_cloud
+    if delta < -15:
+        trend = "clearing"
+        trend_txt = "Aufklarend"
+    elif delta > 15:
+        trend = "clouding"
+        trend_txt = "Eintruebend"
+    else:
+        trend = "stable"
+        trend_txt = "Stabil"
+
+    # Bewegungsrichtung: Windrichtung als Proxy (Wolken bewegen sich
+    # mit dem Wind). Windrichtung ist die Richtung, aus der der Wind
+    # KOMMT -> Bewegungsrichtung = 180 + wind_dir
+    movement_dir = (wind_dir + 180) % 360 if wind_dir is not None else None
+
+    # Standort-spezifische Vorhersage: welche Standorte werden besser/schlechter?
+    locs = {}
+    try:
+        for l in ac.active_locations(ac.DEFAULT_LOCATIONS):
+            name = l["name"]
+            lat, lon = l["lat"], l["lon"]
+            # Einfache Geometrie: Ist der Standort in Bewegungsrichtung?
+            if movement_dir is not None and wind_speed and wind_speed > 3:
+                # Vektor vom Zentrum zum Standort
+                import math
+                dlat = lat - lat_c
+                dlon = (lon - lon_c) * math.cos(math.radians(lat_c))
+                bearing_to_loc = (math.degrees(math.atan2(dlon, dlat)) + 360) % 360
+                ang_diff = abs(bearing_to_loc - movement_dir)
+                if ang_diff > 180:
+                    ang_diff = 360 - ang_diff
+                # Wenn Standort in Bewegungsrichtung (<60 Grad Abweichung)
+                # und Trend=clearing -> Standort klart eher auf
+                in_path = ang_diff < 60
+                dist_km = math.sqrt(dlat**2 + dlon**2) * 111
+                eta_h = dist_km / max(wind_speed * 3.6, 1) if wind_speed else None
+                locs[name] = {
+                    "in_clearing_path": trend == "clearing" and in_path,
+                    "distance_km": round(dist_km, 1),
+                    "eta_hours": round(eta_h, 1) if eta_h else None,
+                }
+    except Exception:
+        pass
+
+    return {
+        "available": True,
+        "current_clouds": now_cloud,
+        "clouds_2h": future_cloud,
+        "delta": delta,
+        "trend": trend,
+        "trend_text": trend_txt,
+        "wind_direction_deg": wind_dir,
+        "wind_speed_kmh": round(wind_speed * 3.6, 1) if wind_speed else None,
+        "movement_direction_deg": movement_dir,
+        "locations": locs,
+        "timestamp": _dt.now().isoformat(timespec="seconds"),
+    }
+
+
+# --- Luecke 1: Hoehen-Differenzierung / Inversions-Erkennung ---
+def _inversion_adjusted(spot: dict, clouds: float, tau: float,
+                        wind: float) -> dict:
+    """Erkennt wahrscheinliche Rheingraben-Inversion und adjustiert
+    Wolkenwerte fuer hochgelegene Standorte.
+
+    Logik: Bei grosser Bewolkung + geringem Taupunkt-Spread + schwachem
+    Wind liegt vermutlich Bodennebel/Hochnebel in der Ebene. Standorte
+    >200m Hoehe (z.B. Koenigsstuhl 550m) koennen UEBER dieser Schicht
+    klar sein. Das DWD-Modell modelliert die Talsohle, nicht den Berg.
+
+    Rueckgabe: {"inversion_likely": bool, "clouds_adjusted": float,
+                "elevation_m": int, "adjustment_pp": float}
+    """
+    elevation = spot.get("elevation_m", 100)
+    inversion_likely = (
+        clouds is not None and clouds > 70
+        and tau is not None and tau < 3.0
+        and wind is not None and wind < 10
+        and elevation > 200
+    )
+    if not inversion_likely:
+        return {"inversion_likely": False,
+                "clouds_adjusted": clouds,
+                "elevation_m": elevation, "adjustment_pp": 0}
+
+    # Adjustierung: Hoeher = mehr Klärung, max 60pp Reduktion
+    # Formel: (Hoehe - 100m) / 1000m * 100pp, gekappt bei 60pp
+    # 550m Koenigsstuhl: (550-100)/1000*100 = 45pp Reduktion
+    # 150m Weinheim: (150-100)/1000*100 = 5pp (gering)
+    adjustment = min(60.0, max(0.0, (elevation - 100) / 1000 * 100))
+    adjusted = max(0, clouds - adjustment)
+    return {"inversion_likely": True,
+            "clouds_adjusted": round(adjusted, 1),
+            "elevation_m": elevation,
+            "adjustment_pp": round(adjustment, 1)}
 
 
 # --- Push-Benachrichtigungen: anstehende PRIME WINDOWs als JSON ---

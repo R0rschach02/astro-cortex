@@ -697,6 +697,52 @@ function moonNightsRows(nights) {
 
 
 
+
+/* ============================================================
+   LUECKE 1+2: Inversions-Badge + Wetter-Bewegungsanalyse
+   ============================================================ */
+function inversionBadgeHtml(s) {
+  const inv = s.inversion;
+  if (!inv || !inv.inversion_likely) return "";
+  const adj = s.clouds_total_adjusted;
+  return `<div class="inv-badge" title="Inversions-Erkennung: Talsohle "
+    + "bewoelkt, aber ${inv.elevation_m}m Hoehe vermutlich ueber der "
+    + "Wolkenschicht (${inv.adjustment_pp}pp Korrektur)">
+    \u26F0 \u00DCBER INVERSION — ${adj !== undefined ? adj.toFixed(0) + "%" : "?"} statt ${s.clouds_total}%
+  </div>`;
+}
+
+async function updateWeatherMovement() {
+  try {
+    const d = await api("/api/weather/movement");
+    if (!d || !d.available) return;
+    const el = document.getElementById("wmove");
+    if (!el) return;
+    const icon = d.trend === "clearing" ? "\u2600" :
+                 d.trend === "clouding" ? "\u2601" : "\u2014";
+    const arrow = d.movement_direction_deg != null
+      ? dirToArrow(d.movement_direction_deg) : "";
+    const speed = d.wind_speed_kmh ? d.wind_speed_kmh.toFixed(0) + " km/h" : "";
+    let loc_hint = "";
+    const clearing = Object.entries(d.locations || {})
+      .filter(([n, v]) => v.in_clearing_path)
+      .map(([n, v]) => `${n.split(",")[0]} (~${v.eta_hours}h)`);
+    if (clearing.length && d.trend === "clearing") {
+      loc_hint = ` \u00b7 Klart auf: ${clearing.slice(0, 2).join(", ")}`;
+    }
+    el.innerHTML = `<span class="wm-icon">${icon}</span> `
+      + `<span class="wm-trend wm-${d.trend}">${d.trend_text}</span> `
+      + `${arrow} ${speed}${loc_hint}`;
+    el.className = "wmove mono wm-" + d.trend;
+  } catch (e) { /* Hintergrund-Feature, still failen */ }
+}
+
+function dirToArrow(deg) {
+  const dirs = ["\u2191", "\u2197", "\u2192", "\u2198",
+                "\u2193", "\u2199", "\u2190", "\u2196"];
+  return dirs[Math.round(deg / 45) % 8];
+}
+
 /* ============================================================
    ERINNERUNGEN: Taegliche Pop-up-Meldungen (Datenwirt)
    ============================================================ */
@@ -913,6 +959,7 @@ function panelHtml(s) {
     </div>
     <div class="grp mono"><b>Planeten &gt; 30°</b><span class="age">de421 · lokal</span></div>
     <div class="kv mono">${planetRows || row("Planeten", "keine Daten")}</div>
+    ${inversionBadgeHtml(s)}
     ${groundTruthHtml()}
     <button class="transit-btn" onclick="fetchTransitRoute('${esc(s.id || s.name)}', ${s.lat}, ${s.lon})" title="OePNV-Einsatzweg vom HQ (Ilvesheim) zu diesem Standort">&#128646; TRANSIT ROUTE</button>
     <div id="transit-result" class="transit-result"></div>
@@ -1580,6 +1627,7 @@ function setGaugeVal(id, txt, cls) {
 
 function updateAstroInstruments(data) {
   pingLedState();   // Freshness-Ampel im bestaehenden 60s-Takt
+  updateWeatherMovement();   // Luecke 2: Bewegungstrend
   const s = telemetrySpot(data);
   if (!s) return;
   setTelemetry(s.name, true);   // Link-Label synchron halten

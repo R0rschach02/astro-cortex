@@ -1127,3 +1127,22 @@ body.night .basemap-tile { filter: none; }
   #comms-terminal .ct-line { white-space: normal;
     word-break: break-word; overflow-wrap: anywhere; }
 }
+
+/* Inversions-Badge: Standort ueber der Wolkenschicht */
+.inv-badge { margin: 6px 0; padding: 6px 10px;
+  border: 1px solid rgba(255,210,74,.5);
+  background: rgba(255,210,74,.1); color: #ffd24a;
+  font: 700 10px var(--mono); letter-spacing: .05em;
+  animation: inv-pulse 2s ease-in-out infinite; }
+@keyframes inv-pulse { 50% { background: rgba(255,210,74,.2); } }
+
+/* Wetter-Bewegung in der Top-Bar */
+.wmove { font-size: 10px; font-weight: 700; letter-spacing: .04em;
+  padding: 3px 7px; white-space: nowrap;
+  border: 1px solid rgba(159,176,192,.25); }
+.wmove .wm-icon { font-size: 13px; }
+.wmove.wm-clearing { color: #3aff7c;
+  border-color: rgba(58,255,124,.35); }
+.wmove.wm-clouding { color: #ff8a72;
+  border-color: rgba(255,92,80,.35); }
+.wmove.wm-stable { color: #9fb0c0; }
