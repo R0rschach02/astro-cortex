@@ -775,7 +775,8 @@ def api_ota_bundle():
         headers={
             "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
             "Content-Length": str(file_size),
-            "Accept-Ranges": "bytes",
+            "Accept-Ranges": "none",
+            "X-Content-Type-Options": "nosniff",
         })
 
 

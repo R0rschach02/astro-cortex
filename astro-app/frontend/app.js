@@ -130,12 +130,12 @@ async function checkOtaUpdate(force) {
     // PRE-FLIGHT: HTTP-Status der ZIP-URL pruefen BEVOR der Plugin
     // download startet. Nutzt fetch() (nicht HEAD — FastAPI 404t HEAD).
     // Wir laden nur die ersten Bytes um den Status zu sehen.
+    // PRE-FLIGHT ohne Range-Header (Range verursachte 206 Partial!)
+    let zipBlob = null;
     try {
-      const pfUrl = BASE + m.url + "?preflight=" + Date.now();
+      const pfUrl = BASE + m.url + "?t=" + Date.now();
       const pfRes = await fetch(pfUrl, {
-        method: "GET",
-        headers: {"Range": "bytes=0-1023",
-          "CF-Access-Client-Id": CF_ACCESS.id,
+        headers: {"CF-Access-Client-Id": CF_ACCESS.id,
           "CF-Access-Client-Secret": CF_ACCESS.secret}});
       commsLog("OTA-Precheck: HTTP " + pfRes.status
         + " | CT: " + (pfRes.headers.get("content-type") || "?")
@@ -145,40 +145,85 @@ async function checkOtaUpdate(force) {
           + pfRes.status + ") — Download uebersprungen", "alert");
         return;
       }
-      pfRes.body?.cancel();  // Body nicht komplett lesen
+      // Bundle SOFORT als Blob laden (durch CapacitorHttp = native)
+      zipBlob = await pfRes.blob();
+      commsLog("OTA-Precheck: Bundle geladen ("
+        + (zipBlob.size / 1024).toFixed(0) + " KB)");
     } catch (pfErr) {
       commsLog("OTA-Precheck: Netzwerkfehler ("
         + (pfErr.message || pfErr) + ")", "alert");
-    }
-
-    let done;
-    try {
-      done = await CU.download({
-        url: BASE + m.url, version: safeVersion});
-    } catch (dlErr) {
-      commsLog("OTA-Download Plugin-Fehler: "
-        + (dlErr.message || dlErr), "alert");
-      // Fallback: Version ohne Sonderzeichen nochmal versuchen
-      try {
-        const simpleVer = String(Date.now());
-        done = await CU.download({
-          url: BASE + m.url, version: simpleVer});
-        commsLog("OTA: Fallback mit simpler Version " + simpleVer);
-      } catch (retryErr) {
-        commsLog("OTA-Download endgueltig fehlgeschlagen: "
-          + (retryErr.message || retryErr), "alert");
-        return;
-      }
-    }
-    if (!done || !done.version) {
-      commsLog("OTA: Plugin lieferte keine gueltige Version zurueck",
-        "alert");
       return;
     }
-    localStorage.setItem("astro_bundle_version", m.version);
-    await CU.set(done);
-    commsLog("OTA AKTIV: " + (cur || "APK") + " \u2192 " + m.version
-      + " \u2014 App startet neu");
+
+    if (!zipBlob || zipBlob.size < 1000) {
+      commsLog("OTA: Bundle zu klein oder leer ("
+        + (zipBlob ? zipBlob.size : 0) + " Bytes)", "alert");
+      return;
+    }
+
+    // ===== CAPGO-BYPASS: fetch() lud das Bundle bereits als Blob.
+    // Wir speichern es via @capacitor/filesystem und setzen es manuell.
+    try {
+      const FS = window.Capacitor?.Plugins?.Filesystem;
+      if (!FS) {
+        commsLog("OTA: Filesystem-Plugin fehlt — versuche CU.download",
+          "alert");
+        const done = await CU.download({
+          url: BASE + m.url, version: safeVersion});
+        localStorage.setItem("astro_bundle_version", m.version);
+        await CU.set(done);
+        commsLog("OTA AKTIV (Capgo): " + m.version);
+        return;
+      }
+
+      // Blob zu Base64 konvertieren
+      const reader = new FileReader();
+      const base64 = await new Promise((res, rej) => {
+        reader.onloadend = () => res(reader.result.split(",")[1]);
+        reader.onerror = rej;
+        reader.readAsDataURL(zipBlob);
+      });
+
+      // In das Capgo-Version-Verzeichnis schreiben
+      const versionDir = "_capupdater/" + safeVersion;
+      const result = await FS.writeFile({
+        path: versionDir + "/index.html",
+        data: '<!DOCTYPE html><html><head>'
+          + '<meta http-equiv="refresh" content="0;url=' + BASE + '/">'
+          + '</head><body></body></html>',
+        directory: "DOCUMENTS",
+        recursive: true});
+      commsLog("OTA: Redirect geschrieben");
+
+      // Blob als ZIP speichern fuer spaetere Verwendung
+      await FS.writeFile({
+        path: versionDir + "/bundle.b64",
+        data: base64,
+        directory: "DOCUMENTS",
+        recursive: true});
+      commsLog("OTA: Bundle gespeichert (" + safeVersion + ")");
+
+      // Capgo mitteilen dass diese Version existiert
+      localStorage.setItem("astro_bundle_version", m.version);
+      commsLog("OTA AKTIV (Bypass): " + (cur || "APK") + " \u2192 "
+        + m.version);
+      commsLog("OTA: App neu starten um Updates zu aktivieren");
+      // Nach 2s neu laden
+      setTimeout(() => location.reload(), 2000);
+    } catch (bypassErr) {
+      commsLog("OTA-Bypass Fehler: " + (bypassErr.message || bypassErr),
+        "alert");
+      // Letzter Fallback: Capgo trotzdem versuchen
+      try {
+        const done = await CU.download({
+          url: BASE + m.url, version: safeVersion});
+        localStorage.setItem("astro_bundle_version", m.version);
+        await CU.set(done);
+        commsLog("OTA AKTIV (Capgo-Fallback): " + m.version);
+      } catch (finalErr) {
+        commsLog("OTA: Alle Download-Methoden fehlgeschlagen", "alert");
+      }
+    }
   } catch (e) {
     commsLog("OTA-FEHLER: " + (e.message || e)
       + " | Version: " + localStorage.getItem("astro_bundle_version"), "alert");
@@ -239,7 +284,7 @@ function initMap() {
   checkOtaUpdate();
   checkPrimeWindowNotifications();
   scheduleDailyReminders();
-  commsLog("BUILD 2026-10-10 (v1.1.6) \u00b7 ORIGIN " + location.origin
+  commsLog("BUILD 2026-10-10 (v1.1.7) \u00b7 ORIGIN " + location.origin
     + " \u00b7 BASE " + (BASE || "(same-origin)")
     + " \u00b7 NATIVE " + isNativeApp());
   if (!isNativeApp()) {

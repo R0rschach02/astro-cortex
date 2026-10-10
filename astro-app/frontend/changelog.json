@@ -576,6 +576,12 @@
       "title": "v1.1.6 — OTA Pre-Flight-Check",
       "detail": "Vor jedem CapacitorUpdater.download() laeuft jetzt ein Pre-Flight-Check: fetch() mit Range-Header auf die ZIP-URL loggt HTTP-Status, Content-Type und Content-Length ins Comms-Feed (OTA-Precheck: HTTP 200 | CT: application/zip | CL: 164846). Bei Nicht-200 wird der Plugin-Download uebersprungen. Backend: bundle.zip-Route sendet jetzt explizit Content-Length und Accept-Ranges: bytes. BUILD-String auf v1.1.6 aktualisiert, versionCode 10102106.",
       "usage": "OTA-Precheck zeigt HTTP-Status bevor der Plugin startet"
+    },
+    {
+      "date": "2026-10-10",
+      "title": "v1.1.7 — OTA Capgo-Bypass: fetch() + Filesystem",
+      "detail": "Der Pre-Flight-Check lud das Bundle als Range-Request (bytes=0-1023) und erhielt 206 Partial Content — der Capgo-Updater crashte darauf. Jetzt: (1) Pre-Flight ohne Range-Header, laedt das komplette Bundle als Blob in einem Durchgang (durch CapacitorHttp = native, bekannte funktionierende Pipeline). (2) Capgo-Download komplett umgangen: fetch() laedt das ZIP, Blob wird zu Base64 konvertiert und via @capacitor/filesystem im _capupdater-Verzeichnis gespeichert. (3) Backend: Accept-Ranges: none auf bundle.zip (keine 206-Antworten mehr). (4) Drei-Wege-Fallback: Bypass → Capgo download() → Fehlermeldung.",
+      "usage": "OTA-Download laeuft jetzt durch CapacitorHttp statt durch Capgo-Plugin"
     }
   ]
 }
