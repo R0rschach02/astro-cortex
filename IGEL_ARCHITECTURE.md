@@ -278,7 +278,7 @@ Schritte: Syntax-Check → ruff (F8xx/E722/BLE001) → pytest → cp workspace�
 |---|---|---|
 | ~~1~~ | ~~`GET /updates/version` aktualisieren~~ — **erledigt v1.1.9** (dynamisch + APK-Download-Name) | ✅ |
 | ~~2~~ | ~~APK-Dateiname in Backend setzen~~ — **erledigt v1.1.9** (Default 1.1.9) | ✅ |
-| 3 | Prime-Window-Push im Crawler (`check_prime_window_push()`) an Dual-Profile anpassen (Telegram-Alerts) | Mittel |
+| ~~3~~ | ~~Prime-Window-Push im Crawler an Dual-Profile anpassen~~ — **erledigt 11.10.** (`check_prime_window_push()` fragt `/api/notifications/upcoming` lokal ab, Dual-Profile-Telegram + Dedup `type|location|night|start`, Commit aa03762) | ✅ |
 | 4 | Signierter Release-Build statt Debug-APK | Mittel |
 | 5 | OTA-Feldtest auf dem Gerät: Kaltstart nach v1.1.9-APK → Comms muss "OTA AKTIV" + echten Neustart zeigen (nicht nur Log) | Hoch |
 | 6 | VRN-GTFS-Feed-Refresh (manuell) | Niedrig |
