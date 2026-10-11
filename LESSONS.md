@@ -264,3 +264,30 @@ ID-Kontext wie `#cockpit #flightstick`), weil die Datei permanent waechst und
 Media-Bloecke meist oben bleiben. Vor Deploy: Mobile-Viewport gegen die Basis-Regel
 derselben Property pruefen. **English:** Media overrides need higher specificity
 than base rules appended later in the file - source order silently wins.
+
+## Lesson 21: Mock-Green "OTA AKTIV" — Erfolg loggen ohne Wirkung (v1.1.7/8)
+**Symptom:** Comms zeigte "OTA AKTIV (Bypass): alt -> neu", Version in localStorage
+gesetzt, App lud neu - aber der ausgefuehrte Code blieb der alte. Frontend-Deploys
+erreichten installierte APKs monatelang gar nicht. **Ursache:** Der Capgo-Bypass lud
+das ZIP per fetch, speicherte es als .b64 via Filesystem - und hatte KEINE API, das
+Bundle zu installieren (kein CU.set, kein Read-Back, index.html laedt app.js relativ
+aus der APK). Der Code-Kommentar gab es selbst zu ("Vereinfachung: Nur die
+Versionsnummer setzen"). Ein "AKTIV"-Log ohne verifizierten Mechanismus ist ein
+Erfolgsvorspielen. **Regel:** Eine Erfolgsmeldung darf erst nach dem Schritt stehen,
+der die Wirkung physisch herstellt (hier: CU.set() setzt den WebView-Pointer +
+notifyAppReady() verhindert Auto-Revert). Bei jedem "es geht"-Claim fragen: WELCHE
+Zeile erzeugt die Wirkung - und wuerde sie auch ohne den dekorativen Teil feuern?
+**English:** Log success only after the step that physically produces the effect;
+a green log line without a mechanism is theater.
+
+## Lesson 22: Plugin-Verhalten aus dem mitgelieferten Source lesen, nicht aus Erinnerung
+**Symptom:** Annahme "Capgo-Updater crasht auf 206 / braucht semver-Versionen" trieb
+einen wochenlangen Bypass-Aufwand. **Ursache:** Der tatsaechlich installierte Plugin-
+Source (v8.52.1) akzeptiert 200 UND 206, sendet bei Frisch-Downloads gar keinen Range-
+Header und validiert Versionen lax - die Crash-Ursache war der Server (206 auf Range
+durch FileResponse), nicht das Plugin. **Regel:** Bei "Plugin X kann nicht Y": erst
+node_modules/<Plugin>/android/src .../ definitions.d.ts lesen (die exakt gebaute
+Version), dann Architektur-Entscheidung. Und: Fixes auf der Server-Seite ansetzen,
+wenn der Server das protocol-verletzende Verhalten produziert. **English:** Read the
+bundled plugin source before blaming the plugin; fix the side that violates the
+protocol.
