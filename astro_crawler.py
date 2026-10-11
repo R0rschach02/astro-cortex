@@ -1875,110 +1875,85 @@ DEVIATION_SEEING_ARCSEC = 1.0
 
 
 
-def check_prime_window_push():
-    """PRIME-WINDOW-Fruehwarnung (immer, 2 Tage im Voraus): Findet der
-    Heavy-Tick ein Golden Window in genau 2 Naechten, dessen Bedingungen
-    UEBERDURCHSCHNITTLICH sind (Vergleich gegen alle aktuell bekannten
-    Fenster aller Standorte), geht EIN Telegram-Push pro Standort|Nacht
-    heraus - mit Location, Datum und genauer Uhrzeit. Bewusst NICHT an
-    weather_pushes_allowed gekoppelt (Nutzerwunsch: immer senden)."""
-    from datetime import date as _date
-    today = _date.today()
-    target_night = (today + timedelta(days=2)).isoformat()
+def check_prime_window_push(hours_ahead: int = 48):
+    """DUAL-PROFILE-FRUEHWARNUNG (v1.1.11, ersetzt die alte
+    Ueberdurchschnitts-Heuristik): Der Radar-Tick fragt den Backend-
+    Endpoint /api/notifications/upcoming (localhost, 48-h-Horizont) ab -
+    DIESELBE Profil-Definition, die auch die App fuer ihre lokalen
+    Pushes nutzt (LUNAR WINDOW: Mond >15deg, Wolken <30%, Seeing <2.0";
+    DEEP SKY WINDOW: Mond weg/crescent, Wolken <20%, Bortle <=6).
+    Fuer jedes neu in den Horizont tretende Event geht GENAU EIN
+    Telegram-Push raus (Dedup: type|location|night|start im State,
+    14-Tage-Cleanup). Bewusst NICHT an weather_pushes_allowed gekoppelt
+    (Planungs-Event, kein Wetter-Spam); Backend down => still, der
+    naechste Tick (5 min) holt nach."""
+    import urllib.request
+    url = ("http://127.0.0.1:8000/api/notifications/upcoming"
+           f"?hours_ahead={hours_ahead}")
     try:
-        with open(FORECAST_PATH, "r", encoding="utf-8") as f:
-            fc = json.load(f)
-    except (OSError, ValueError):
+        with urllib.request.urlopen(url, timeout=10) as r:
+            data = json.loads(r.read().decode("utf-8"))
+    except Exception as e:                     # BLE001: bewusst, s. LESSONS
+        log.warning("[DualProfile] Backend nicht erreichbar: %s", e)
         return
+    events = data.get("events") or []
+    if not events:
+        return
+
     state = load_state()
     state.setdefault("prime_pushed", {})
+    WD = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
 
-    # 1) Fenster-Metriken sammeln: alle Fenster aller Standorte (naechste
-    #    Naechte) fuer den Vergleichsmassstab "Durchschnitt"
-    def _win_metrics(entry, gw):
-        """(clouds_avg, seeing_avg, wind_max, tau_min) der Fensterstunden."""
+    for ev in events:
+        etype = ev.get("type", "?")
+        key = "|".join([etype, str(ev.get("location")),
+                        str(ev.get("night")), str(ev.get("start"))])
+        if state["prime_pushed"].get(key):
+            continue                            # schon gewarnt
+
+        # Zeitpunkt lesbar aufbereiten (+ Restzeit als Dringlichkeit)
         try:
-            start_h = int(gw["start"].split(":")[0])
-        except (KeyError, ValueError):
-            return None
-        cl, se, wi, ta, n = [], [], [], [], 0
-        for h in (entry.get("series") or []):
-            ts = (h.get("ts") or "")[:10]
-            try:
-                hh = int((h.get("ts") or "")[11:13])
-            except ValueError:
-                continue
-            if ts != gw.get("night"):
-                continue
-            # Fensternaehe: Startstunde bis Start+hours (Toleranz +1)
-            if not (start_h - 1 <= hh <= start_h + gw.get("hours", 1)):
-                continue
-            if h.get("clouds") is not None: cl.append(h["clouds"])
-            if h.get("seeing") is not None: se.append(h["seeing"])
-            if h.get("wind") is not None: wi.append(h["wind"])
-            if h.get("tau") is not None: ta.append(h["tau"])
-            n += 1
-        if n == 0:
-            return None
-        return (sum(cl) / len(cl) if cl else None,
-                sum(se) / len(se) if se else None,
-                max(wi) if wi else None,
-                min(ta) if ta else None)
+            d = datetime.strptime(str(ev.get("night")), "%Y-%m-%d")
+            date_de = f"{WD[d.weekday()]}, {d.strftime('%d.%m.%Y')}"
+        except ValueError:
+            date_de = str(ev.get("night"))
+        hu = ev.get("hours_until_start")
+        lead = (f"Start in ~{hu:.0f} h" if isinstance(hu, (int, float))
+                and hu >= 6 else "JETZT DRAN (< 6 h)")
 
-    all_clouds, all_seeing = [], []
-    for entry in fc.values():
-        for gw in (entry.get("golden_windows") or [])[:3]:
-            m = _win_metrics(entry, gw)
-            if m and m[0] is not None: all_clouds.append(m[0])
-            if m and m[1] is not None: all_seeing.append(m[1])
-    avg_clouds = sum(all_clouds) / len(all_clouds) if all_clouds else None
-    avg_seeing = sum(all_seeing) / len(all_seeing) if all_seeing else None
+        conds_list = [c for c in (ev.get("conditions") or []) if c]
+        if etype == "DEEP_SKY_WINDOW":
+            # Moon-Status steht schon als eigene Zeile - aus den
+            # Backend-conditions filtern, sonst doppelt er sich
+            conds_list = [c for c in conds_list
+                          if not str(c).startswith("Moon")]
+        conds = " \u00b7 ".join(conds_list)
+        if etype == "LUNAR_WINDOW":
+            body = (f"\U0001F319 LUNAR WINDOW \u2014 {ev.get('location')}\n"
+                    f"Nacht {date_de}, {ev.get('start')}-{ev.get('end')} Uhr\n"
+                    f"{lead}\n"
+                    f"Mond Alt {ev.get('moon_alt', 0):.0f}\u00b0"
+                    f" \u00b7 Illum {ev.get('moon_illum', 0):.0f}%\n"
+                    f"{conds}\n"
+                    f"Bortle egal \u2014 Mond \u00fcberstrahlt LP\n"
+                    f"Session planen: Transit-R\u00fcckfahrt rechtzeitig "
+                    f"sichern.")
+        else:
+            body = (f"\U0001F30C DEEP SKY WINDOW \u2014 {ev.get('location')}\n"
+                    f"Nacht {date_de}, {ev.get('start')}-{ev.get('end')} Uhr\n"
+                    f"{lead}\n"
+                    f"Moon: {ev.get('moon_status', 'Set')}\n"
+                    f"{conds}\n"
+                    f"Bortle {ev.get('bortle', '?')} \u2014 DSO-tauglich\n"
+                    f"Session planen: Transit-R\u00fcckfahrt rechtzeitig "
+                    f"sichern.")
+        send_telegram(f"ASTRO-CRAWLER DUAL-PROFILE\n"
+                      f"{datetime.now():%d.%m. %H:%M}\n\n{body}")
+        state["prime_pushed"][key] = datetime.now()\
+            .isoformat(timespec="minutes")
+        log.info("[DualProfile] Push %s (%s, Start in %s h)", key,
+                 etype, round(hu) if isinstance(hu, (int, float)) else "?")
 
-    # 2) Fenster in genau 2 Naechten auf Ueberdurchschnittlichkeit pruefen
-    for name, entry in fc.items():
-        for gw in (entry.get("golden_windows") or []):
-            if gw.get("night") != target_night:
-                continue
-            m = _win_metrics(entry, gw)
-            if not m:
-                continue
-            clouds, seeing, wind, tau = m
-            reasons = []
-            if avg_clouds is not None and clouds is not None \
-                    and clouds <= avg_clouds * 0.75:
-                reasons.append(f"Wolken \u00d8 {clouds:.0f}% "
-                               f"(Schnitt aller Fenster: {avg_clouds:.0f}%)")
-            if avg_seeing is not None and seeing is not None \
-                    and seeing <= avg_seeing * 0.8:
-                reasons.append(f"Seeing \u00d8 {seeing:.1f}\u2033 "
-                               f"(Schnitt: {avg_seeing:.1f}\u2033)")
-            if not reasons:
-                continue   # fenstergut, aber nicht ueberdurchschnittlich
-            key = f"{name}|{target_night}"
-            if state["prime_pushed"].get(key):
-                continue
-            hours = max(1, gw.get("hours", 1))
-            try:
-                end_h = int(gw["start"].split(":")[0]) + hours
-            except ValueError:
-                continue
-            date_de = datetime.strptime(target_night, "%Y-%m-%d")\
-                .strftime("%d.%m.%Y")
-            conds = [f"Wind max {wind:.0f} km/h" if wind is not None else "",
-                     f"Tau min {tau:.0f} K" if tau is not None else ""]
-            msg = (f"PRIME WINDOW \u2014 2 TAGE IM VORAUS\n"
-                   f"{name}\n"
-                   f"Nacht {date_de}, {gw['start']}-"
-                   f"{end_h % 24:02d}:00 Uhr\n"
-                   + "\n".join(r for r in reasons if r) + "\n"
-                   + " \u00b7 ".join(c for c in conds if c) + "\n"
-                   f"Session planen: Transit-Rueckfahrt rechtzeitig sichern.")
-            send_telegram("ASTRO-CRAWLER PRIME WINDOW\n"
-                          f"{datetime.now():%d.%m. %H:%M}\n\n{msg}")
-            state["prime_pushed"][key] = datetime.now()\
-                .isoformat(timespec="minutes")
-            log.info("[PrimeWindow] Push %s (%s)", name,
-                     "; ".join(reasons))
     # Zustand schlank halten (14 Tage)
     cutoff = (datetime.now() - timedelta(days=14))\
         .strftime("%Y-%m-%dT%H:%M")
