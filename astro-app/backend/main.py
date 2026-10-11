@@ -53,8 +53,13 @@ log = logging.getLogger("astro-app")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
 # Optionaler Schutz schreibender Endpunkte: env ASTRO_API_TOKEN setzen
 API_TOKEN = os.environ.get("ASTRO_API_TOKEN", "")
+BACKEND_VERSION = "v1.1.9"
+# Cloudflare-Access M2M-Token: liegt AUSSERHALB des Repos (gitignored)
+# und wird der App erst zur Laufzeit ueber /updates/app-bootstrap.json
+# zugestellt - kein Secret mehr im APK-/Frontend-Code.
+CF_SECRETS_FILE = os.path.expanduser("~/.astro_secrets/cf_access.json")
 
-app = FastAPI(title="Astro Command Center", version="1.0")
+app = FastAPI(title="Astro Command Center", version="1.1.9")
 
 
 # ---------------------------------------------------------------------------
@@ -714,6 +719,15 @@ async def no_cache_static(request, call_next):
     """CF cached /native/ und /updates/ mit max-age=14400. Brechen."""
     path = request.url.path
     if path.startswith("/native/") or path.startswith("/updates/"):
+        # Range-Requests auf das OTA-Bundle strikt verweigern: Der
+        # Capgo-Updater (OkHttp) resume't mit Range-Headern und stolpert
+        # ueber 206 Partial Content (Content-Length-Konflikt). Wir
+        # entfernen den Header VOR dem Routing -> FileResponse liefert
+        # immer 200 + komplette Datei + exakte Content-Length.
+        if path == "/updates/bundle.zip":
+            request.scope["headers"] = [
+                (k, v) for k, v in request.scope.get("headers", [])
+                if k.decode("latin-1").lower() != "range"]
         resp = await call_next(request)
         resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         resp.headers["Pragma"] = "no-cache"
@@ -757,6 +771,35 @@ def api_ota_manifest():
         raise HTTPException(404, "kein OTA-Bundle deployt")
     return FileResponse(mf, media_type="application/json",
                         headers={"Cache-Control": "no-store"})
+
+
+@app.get("/updates/app-bootstrap.json")
+def api_app_bootstrap():
+    """CF-Access-M2M-Tokens fuer die native App (Secret-Rotation ohne
+    APK-Rebuild). Liegt bewusst unter /updates/ (CF-Access-Bypass aktiv,
+    CORS + no-store von der Middleware): Die App kann hierhin ohne
+    Token und zieht sich bei jedem Kaltstart die aktuellen Credentials.
+    Quelle: ~/.astro_secrets/cf_access.json (ausserhalb des Git-Repos).
+    BEWUSSTE Rest-Risiko-Abwaegung: Der Endpoint ist - wie bundle.zip -
+    oeffentlich erreichbar; wer die URL kennt, bekommt die Tokens. Das
+    schuetzt vor Mitlaeufern, nicht vor zielgerichteten Angreifern -
+    dafuer rotiert das Secret zentral auf dem Server."""
+    if not os.path.exists(CF_SECRETS_FILE):
+        raise HTTPException(503, "Kein CF-Access-Secret konfiguriert "
+                                 "(~/.astro_secrets/cf_access.json fehlt)")
+    try:
+        with open(CF_SECRETS_FILE) as f:
+            creds = json.load(f)
+        if not creds.get("client_id") or not creds.get("client_secret"):
+            raise HTTPException(503, "cf_access.json unvollstaendig "
+                                     "(client_id/client_secret fehlen)")
+        return {"client_id": creds["client_id"],
+                "client_secret": creds["client_secret"],
+                "source": "server"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(503, f"cf_access.json nicht lesbar: {e}")
 
 
 @app.get("/updates/bundle.zip")
@@ -1022,7 +1065,7 @@ APK_DIR = os.path.expanduser("~")
 
 @app.get("/native/astro-cortex-v{version}.apk")
 @app.get("/native/astro-cortex.apk")
-def api_native_apk(version: str = "1.1.3",
+def api_native_apk(version: str = "1.1.9",
                    token: Optional[str] = None,
                    request: Request = None):
     """APK-Auslieferung mit korrektem Content-Disposition und Build-
@@ -1056,8 +1099,14 @@ def api_version_check():
     apk_files = [f for f in os.listdir(apk_dir) if f.endswith(".apk")] \
         if os.path.isdir(apk_dir) else []
     latest_apk = sorted(apk_files)[-1] if apk_files else "unbekannt"
-    return {"backend_version": "v1.1.4",
-            "apk_file": latest_apk,
+    # Neueste versionierte APK im Home-Verzeichnis (physischer Download)
+    home_apks = sorted(
+        f for f in os.listdir(os.path.expanduser("~"))
+        if f.startswith("astro-cortex-v") and f.endswith(".apk"))
+    latest_home_apk = home_apks[-1] if home_apks else "unbekannt"
+    return {"backend_version": BACKEND_VERSION,
+            "apk_build_file": latest_apk,
+            "apk_download": latest_home_apk,
             "apk_path": apk_dir,
             "ota_version": json.load(open(
                 "/home/enigma/updates/latest.json")).get("version", "?")

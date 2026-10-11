@@ -1,7 +1,9 @@
 # IGEL_ARCHITECTURE.md — Astro Command Center Master-Dokument
-**Version:** v1.1.8 (Build 10102108) · **OTA-Hash:** `28d2067-10102329`
-**Datum:** 10.10.2026 · **Git:** `origin/main @ 65dd883` · **Server:** `api.teamigel.com`
-**APK:** `https://api.teamigel.com/native/astro-cortex-v1.1.8.apk` (7.505.501 Bytes)
+**Version:** v1.1.9 (Build 10102109) · **OTA-Hash:** `siehe /updates/latest.json`
+**Datum:** 11.10.2026 · **Git:** `origin/main` · **Server:** `api.teamigel.com`
+**APK:** `https://api.teamigel.com/native/astro-cortex-v1.1.9.apk`
+
+**v1.1.9 Sicherheits-/Architektur-Release:** (1) CF-Secret-Leak behoben — Tokens kommen vom Server-Endpoint statt aus dem Code; (2) OTA installiert jetzt WIRKLICH (CU.download→CU.set→notifyAppReady, kein Mock-Green); (3) Batterieschutz — appStateChange stoppt alle Timer im Hintergrund.
 
 ---
 
@@ -144,11 +146,11 @@ Vergleicht Gesamtbewölkung jetzt vs. +2h (Open-Meteo), nutzt Windrichtung als P
 
 ---
 
-## 3. OTA-Pipeline (v1.1.8 — Funktionierender Bypass)
+## 3. OTA-Pipeline (v1.1.9 — Echte Installation über das Capgo-Plugin)
 
-### Architektur-Entscheidung: Capgo-Plugin umgangen
+### Architektur-Entscheidung: Plugin-Download rehabilitiert (206 serverseitig gekillt)
 
-Der @capgo/capacitor-updater Plugin's interner HTTP-Client ist unzuverlässig (crashte bei 206 Partial Content, Version-Strings mit Bindestrichen, und Content-Length-Konflikten). Wir umgehen ihn komplett:
+Der v1.1.8-"Bypass" (fetch → .b64 → toter Ballast, "OTA AKTIV" ohne Wirkung = Mock-Green) ist ENTFERNT. Zwei Erkenntnisse aus dem Plugin-Source (v8.52.1): (a) Es gibt KEINE API, um fertige Bytes zu übergeben — download({url,version}) + set({version}) ist der einzige Installationsweg. (b) Frische Downloads senden keinen Range-Header; nur Resume-Pfade tun es. Der 206-Crash ist seit v1.1.9 serverseitig unmöglich: Die Middleware entfernt den Range-Header VOR dem Routing → FileResponse liefert IMMER 200 komplett + exakte Content-Length.
 
 ```
 Kaltstart / UPLINK-Button
@@ -156,38 +158,39 @@ Kaltstart / UPLINK-Button
 checkOtaUpdate(force?)
     ↓ [24h-Drossel — force=true via UPLINK umgeht]
     ↓
-fetch(BASE + "/updates/latest.json?t=" + Date.now())   ← Cache-Buster
-    ↓ [400/404 → "Manifest nicht erreichbar" → Abbruch]
-    ↓ [version=null → "Manifest ungueltig" → Abbruch]
-    ↓
-fetch(BASE + m.url)                                     ← Voller GET (kein Range!)
-    ↓ [Über CapacitorHttp = native HTTP, BEWÄHRTE Pipeline]
-    ↓ → zipBlob (162 KB)
-    ↓
-FileReader.readAsDataURL(zipBlob)
-    ↓ → Base64 (Praefix mit indexOf(",") validiert und abgeschnitten)
-    ↓
-Filesystem.writeFile({path: "ota_VERSION.b64", directory: "DATA"})
-    ↓ [FLAT path, KEINE Subdirectories, KEIN recursive]
-    ↓
-localStorage.setItem("astro_bundle_version", m.version)
-    ↓
-setTimeout(() => location.reload(), 2000)
+fetch(BASE + "/updates/latest.json?t=" + Date.now())   ← KEINE Token-Header (Bypass-Pfad)
+    ↓ [version=null/url=null → "Manifest ungueltig" → Abbruch]
+    ↓ [version == localStorage → "OTA: aktuell" → Ende]
+HEAD-Precheck (Status + Content-Type + Content-Length, ohne Body)
+    ↓ [!=200 → Abbruch]
+CU.download({url, version: safeVersion, checksum: sha256?})
+    ↓ [Plugin lädt via OkHttp NATIV, entpackt ZIP ins Bundle-Verzeichnis]
+    ↓ [Fehler → ehrliche Fehlermeldung, Version bleibt UNVERÄNDERT]
+localStorage.setItem("astro_bundle_version", m.version)   ← erst NACH erfolgreichem Download
+CU.set({version: safeVersion})
+    ↓ [WebView-Pointer wird physisch auf das neue Bundle gesetzt, App-Neustart]
+setTimeout(location.reload, 4000)                          ← Sicherheitsnetz
 ```
+
+**notifyAppReady()**: Muss in jedem Bundle (auch APK-Code) laufen — sonst revertiert Capgo nach appReadyTimeout (10 s) still auf das vorherige Bundle. Seit v1.1.9 im Startup.
+
+**Checksumme**: astro_deploy.sh schreibt jetzt die VOLLE SHA-64 in latest.json; CU.download() verifiziert sie optional mit.
 
 ### Server-Headers (Backend)
 
 **`/updates/bundle.zip`:**
 ```
-HTTP/2 200 OK
+HTTP 200 OK (auch auf Range-Requests — Header wird in der Middleware gestrippt)
 Content-Type: application/zip
-Content-Length: 166235 (exakter Integer)
-Accept-Ranges: none (keine 206-Antworten!)
+Content-Length: exakter Integer
+Accept-Ranges: none
 Cache-Control: no-store, no-cache, must-revalidate, max-age=0
 Pragma: no-cache
 ```
 
-**WICHTIG:** `Accept-Ranges: none` ist gesetzt, aber `Range`-Requests IMMER NOCH mit 206 beantwortet werden können (von uvicorn). Der Pre-Flight sendet KEINEN Range-Header.
+### Token-Bootstrap (v1.1.9)
+
+`GET /updates/app-bootstrap.json` liefert die M2M-Credentials aus `~/.astro_secrets/cf_access.json` (liegt bewusst im Access-Bypass wie bundle.zip; bewusste Abwägung: schützt vor Mitlaeufern, nicht vor Zielgerichteten — daführ zentrale Rotation ohne APK). Die App holt sie bei jedem Start und cachet sie im localStorage (`astro_cf_id`/`astro_cf_secret`).
 
 ### Cloudflare-Konfiguration
 
@@ -197,10 +200,11 @@ Pragma: no-cache
 | Cache Rule #2 | `/updates/` | Bypass cache |
 | Access Policy | `api.teamigel.com` | Service Auth (M2M) |
 
-**CF-Access-Service-Tokens (in app.js als `CF_ACCESS`):**
+**CF-Access-Service-Tokens — NICHT mehr im Code/Repo (Leak 10/2026, rotiert):**
 ```
-CF-Access-Client-Id: 2cf0ebe34375ac9e58cd1aef99cb31d6.access
-CF-Access-Client-Secret: cfast_u1pe4fQKo8pOoQKgv0lhmy1gQvruihuAfUr8Vat65f85f9c0
+Server-Seite:  ~/.astro_secrets/cf_access.json   (gitignored, chmod 600)
+App-Seite:     GET /updates/app-bootstrap.json   (CF-Bypass-Pfad, kein Token nötig)
+Rotation:      Datei am Server austauschen → App zieht beim nächsten Start
 ```
 **Nicht in OTA-Downloads senden** (Bypass aktiv, Token-Header stören)!
 
@@ -272,11 +276,11 @@ Schritte: Syntax-Check → ruff (F8xx/E722/BLE001) → pytest → cp workspace�
 
 | # | Task | Priorität |
 |---|---|---|
-| 1 | `GET /updates/version` auf v1.1.8 aktualisieren (steht noch auf v1.1.4) | Hoch |
-| 2 | APK-Dateiname in Backend auf `astro-cortex-v1.1.8.apk` setzen | Hoch |
-| 3 | Primen-Window-Push im Crawler (`check_prime_window_push()`) an Dual-Profile anpassen (Telegram-Alerts) | Mittel |
+| ~~1~~ | ~~`GET /updates/version` aktualisieren~~ — **erledigt v1.1.9** (dynamisch + APK-Download-Name) | ✅ |
+| ~~2~~ | ~~APK-Dateiname in Backend setzen~~ — **erledigt v1.1.9** (Default 1.1.9) | ✅ |
+| 3 | Prime-Window-Push im Crawler (`check_prime_window_push()`) an Dual-Profile anpassen (Telegram-Alerts) | Mittel |
 | 4 | Signierter Release-Build statt Debug-APK | Mittel |
-| 5 | Cloudflare Cache-Status der alten APK-URL prüfen (sollte nach TTL abgelaufen sein) | Niedrig |
+| 5 | OTA-Feldtest auf dem Gerät: Kaltstart nach v1.1.9-APK → Comms muss "OTA AKTIV" + echten Neustart zeigen (nicht nur Log) | Hoch |
 | 6 | VRN-GTFS-Feed-Refresh (manuell) | Niedrig |
 | 7 | Telegram-Token-Rotation (BotFather) | Niedrig |
 | 8 | Responsive-UI-Epic umsetzen (`docs/EPIC_RESPONSIVE_UI.md`) | Mittel |

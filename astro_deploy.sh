@@ -90,7 +90,7 @@ OTA_VER="$(git rev-parse --short HEAD)-$(date +%m%d%H%M)"
 import hashlib, json, sys, os
 ver = sys.argv[1]
 zp = "/home/enigma/updates/bundle.zip"
-sha = hashlib.sha256(open(zp, "rb").read()).hexdigest()[:16] \
+sha = hashlib.sha256(open(zp, "rb").read()).hexdigest() \
     if os.path.exists(zp) else None
 manifest = {"version": ver, "url": "/updates/bundle.zip"}
 if sha:

@@ -27,15 +27,38 @@ function initNukeCache() {
 /* Cloudflare-Tunnel-Endpoint (Access-geschuetzt). Nativ ist er der
    Default; alte Tailscale-Konfigurationen wandern einmalig um. */
 const CF_API = "https://api.teamigel.com";
-/* Cloudflare-Access M2M-Service-Token (maschinelle Auth, kein OTP/
-   Cookie noetig). Ueberschreibbar via localStorage fuer Rotation ohne
-   APK-Rebuild (astro_cf_id / astro_cf_secret). */
-const CF_ACCESS = {
-  id: localStorage.getItem("astro_cf_id")
-    || "2cf0ebe34375ac9e58cd1aef99cb31d6.access",
-  secret: localStorage.getItem("astro_cf_secret")
-    || "cfast_u1pe4fQKo8pOoQKgv0lhmy1gQvruihuAfUr8Vat65f85f9c0"
+/* CF-Access M2M-Service-Token: NICHT mehr im Code (Leak 10/2026,
+   rotiert). Die App zieht die Tokens bei jedem Kaltstart vom Server
+   (/updates/app-bootstrap.json liegt im CF-Bypass, braucht selbst
+   kein Token) und cached sie im localStorage fuer Offline-Starts.
+   Rotation = Server-Datei austauschen, KEINE neue APK noetig. */
+let CF_ACCESS = {
+  id: localStorage.getItem("astro_cf_id") || "",
+  secret: localStorage.getItem("astro_cf_secret") || "",
 };
+let authPromise = null;
+
+function bootstrapAuth() {
+  if (authPromise) return authPromise;
+  authPromise = (async () => {
+    const b = BASE || CF_API;
+    const r = await fetch(b + "/updates/app-bootstrap.json?t=" + Date.now(),
+      {headers: {"Cache-Control": "no-cache, no-store, must-revalidate",
+                 "Pragma": "no-cache"}});
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const d = await r.json();
+    if (!d.client_id || !d.client_secret)
+      throw new Error("Antwort unvollstaendig");
+    CF_ACCESS = {id: d.client_id, secret: d.client_secret};
+    localStorage.setItem("astro_cf_id", d.client_id);
+    localStorage.setItem("astro_cf_secret", d.client_secret);
+    commsLog("AUTH: M2M-Tokens vom Server bezogen");
+  })().catch(e => {
+    commsLog("AUTH: Bootstrap fehlgeschlagen (" + (e.message || e) + ")"
+      + (CF_ACCESS.id ? " — arbeite mit gecachten Tokens" : ""), "alert");
+  }).finally(() => { authPromise = null; });
+  return authPromise;
+}
 const isNativeApp = () => !!(window.Capacitor
   && window.Capacitor.isNativePlatform
   && window.Capacitor.isNativePlatform())
@@ -72,9 +95,14 @@ function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&l
 
 /* M2M-Auth: Jeder API-Call traegt die CF-Access-Service-Token-Header.
    Nativ laeuft fetch ueber CapacitorHttp (native HTTP-Schicht) - kein
-   CORS, keine Preflights, kein Cookie-Handling. Der alte OTP-WebView-
-   Flow ist entfernt. */
+   CORS, keine Preflights, kein Cookie-Handling. Tokens kommen vom
+   Server-Bootstrap (siehe bootstrapAuth) - nie aus dem Code. */
 async function api(path, opts = {}) {
+  if (!CF_ACCESS.id || !CF_ACCESS.secret) {
+    await bootstrapAuth();
+    if (!CF_ACCESS.id || !CF_ACCESS.secret)
+      throw new Error("keine CF-Access-Tokens (Bootstrap fehlgeschlagen)");
+  }
   opts.headers = Object.assign({
     "CF-Access-Client-Id": CF_ACCESS.id,
     "CF-Access-Client-Secret": CF_ACCESS.secret
@@ -104,9 +132,7 @@ async function checkOtaUpdate(force) {
   commsLog("OTA: Pruefe Manifest...");
   try {
     const m = await (await fetch(BASE + "/updates/latest.json?t=" + Date.now(),
-        {headers: {"CF-Access-Client-Id": CF_ACCESS.id,
-          "CF-Access-Client-Secret": CF_ACCESS.secret,
-          "Cache-Control": "no-cache, no-store, must-revalidate",
+        {headers: {"Cache-Control": "no-cache, no-store, must-revalidate",
           "Pragma": "no-cache"}})).json();
     const cur = localStorage.getItem("astro_bundle_version");
     if (!m || !m.version || typeof m.version !== "string") {
@@ -127,16 +153,11 @@ async function checkOtaUpdate(force) {
     // Version fuer den Plugin sanitizen: nur [a-zA-Z0-9._] erlaubt,
     // da der Updater Version-Strings mit Sonderzeichen ablehnt
     const safeVersion = m.version.replace(/[^a-zA-Z0-9._]/g, "_");
-    // PRE-FLIGHT: HTTP-Status der ZIP-URL pruefen BEVOR der Plugin
-    // download startet. Nutzt fetch() (nicht HEAD — FastAPI 404t HEAD).
-    // Wir laden nur die ersten Bytes um den Status zu sehen.
-    // PRE-FLIGHT ohne Range-Header (Range verursachte 206 Partial!)
-    let zipBlob = null;
+    // PRE-FLIGHT: HEAD-Request prueft Status + Header der ZIP-URL ohne
+    // Body-Download. /updates/ liegt im CF-Bypass -> keine Token-Header.
     try {
-      const pfUrl = BASE + m.url + "?t=" + Date.now();
-      const pfRes = await fetch(pfUrl, {
-        headers: {"CF-Access-Client-Id": CF_ACCESS.id,
-          "CF-Access-Client-Secret": CF_ACCESS.secret}});
+      const pfRes = await fetch(BASE + m.url + "?t=" + Date.now(),
+        {method: "HEAD"});
       commsLog("OTA-Precheck: HTTP " + pfRes.status
         + " | CT: " + (pfRes.headers.get("content-type") || "?")
         + " | CL: " + (pfRes.headers.get("content-length") || "?"));
@@ -145,103 +166,40 @@ async function checkOtaUpdate(force) {
           + pfRes.status + ") — Download uebersprungen", "alert");
         return;
       }
-      // Bundle SOFORT als Blob laden (durch CapacitorHttp = native)
-      zipBlob = await pfRes.blob();
-      commsLog("OTA-Precheck: Bundle geladen ("
-        + (zipBlob.size / 1024).toFixed(0) + " KB)");
     } catch (pfErr) {
       commsLog("OTA-Precheck: Netzwerkfehler ("
         + (pfErr.message || pfErr) + ")", "alert");
       return;
     }
 
-    if (!zipBlob || zipBlob.size < 1000) {
-      commsLog("OTA: Bundle zu klein oder leer ("
-        + (zipBlob ? zipBlob.size : 0) + " Bytes)", "alert");
-      return;
-    }
-
-    // ===== CAPGO-BYPASS: fetch() lud das Bundle bereits als Blob.
-    // Wir speichern es via @capacitor/filesystem und setzen es manuell.
+    // ===== DOWNLOAD + WIRKLICHE INSTALLATION =====
+    // CU.download() laedt das ZIP auf nativer Seite (OkHttp), prueft
+    // optional den SHA-256 und ENT PACKT es ins Bundle-Verzeichnis.
+    // CU.set() stellt den WebView-Pointer physisch auf das neue Bundle
+    // und startet die App neu in diese Version. Der Server antwortet
+    // seit v1.1.9 auf Range-Requests mit 200 komplett - der fruehere
+    // 206-Crash des Plugins ist damit behoben. Die Version wird NUR
+    // bei erfolgreicher Installation gesetzt (kein Mock-Green mehr).
+    const dlOpts = {url: BASE + m.url, version: safeVersion};
+    if (m.sha256 && /^[0-9a-f]{64}$/.test(m.sha256))
+      dlOpts.checksum = m.sha256;
     try {
-      const FS = window.Capacitor?.Plugins?.Filesystem;
-      if (!FS) {
-        commsLog("OTA: Filesystem-Plugin fehlt — versuche CU.download",
-          "alert");
-        const done = await CU.download({
-          url: BASE + m.url, version: safeVersion});
-        localStorage.setItem("astro_bundle_version", m.version);
-        await CU.set(done);
-        commsLog("OTA AKTIV (Capgo): " + m.version);
-        return;
-      }
-
-      // Blob zu Base64: FileReader mit Praefix-Strip (data:...;base64,)
-      commsLog("OTA: Konvertiere " + zipBlob.size + " Bytes zu Base64...");
-      const base64 = await new Promise((res, rej) => {
-        const r = new FileReader();
-        r.onloadend = () => {
-          const raw = r.result || "";
-          const idx = raw.indexOf(",");
-          if (idx < 1 || idx > 100) {
-            rej(new Error("Base64-Praefix unerwartet: "
-              + raw.substring(0, 40) + "..."));
-            return;
-          }
-          const clean = raw.substring(idx + 1);
-          if (!clean || clean.length < 100) {
-            rej(new Error("Base64 zu kurz: " + clean.length));
-            return;
-          }
-          commsLog("OTA: Base64 OK (" + (clean.length / 1024).toFixed(0)
-            + " KB, Praefix bis Index " + idx + " entfernt)");
-          res(clean);
-        };
-        r.onerror = () => rej(new Error("FileReader Fehler"));
-        r.readAsDataURL(zipBlob);
-      });
-
-      // FLAT path (keine Subdirectories!), Directory.Data, kein recursive
-      // — die Kombination die @capacitor/filesystem am robustesten ist
-      const fileName = "ota_" + safeVersion + ".b64";
-      commsLog("OTA: Speichere als " + fileName + " in DATA...");
-      await FS.writeFile({
-        path: fileName,
-        data: base64,
-        directory: "DATA"});
-      commsLog("OTA: Bundle in " + fileName + " gespeichert");
-
-      //Auch das JS/CSS einzeln speichern fuer direkte Anwendung
-      try {
-        // ZIP entpacken via JSZip-equivalent (Blob-URL als Script laden)
-        // Vereinfachung: Nur die Versionsnummer setzen und neu laden
-        // Der naechste Kaltstart laedt vom Server (nicht von der APK)
-        commsLog("OTA: Version gesetzt — naechster Start laedt vom Server");
-      } catch (applyErr) {
-        commsLog("OTA: Anwendung uebersprungen ("
-          + (applyErr.message || applyErr) + ")");
-      }
-
-      // Capgo mitteilen dass diese Version existiert
+      const done = await CU.download(dlOpts);
+      commsLog("OTA: Bundle entpackt als '" + done.version
+        + "' (" + (done.status || "ok") + ") — aktiviere...");
       localStorage.setItem("astro_bundle_version", m.version);
-      commsLog("OTA AKTIV (Bypass): " + (cur || "APK") + " \u2192 "
-        + m.version);
-      commsLog("OTA: App neu starten um Updates zu aktivieren");
-      // Nach 2s neu laden
-      setTimeout(() => location.reload(), 2000);
-    } catch (bypassErr) {
-      commsLog("OTA-Bypass Fehler: " + (bypassErr.message || bypassErr),
-        "alert");
-      // Letzter Fallback: Capgo trotzdem versuchen
-      try {
-        const done = await CU.download({
-          url: BASE + m.url, version: safeVersion});
-        localStorage.setItem("astro_bundle_version", m.version);
-        await CU.set(done);
-        commsLog("OTA AKTIV (Capgo-Fallback): " + m.version);
-      } catch (finalErr) {
-        commsLog("OTA: Alle Download-Methoden fehlgeschlagen", "alert");
-      }
+      await CU.set({version: safeVersion});
+      commsLog("OTA AKTIV: " + (cur || "APK") + " \u2192 " + m.version
+        + " — App startet neu", undefined);
+      // Sicherheitsnetz: falls set() den Reload nicht ausloest
+      setTimeout(() => location.reload(), 4000);
+    } catch (dlErr) {
+      // Ehrlicher Fehlerzustand: Version NICHT setzen - der naechste
+      // UPLINK/Start versucht es erneut. Kein vorgetaeuschter Erfolg.
+      commsLog("OTA-INSTALL FEHLGESCHLAGEN: " + (dlErr.message || dlErr)
+        + " — Version unveraendert ("
+        + (localStorage.getItem("astro_bundle_version") || "APK")
+        + ")", "alert");
     }
   } catch (e) {
     commsLog("OTA-FEHLER: " + (e.message || e)
@@ -300,10 +258,18 @@ function initMap() {
   initNukeCache();
   // Build-Diagnose (eine Zeile Comms): welcher Stand laeuft und wie
   // die App ihren Kontext sieht (Support-Fallstricke einsparen)
+  // Capgo-Handshake: Das AKTIVE Bundle meldet Bereitschaft. Ohne dieses
+  // Signal revertiert der Updater nach appReadyTimeout (10 s) auf das
+  // vorherige Bundle - vermutlich der Grund, warum fruehere Updates
+  // "verschwinden" konnten. Muss in JEDEM Bundle laufen (auch der APK).
+  try {
+    const CUn = window.Capacitor?.Plugins?.CapacitorUpdater;
+    if (CUn) CUn.notifyAppReady().catch(() => {});
+  } catch (e) { /* nicht fatal */ }
   checkOtaUpdate();
   checkPrimeWindowNotifications();
   scheduleDailyReminders();
-  commsLog("BUILD 2026-10-10 (v1.1.8) \u00b7 ORIGIN " + location.origin
+  commsLog("BUILD 2026-10-11 (v1.1.9) \u00b7 ORIGIN " + location.origin
     + " \u00b7 BASE " + (BASE || "(same-origin)")
     + " \u00b7 NATIVE " + isNativeApp());
   if (!isNativeApp()) {
@@ -1394,6 +1360,66 @@ function updateDataAge() {
 }
 
 /* ============================================================
+   LIFECYCLE / BATTERY-SCHUTZ (v1.1.9): Im Hintergrund schlaft die
+   WebView. appStateChange (@capacitor/app) stoppt beim Minimieren
+   ALLE Timer - 60s-Refresh, DataAge-Anzeige, Radar-Animation (700ms
+   Self-Reschedule), Radar-Frame-Refetch (5min), Regen-Wiedergabe -
+   und startet sie beim Zurueckkehren neu, inkl. sofortigem
+   Daten-Fetch. Browser/PWA: visibilitychange als Fallback.
+   GPS läuft ohnehin On-Demand (getCurrentPosition, kein
+   watchPosition im Code) - ein clearWatch ist nicht noetig, ein
+   laufender GPS-Fix bricht mit dem App-Stop von selbst ab.
+   ============================================================ */
+let appSuspended = false;
+let dataAgeTimer = null;
+
+function pauseAllTimers() {
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+  if (dataAgeTimer) { clearInterval(dataAgeTimer); dataAgeTimer = null; }
+  if (rvState.timer) { clearTimeout(rvState.timer); clearInterval(rvState.timer); }
+  if (rvState.refetch) { clearInterval(rvState.refetch); }
+  if (rgTimer) { clearTimeout(rgTimer); }
+  if (rgDebounce) { clearTimeout(rgDebounce); }
+}
+
+function suspendApp() {
+  if (appSuspended) return;
+  appSuspended = true;
+  pauseAllTimers();
+  commsLog("SYSTEM STANDBY: Timer gestoppt (Batterieschutz)");
+}
+
+function resumeApp() {
+  if (!appSuspended) return;
+  appSuspended = false;
+  commsLog("SYSTEM ACTIVE: Reaktiviere Timer + Uplink...");
+  applyDatalinkMode();          // 60s-Ticker falls DATALINK AUTO
+  if (!dataAgeTimer) dataAgeTimer = setInterval(updateDataAge, 60_000);
+  if (rvState.active && rvState.kind) {
+    rvStop(false);              // sauber neu aufsetzen: Animation
+    rvStart(rvState.kind);      // + 5min-Frame-Refetch
+  } else if (rgPlaying) {
+    rgAdvance();                // Regen-Wiedergabe weiterschaukeln
+  }
+  updateDataAge();
+  refresh();                    // initialer Fetch frischer Daten
+}
+
+function initLifecycle() {
+  const AppPlug = window.Capacitor?.Plugins?.App;
+  if (AppPlug?.addListener) {
+    AppPlug.addListener("appStateChange", (s) =>
+      s.isActive ? resumeApp() : suspendApp());
+    commsLog("LIFECYCLE: appStateChange aktiv (@capacitor/app)");
+  } else if (isNativeApp()) {
+    commsLog("LIFECYCLE: @capacitor/app fehlt - nur Fallback aktiv", "alert");
+  }
+  // Fallback/Pfad im Browser (PWA): Tab-Sichtbarkeit
+  document.addEventListener("visibilitychange", () =>
+    document.hidden ? suspendApp() : resumeApp());
+}
+
+/* ============================================================
    GPS-PING (Phase 2): ein Tap = eine Messung. Native nutzt das vom
    Capacitor-Runtime injizierte window.Capacitor.Plugins.Geolocation
    (kein Bundler noetig), Browser bleibt bei navigator.geolocation.
@@ -1531,6 +1557,7 @@ async function showChangelog() {
 /* ---------- Start ---------- */
 window.addEventListener("DOMContentLoaded", () => {
   if (localStorage.getItem("astro_night") === "1") document.body.classList.add("night");
+  bootstrapAuth();   // M2M-Tokens vorm ersten API-Call vom Server holen
   initMap();
   $("btn-refresh").onclick = refresh;
   $("btn-mode").onclick = toggleMode;
@@ -1555,7 +1582,8 @@ window.addEventListener("DOMContentLoaded", () => {
   $("tab-fc").onclick = () => showTab("fc");
   refresh();
   applyDatalinkMode();
-  setInterval(updateDataAge, 60_000);   // nur Anzeige, kein Traffic
+  if (!dataAgeTimer) dataAgeTimer = setInterval(updateDataAge, 60_000);
+  initLifecycle();
   if ("serviceWorker" in navigator) {
     // Native (Capacitor): KEIN Service Worker - Assets kommen gebuendelt
     // aus der APK; ein SW-Cache wuerde bei App-Updates veraltete

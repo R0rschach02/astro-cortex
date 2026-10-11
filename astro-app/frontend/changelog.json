@@ -588,6 +588,12 @@
       "title": "v1.1.8 — Filesystem-Fix: Flat Path + Directory.DATA",
       "detail": "writeFile-Parameter korrigiert: (1) Base64-Praefix-Validierung mit indexOf statt split (prueft dass Praefix existiert und Base64 lang genug ist). (2) FLAT path ohne Subdirectories (ota_VERSION.b64 statt _capupdater/VERSION/bundle.b64) — Subdirectories mit recursive:true waren die Ursache fuer Invalid input parameters. (3) directory: DATA statt DOCUMENTS — robuster auf Android. (4) HTML-Redirect-Datei entfernt (war ein Hack). Detaillierte Comms-Logs bei jedem Konvertierungs-Schritt.",
       "usage": "OTA-Speicherung sollte jetzt durchgehen"
+    },
+    {
+      "date": "2026-10-11",
+      "title": "v1.1.9 — Security + echter OTA-Install + Batterieschutz",
+      "desc": "Drei Architektur-Fixes: (1) SECRET-LEAK BEHOBEN: Das CF-Access-M2M-Secret steht nicht mehr im App-Code (Leak im oeffentlichen Repo, 10/2026, rotiert). Die App zieht ihre Tokens jetzt bei jedem Start vom Server (/updates/app-bootstrap.json, Server-Datei ~/.astro_secrets/cf_access.json ausserhalb des Repos) und cachet sie nur noch lokal — Secret-Rotation kuenftig ohne APK-Rebuild. (2) OTA WIRKLICH INSTALLIERT: Der alte 'Bypass' speicherte das Bundle als tote .b64-Datei und loggte 'OTA AKTIV' ohne jegliche Wirkung (Mock-Green). Jetzt: CU.download() laedt+entpackt das ZIP nativ (OkHttp, Server antwortet auf Range-Requests nicht mehr mit 206), optionale SHA-256-Pruefung, CU.set() stellt den WebView-Pointer physisch um, notifyAppReady() verhindert das Auto-Revert nach 10s, Version-Tracking nur noch bei erfolgreicher Installation. (3) BATTERIESCHUTZ: Beim Minimieren (appStateChange via @capacitor/app) stoppen ALLE Timer — 60s-Refresh, Radar-Animation, 5min-Radar-Refetch, DataAge — beim Zurueckkehren Neustart + sofortiger Daten-Fetch. GPS war schon On-Demand (kein watchPosition). Browser-PWA: visibilitychange-Fallback.",
+      "usage": "UPLINK prueft jetzt OTA; App im Hintergrund verbraucht kaum noch Akku"
     }
   ]
 }

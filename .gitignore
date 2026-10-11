@@ -15,6 +15,7 @@
 !/.gitignore
 !/.gitattributes
 /.env
+/.astro_secrets/
 !/.env.example
 
 # --- Projekt: PWA/Backend ---
