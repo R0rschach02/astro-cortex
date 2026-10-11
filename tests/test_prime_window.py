@@ -1,75 +1,115 @@
-"""PRIME-WINDOW-Fruehwarnung: 2 Tage im Voraus, ueberdurchschnittlich,
-immer (ungated), dedupliziert, mit Location/Datum/Uhrzeit."""
+"""DUAL-PROFILE-Fruehwarnung (v1.1.11): Der Crawler konsumiert
+/api/notifications/upcoming (localhost) - dieselben LUNAR/DEEP-SKY-
+Profile wie die App. Ein Push pro Event (Dedup type|location|night|
+start), parallel Telegram + FCM, Backend-down = still."""
 import sys
-from datetime import date, timedelta
+import urllib.request
 
 sys.path.insert(0, "/home/enigma")
 
 import astro_crawler as ac
 
 
-def _fc(premium):
-    """Zwei Standorte: einer mit Premium-Fenster in 2 Naechten (Wolken
-    8% / Seeing 1.4), der andere Durchschnitt (Wolken 40% / 2.5")."""
-    night = (date.today() + timedelta(days=2)).isoformat()
+class _FakeResp:
+    def __init__(self, payload):
+        import json as _json
+        self._b = _json.dumps(payload).encode()
 
-    def series(cl, se):
-        return [{"ts": f"{night}T22:00", "clouds": cl, "seeing": se,
-                 "wind": 8, "tau": 6},
-                {"ts": f"{night}T23:00", "clouds": cl, "seeing": se,
-                 "wind": 8, "tau": 6}]
+    def read(self):
+        return self._b
 
-    return {
-        "Premiumort": {"golden_windows": [{"night": night, "start": "22:00",
-                                           "hours": 2}],
-                       "series": series(8, 1.4) if premium else series(40, 2.5)},
-        "Normalort": {"golden_windows": [{"night": night, "start": "23:00",
-                                          "hours": 2}],
-                      "series": series(55, 2.8)},
-    }
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        return False
 
 
-def _run(monkeypatch, fc, state=None):
-    sent = []
-    saved = {}
+def _event(etype="DEEP_SKY_WINDOW", **over):
+    ev = {"location": "Katzenbuckel (Odenwald)", "night": "2026-10-13",
+          "start": "21:00", "end": "04:00", "hours_until_start": 30.0,
+          "type": etype, "clouds_avg": 8, "seeing_avg": 1.4,
+          "wind_max": 6, "moon_alt": -22.5, "moon_illum": 3,
+          "bortle": 4, "moon_status": "Set",
+          "conditions": ["Moon: Set", "Wolken \u00d8 8%", "Bortle 4",
+                         "Seeing 1.4\u2033"]}
+    ev.update(over)
+    return ev
+
+
+def _run(monkeypatch, events, state=None):
+    teles, fcms, saved = [], [], {}
     monkeypatch.setattr(ac, "load_state",
-                        lambda: state or {"observation_mode": False})
+                        lambda: state or {})
     monkeypatch.setattr(ac, "save_state", lambda s: saved.update(s))
-    monkeypatch.setattr(ac, "send_telegram", lambda msg: sent.append(msg))
-    monkeypatch.setattr(ac, "FORECAST_PATH", "/tmp/fc_prime_test.json")
-    import json as _json
-    with open("/tmp/fc_prime_test.json", "w") as f:
-        _json.dump(fc, f)
+    monkeypatch.setattr(ac, "send_telegram", lambda msg: teles.append(msg))
+    monkeypatch.setattr(ac, "send_fcm_push",
+                        lambda title, body, data=None: fcms.append(title))
+    monkeypatch.setattr(urllib.request, "urlopen",
+                        lambda url, timeout=10:
+                        _FakeResp({"events": events}))
     ac.check_prime_window_push()
-    return sent, saved
+    return teles, fcms, saved
 
 
-def test_prime_push_feuert_mit_ortsdatum_uhrzeit(monkeypatch):
-    sent, saved = _run(monkeypatch, _fc(premium=True))
-    assert len(sent) == 1, sent
-    msg = sent[0]
-    assert "Premiumort" in msg and "22:00-00:00 Uhr" in msg
-    assert (date.today() + timedelta(days=2)).strftime("%d.%m.%Y") in msg
-    assert "2 TAGE IM VORAUS" in msg
-    assert "prime_pushed" in saved
+def test_deep_sky_push_feuert_formatiert(monkeypatch):
+    teles, fcms, saved = _run(monkeypatch, [_event()])
+    assert len(teles) == 1, teles
+    msg = teles[0]
+    assert "DEEP SKY WINDOW \u2014 Katzenbuckel (Odenwald)" in msg
+    assert "21:00-04:00 Uhr" in msg and "13.10.2026" in msg
+    assert "Start in ~30 h" in msg
+    assert "Bortle 4" in msg
+    # Moon-Doppler-Filter: eigene Moon-Zeile ja, conditions-Moon nein
+    assert msg.count("Moon: Set") == 1, msg
+    assert len(fcms) == 1 and "DEEP SKY WINDOW" in fcms[0]
+    key = "DEEP_SKY_WINDOW|Katzenbuckel (Odenwald)|2026-10-13|21:00"
+    assert key in saved.get("prime_pushed", {})
 
 
-def test_prime_push_dedup(monkeypatch):
-    sent, saved = _run(monkeypatch, _fc(premium=True))
+def test_lunar_push_format(monkeypatch):
+    teles, fcms, _ = _run(monkeypatch, [_event(
+        "LUNAR_WINDOW", moon_alt=35.2, moon_illum=78, hours_until_start=47.5,
+        conditions=["Mond Alt 35\u00b0", "Illum 78%", "Wolken \u00d8 12%",
+                    "Seeing 1.4\u2033"])])
+    assert len(teles) == 1
+    assert "LUNAR WINDOW \u2014 Katzenbuckel (Odenwald)" in teles[0]
+    assert "Mond Alt 35\u00b0" in teles[0] and "Illum 78%" in teles[0]
+    assert "Start in ~48 h" in teles[0]
+    assert "LUNAR WINDOW" in fcms[0]
+
+
+def test_dedup_ein_push_pro_window(monkeypatch):
+    _, _, saved = _run(monkeypatch, [_event()])
     key = list(saved["prime_pushed"])[0]
-    sent2, _ = _run(monkeypatch, _fc(premium=True),
-                    state={"prime_pushed": {key: "2099-01-01T00:00"}})
-    assert sent2 == [], "nur ein Push pro Standort|Nacht"
+    teles2, fcms2, _ = _run(
+        monkeypatch, [_event()],
+        state={"prime_pushed": {key: "2099-01-01T00:00"}})
+    assert teles2 == [] and fcms2 == [], \
+        "zweiter Lauf fuer dasselbe Fenster: kein Push"
 
 
-def test_kein_push_ohne_ueberdurchschnitt(monkeypatch):
-    sent, _ = _run(monkeypatch, _fc(premium=False))
-    assert sent == [], "durchschnittliches Fenster -> kein Push"
+def test_zwei_events_zwei_pushes(monkeypatch):
+    teles, fcms, _ = _run(monkeypatch, [
+        _event(), _event("LUNAR_WINDOW", moon_alt=35, moon_illum=78,
+                         start="23:00")])
+    assert len(teles) == 2 and len(fcms) == 2
 
 
-def test_immer_ohne_observation_mode(monkeypatch):
-    # Bewusst observation_mode=False (weather_pushes_allowed waere False):
-    # der Prime-Push ist NICHT gegated
-    sent, _ = _run(monkeypatch, _fc(premium=True),
-                   state={"observation_mode": False})
-    assert len(sent) == 1
+def test_keine_events_still(monkeypatch):
+    teles, fcms, _ = _run(monkeypatch, [])
+    assert teles == [] and fcms == []
+
+
+def test_backend_down_kein_crash(monkeypatch):
+    def _boom(url, timeout=10):
+        raise OSError("connection refused")
+    monkeypatch.setattr(ac, "load_state", lambda: {})
+    monkeypatch.setattr(ac, "save_state", lambda s: None)
+    monkeypatch.setattr(urllib.request, "urlopen", _boom)
+    ac.check_prime_window_push()   # darf nicht werfen
+
+
+def test_kurze_restzeit_banner(monkeypatch):
+    teles, _, _ = _run(monkeypatch, [_event(hours_until_start=4.2)])
+    assert "JETZT DRAN" in teles[0]

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "370706022931",
+    "project_id": "astro-cc",
+    "storage_bucket": "astro-cc.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:370706022931:android:4aaba56eddcd2607f0f5e6",
+        "android_client_info": {
+          "package_name": "de.astrocortex.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAes0HdMVYsolTJXvgl2EsEW9UbTHt6bKw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

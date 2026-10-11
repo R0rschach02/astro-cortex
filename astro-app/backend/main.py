@@ -53,7 +53,7 @@ log = logging.getLogger("astro-app")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
 # Optionaler Schutz schreibender Endpunkte: env ASTRO_API_TOKEN setzen
 API_TOKEN = os.environ.get("ASTRO_API_TOKEN", "")
-BACKEND_VERSION = "v1.1.10"
+BACKEND_VERSION = "v1.1.11"
 # Cloudflare-Access M2M-Token: liegt AUSSERHALB des Repos (gitignored)
 # und wird der App erst zur Laufzeit ueber /updates/app-bootstrap.json
 # zugestellt - kein Secret mehr im APK-/Frontend-Code.
@@ -918,6 +918,71 @@ def api_ground_truth_list(limit: int = 100):
         return {"reports": [dict(r) for r in rows]}
     except _sql.OperationalError:
         return {"reports": []}
+    finally:
+        conn.close()
+
+
+# --- FCM Device-Tokens (v1.1.11): Push-Registration der nativen App ---
+class FcmTokenBody(BaseModel):
+    token: str
+    device: Optional[str] = None
+
+
+def _fcm_tokens_table(conn):
+    """fcm_tokens anlegen (idempotent) - dieselbe Tabelle liest der
+    Crawler fuer den FCM-Versand der Dual-Profile-Windows."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS fcm_tokens (
+            token TEXT PRIMARY KEY,
+            device TEXT,
+            created_at TEXT NOT NULL,
+            last_seen TEXT NOT NULL
+        )""")
+
+
+@app.post("/api/telemetry/fcm_token")
+def api_fcm_token(body: FcmTokenBody):
+    """Device-Token der App (FCM 'registration'-Event). Upsert: dasselbe
+    Geraet aktualisiert statt dupliziert - kein Token-Spam. Der Crawler
+    sendet Dual-Profile-Pushes an alle Zeilen. Auth laeuft wie bei jedem
+    api()-Call der App ueber die CF-Access-Service-Token-Header."""
+    import sqlite3 as _sql
+    from datetime import datetime as _dt
+    tok = (body.token or "").strip()
+    if len(tok) < 20 or len(tok) > 4096:
+        raise HTTPException(400, "Token ungueltig")
+    now = _dt.now().isoformat(timespec="seconds")
+    conn = _sql.connect("/home/enigma/.astro_crawler.db")
+    try:
+        _fcm_tokens_table(conn)
+        conn.execute("""
+            INSERT INTO fcm_tokens (token, device, created_at, last_seen)
+            VALUES (?,?,?,?)
+            ON CONFLICT(token) DO UPDATE SET
+                last_seen = excluded.last_seen,
+                device = excluded.device
+        """, (tok, (body.device or "")[:120], now, now))
+        conn.commit()
+        n = conn.execute("SELECT COUNT(*) FROM fcm_tokens").fetchone()[0]
+    finally:
+        conn.close()
+    log.info("[FCM] Token gespeichert (%s..., Geraete gesamt: %d)",
+             tok[:10], n)
+    return {"ok": True, "devices": n}
+
+
+@app.get("/api/telemetry/fcm_token")
+def api_fcm_token_list():
+    """Diagnose: Anzahl + maskierte Tokens (nie voll ausliefern)."""
+    import sqlite3 as _sql
+    conn = _sql.connect("/home/enigma/.astro_crawler.db")
+    try:
+        _fcm_tokens_table(conn)
+        rows = conn.execute(
+            "SELECT token, device, last_seen FROM fcm_tokens").fetchall()
+        return {"devices": len(rows), "tokens": [
+            {"token": r[0][:8] + "...", "device": (r[1] or "")[:30],
+             "last_seen": r[2]} for r in rows]}
     finally:
         conn.close()
 

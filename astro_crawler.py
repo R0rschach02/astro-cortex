@@ -1875,6 +1875,100 @@ DEVIATION_SEEING_ARCSEC = 1.0
 
 
 
+# --- FCM (Firebase Cloud Messaging, v1.1.11) ------------------------
+# Native OS-Pushes an alle registrierten Geraete (Lockscreen), parallel
+# zum Telegram-Kanal. Credentials liegen AUSSERHALB des Repos in
+# ~/.astro_secrets/firebase_adminsdk.json; Device-Tokens pflegt das
+# Backend (POST /api/telemetry/fcm_token) in der gemeinsamen Haupt-DB.
+FIREBASE_CREDENTIALS = os.path.expanduser(
+    "~/.astro_secrets/firebase_adminsdk.json")
+_FCM_APP = None
+_FCM_BROKEN = False      # einmal als kaputt erkannt -> still skippen
+
+
+def _fcm_init():
+    """Lazy Firebase-Admin-Init. Liefert die App-Instanz oder None
+    (dann wird nur Telegram gesendet). Jeder Fehlschlag ist NICHT
+    fatal - der Radar-Tick stirbt nie am Push-SDK."""
+    global _FCM_APP, _FCM_BROKEN
+    if _FCM_APP is not None:
+        return _FCM_APP
+    if _FCM_BROKEN:
+        return None
+    try:
+        import firebase_admin
+        from firebase_admin import credentials
+        if not os.path.exists(FIREBASE_CREDENTIALS):
+            log.warning("[FCM] Credentials fehlen (%s) - nur Telegram",
+                        FIREBASE_CREDENTIALS)
+            _FCM_BROKEN = True
+            return None
+        _FCM_APP = firebase_admin.initialize_app(
+            credentials.Certificate(FIREBASE_CREDENTIALS),
+            name="astro-push")
+        log.info("[FCM] Admin-SDK initialisiert")
+    except Exception as e:                     # BLE001: bewusst, s.o.
+        log.warning("[FCM] Init fehlgeschlagen (%s) - nur Telegram", e)
+        _FCM_BROKEN = True
+        return None
+    return _FCM_APP
+
+
+def send_fcm_push(title, body, data=None):
+    """Ein FCM-Push an ALLE registrierten Geraete (fcm_tokens-Tabelle).
+    Ungueltige Tokens (deinstallierte Geraete) meldet FCM zurueck und
+    werden aus der DB entfernt. Liefert die Anzahl erreichter Geraete."""
+    app_ = _fcm_init()
+    if app_ is None:
+        return 0
+    import sqlite3 as _sq
+    from firebase_admin import messaging
+    conn = None
+    try:
+        conn = _sq.connect(DB_PATH)
+        tokens = [r[0] for r in conn.execute(
+            "SELECT token FROM fcm_tokens").fetchall()]
+    except Exception as e:                     # Tabelle evtl. noch leer
+        log.info("[FCM] noch keine Token-Tabelle (%s)", e)
+        return 0
+    finally:
+        if conn is not None:
+            conn.close()
+    if not tokens:
+        log.info("[FCM] keine registrierten Geraete - nur Telegram")
+        return 0
+    batch = tokens[:500]                        # FCM-Multicast-Limit
+    msg = messaging.MulticastMessage(
+        tokens=batch,
+        notification=messaging.Notification(title=title, body=body),
+        data={k: str(v) for k, v in (data or {}).items()},
+        android=messaging.AndroidConfig(priority="high"))
+    try:
+        resp = messaging.send_each_for_multicast(msg, app=app_)
+    except Exception as e:                     # BLE001: bewusst, s.o.
+        log.warning("[FCM] Versand fehlgeschlagen: %s", e)
+        return 0
+    ok = sum(1 for r in resp.responses if r.success)
+    # Tote Tokens entfernen - aber NUR wenn die Fehlermeldung das TOKEN
+    # meint (nicht-registriert / ungueltig). Payload-Fehler (INVALID_
+    # ARGUMENT wegen Titel etc.) duerfen nie ein valides Token loeschen.
+    dead = [t for t, r in zip(batch, resp.responses)
+            if not r.success and r.exception is not None
+            and "registration token" in str(r.exception).lower()]
+    if dead:
+        try:
+            conn = _sq.connect(DB_PATH)
+            conn.executemany("DELETE FROM fcm_tokens WHERE token = ?",
+                             [(t,) for t in dead])
+            conn.commit()
+            conn.close()
+            log.info("[FCM] %d tote Tokens entfernt", len(dead))
+        except Exception as e:                 # BLE001: bewusst, s.o.
+            log.warning("[FCM] Token-Aufraeumen fehlgeschlagen: %s", e)
+    log.info("[FCM] %d/%d Geraete erreicht", ok, len(batch))
+    return ok
+
+
 def check_prime_window_push(hours_ahead: int = 48):
     """DUAL-PROFILE-FRUEHWARNUNG (v1.1.11, ersetzt die alte
     Ueberdurchschnitts-Heuristik): Der Radar-Tick fragt den Backend-
@@ -1949,6 +2043,16 @@ def check_prime_window_push(hours_ahead: int = 48):
                     f"sichern.")
         send_telegram(f"ASTRO-CRAWLER DUAL-PROFILE\n"
                       f"{datetime.now():%d.%m. %H:%M}\n\n{body}")
+        # Parallel: nativer OS-Push auf alle Lockscreens (FCM), Titel/
+        # Body bewusst kompakt - Telegram hat die Langform
+        send_fcm_push(
+            (f"\U0001F319 LUNAR WINDOW \u2014 {ev.get('location')}"
+             if etype == "LUNAR_WINDOW" else
+             f"\U0001F30C DEEP SKY WINDOW \u2014 {ev.get('location')}"),
+            f"Nacht {date_de}, {ev.get('start')}-{ev.get('end')}"
+            f" Uhr \u00b7 {lead} \u00b7 {conds}",
+            {"type": etype, "location": str(ev.get("location")),
+             "night": str(ev.get("night")), "start": str(ev.get("start"))})
         state["prime_pushed"][key] = datetime.now()\
             .isoformat(timespec="minutes")
         log.info("[DualProfile] Push %s (%s, Start in %s h)", key,

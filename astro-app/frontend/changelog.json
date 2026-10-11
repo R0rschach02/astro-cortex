@@ -600,6 +600,12 @@
       "title": "v1.1.10 — OTA-Set-Fix + CORS-Bootstrap-Fix",
       "desc": "Zwei Feld-Fehler der v1.1.9 behoben: (1) MOBILE OTA-INSTALL: Capgo v8+ verlangt bei set() zwingend die Bundle-ID aus dem download()-Resultat — Aufruf korrigiert auf CU.set({id: done.id}) (vorher {version: ...} => 'Set called without id'). (2) DESKTOP CORS: Der Auth-Bootstrap-Fetch sendete Custom-Header (Cache-Control/Pragma), was im Browser einen CORS-Preflight ausloest, den Cloudflare mit HTTP 400 beantwortet. Der Fetch ist jetzt ein Simple Request ohne Custom-Header (Cache-Buster bleibt als Query-Parameter) und nutzt die relative URL, wo die Web-Version ohnehin same-origin laeuft (Tailscale Serve) — Cross-Origin bleibt nur der native Pfad ueber CapacitorHttp (kein CORS). versionCode 10102110.",
       "usage": "OTA-Install schlaegt nicht mehr beim set() fehl; Desktop-Bootstrap ohne CORS-Block"
+    },
+    {
+      "date": "2026-10-11",
+      "title": "v1.1.11 — FCM Push: Native Lockscreen-Alarme",
+      "desc": "Firebase Cloud Messaging als dritter Benachrichtigungs-Kanal (parallel Telegram + App-lokale Notifs): Die App fragt nach dem Auth-Bootstrap um Push-Berechtigung, registriert sich bei FCM und lädt das Device-Token an POST /api/telemetry/fcm_token (mit CF-Access-Headern; Upsert in neuer fcm_tokens-Tabelle, kein Token-Spam). Der Crawler feuert bei jedem Dual-Profile-Window (LUNAR/DEEP SKY) parallel zum Telegram einen nativen OS-Push an ALLE registrierten Geräte — firebase-admin SDK mit Service-Account aus ~/.astro_secrets (außerhalb des Repos), tote Tokens werden automatisch aus der DB entfernt. Energie-Kosten null: Der Push kommt über den OS-Kanal, die App schläft weiter (appStateChange-Standby bleibt unverändert wirksam). versionCode 10102111.",
+      "usage": "Einmalig nach Update: Beim ersten Start Push erlauben — ab dann kommen Windows auf den Lockscreen"
     }
   ]
 }

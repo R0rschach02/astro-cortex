@@ -276,7 +276,7 @@ function initMap() {
   checkOtaUpdate();
   checkPrimeWindowNotifications();
   scheduleDailyReminders();
-  commsLog("BUILD 2026-10-11 (v1.1.10) \u00b7 ORIGIN " + location.origin
+  commsLog("BUILD 2026-10-11 (v1.1.11) \u00b7 ORIGIN " + location.origin
     + " \u00b7 BASE " + (BASE || "(same-origin)")
     + " \u00b7 NATIVE " + isNativeApp());
   if (!isNativeApp()) {
@@ -1427,6 +1427,54 @@ function initLifecycle() {
 }
 
 /* ============================================================
+   FCM PUSH (v1.1.11): Native OS-Alarme via Firebase Cloud
+   Messaging auf den Lockscreen - Marcel & Gruppe bekommen die
+   Dual-Profile-Windows ohne App-Start, null Batterie-Kosten
+   (OS-Push-Kanal). Ablauf: Permission fragen -> register() ->
+   'registration'-Event liefert das Device-Token -> Upload ans
+   Backend. Der Upload laeuft durch api() und traegt damit
+   automatisch die CF-Access-Header (WAF laesst POST sonst 403en).
+   Der Crawler feuert parallel zu Telegram.
+   ============================================================ */
+async function initPushNotifications() {
+  if (!isNativeApp() || !window.Capacitor?.Plugins?.PushNotifications)
+    return;
+  const PN = window.Capacitor.Plugins.PushNotifications;
+  try {
+    const perm = await PN.requestPermissions();
+    if (!perm || perm.receive !== "granted") {
+      commsLog("FCM: Push-Berechtigung nicht erteilt", "alert");
+      return;
+    }
+    await PN.addListener("registration", async (t) => {
+      try {
+        await api("/api/telemetry/fcm_token", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({
+            token: t.value,
+            device: (navigator.userAgent || "").slice(0, 100)})});
+        commsLog("FCM: Device-Token registriert ("
+          + String(t.value).slice(0, 12) + "\u2026)");
+      } catch (e) {
+        commsLog("FCM: Token-Upload fehlgeschlagen ("
+          + (e.message || e) + ")", "alert");
+      }
+    });
+    PN.addListener("registrationError", (e) =>
+      commsLog("FCM: Registrierung fehlgeschlagen ("
+        + (e.error || e.message || e) + ")", "alert"));
+    PN.addListener("pushNotificationReceived", (n) =>
+      commsLog("FCM PUSH EMPFANGEN: " + (n.title || "?")));
+    await PN.register();
+    commsLog("FCM: Registrierung laeuft (await token)");
+  } catch (e) {
+    commsLog("FCM: Init fehlgeschlagen (" + (e.message || e) + ")",
+      "alert");
+  }
+}
+
+/* ============================================================
    GPS-PING (Phase 2): ein Tap = eine Messung. Native nutzt das vom
    Capacitor-Runtime injizierte window.Capacitor.Plugins.Geolocation
    (kein Bundler noetig), Browser bleibt bei navigator.geolocation.
@@ -1564,7 +1612,8 @@ async function showChangelog() {
 /* ---------- Start ---------- */
 window.addEventListener("DOMContentLoaded", () => {
   if (localStorage.getItem("astro_night") === "1") document.body.classList.add("night");
-  bootstrapAuth();   // M2M-Tokens vorm ersten API-Call vom Server holen
+  bootstrapAuth()   // M2M-Tokens vorm ersten API-Call vom Server holen
+    .then(() => initPushNotifications());   // FCM nach CF-Bootstrap
   initMap();
   $("btn-refresh").onclick = refresh;
   $("btn-mode").onclick = toggleMode;
