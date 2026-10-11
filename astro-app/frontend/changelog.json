@@ -594,6 +594,12 @@
       "title": "v1.1.9 — Security + echter OTA-Install + Batterieschutz",
       "desc": "Drei Architektur-Fixes: (1) SECRET-LEAK BEHOBEN: Das CF-Access-M2M-Secret steht nicht mehr im App-Code (Leak im oeffentlichen Repo, 10/2026, rotiert). Die App zieht ihre Tokens jetzt bei jedem Start vom Server (/updates/app-bootstrap.json, Server-Datei ~/.astro_secrets/cf_access.json ausserhalb des Repos) und cachet sie nur noch lokal — Secret-Rotation kuenftig ohne APK-Rebuild. (2) OTA WIRKLICH INSTALLIERT: Der alte 'Bypass' speicherte das Bundle als tote .b64-Datei und loggte 'OTA AKTIV' ohne jegliche Wirkung (Mock-Green). Jetzt: CU.download() laedt+entpackt das ZIP nativ (OkHttp, Server antwortet auf Range-Requests nicht mehr mit 206), optionale SHA-256-Pruefung, CU.set() stellt den WebView-Pointer physisch um, notifyAppReady() verhindert das Auto-Revert nach 10s, Version-Tracking nur noch bei erfolgreicher Installation. (3) BATTERIESCHUTZ: Beim Minimieren (appStateChange via @capacitor/app) stoppen ALLE Timer — 60s-Refresh, Radar-Animation, 5min-Radar-Refetch, DataAge — beim Zurueckkehren Neustart + sofortiger Daten-Fetch. GPS war schon On-Demand (kein watchPosition). Browser-PWA: visibilitychange-Fallback.",
       "usage": "UPLINK prueft jetzt OTA; App im Hintergrund verbraucht kaum noch Akku"
+    },
+    {
+      "date": "2026-10-11",
+      "title": "v1.1.10 — OTA-Set-Fix + CORS-Bootstrap-Fix",
+      "desc": "Zwei Feld-Fehler der v1.1.9 behoben: (1) MOBILE OTA-INSTALL: Capgo v8+ verlangt bei set() zwingend die Bundle-ID aus dem download()-Resultat — Aufruf korrigiert auf CU.set({id: done.id}) (vorher {version: ...} => 'Set called without id'). (2) DESKTOP CORS: Der Auth-Bootstrap-Fetch sendete Custom-Header (Cache-Control/Pragma), was im Browser einen CORS-Preflight ausloest, den Cloudflare mit HTTP 400 beantwortet. Der Fetch ist jetzt ein Simple Request ohne Custom-Header (Cache-Buster bleibt als Query-Parameter) und nutzt die relative URL, wo die Web-Version ohnehin same-origin laeuft (Tailscale Serve) — Cross-Origin bleibt nur der native Pfad ueber CapacitorHttp (kein CORS). versionCode 10102110.",
+      "usage": "OTA-Install schlaegt nicht mehr beim set() fehl; Desktop-Bootstrap ohne CORS-Block"
     }
   ]
 }

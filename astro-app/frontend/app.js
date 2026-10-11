@@ -41,10 +41,15 @@ let authPromise = null;
 function bootstrapAuth() {
   if (authPromise) return authPromise;
   authPromise = (async () => {
-    const b = BASE || CF_API;
-    const r = await fetch(b + "/updates/app-bootstrap.json?t=" + Date.now(),
-      {headers: {"Cache-Control": "no-cache, no-store, must-revalidate",
-                 "Pragma": "no-cache"}});
+    // SIMPLE REQUEST — bewusst KEINE Custom-Header (Cache-Control etc.):
+    // Custom-Header loesen einen CORS-Preflight (OPTIONS) aus, den
+    // Cloudflare auf api.teamigel.com mit 400 beantwortet — der Bootstrap
+    // wuerde im Browser sterben (NetworkError). Relative URL, wo die
+    // Web-Version same-origin laeuft (Tailscale Serve): dann gibt es
+    // ueberhaupt kein CORS. Nativ ist BASE = CF-API (CapacitorHttp,
+    // kein CORS). Frische erzwingt der ?t=-Cache-Buster.
+    const r = await fetch((BASE || "") + "/updates/app-bootstrap.json?t="
+      + Date.now());
     if (!r.ok) throw new Error("HTTP " + r.status);
     const d = await r.json();
     if (!d.client_id || !d.client_secret)
@@ -185,12 +190,14 @@ async function checkOtaUpdate(force) {
       dlOpts.checksum = m.sha256;
     try {
       const done = await CU.download(dlOpts);
-      commsLog("OTA: Bundle entpackt als '" + done.version
-        + "' (" + (done.status || "ok") + ") — aktiviere...");
+      commsLog("OTA: Bundle entpackt als '" + done.version + "' (id "
+        + done.id + ", " + (done.status || "ok") + ") — aktiviere...");
       localStorage.setItem("astro_bundle_version", m.version);
-      await CU.set({version: safeVersion});
+      // Capgo v8+: set() erwartet zwingend {id} aus dem download()-Result
+      // (BundleInfo.id) — {version} allein => "Set called without id"
+      await CU.set({id: done.id || safeVersion});
       commsLog("OTA AKTIV: " + (cur || "APK") + " \u2192 " + m.version
-        + " — App startet neu", undefined);
+        + " — App startet neu");
       // Sicherheitsnetz: falls set() den Reload nicht ausloest
       setTimeout(() => location.reload(), 4000);
     } catch (dlErr) {
@@ -269,7 +276,7 @@ function initMap() {
   checkOtaUpdate();
   checkPrimeWindowNotifications();
   scheduleDailyReminders();
-  commsLog("BUILD 2026-10-11 (v1.1.9) \u00b7 ORIGIN " + location.origin
+  commsLog("BUILD 2026-10-11 (v1.1.10) \u00b7 ORIGIN " + location.origin
     + " \u00b7 BASE " + (BASE || "(same-origin)")
     + " \u00b7 NATIVE " + isNativeApp());
   if (!isNativeApp()) {

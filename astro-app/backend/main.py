@@ -53,7 +53,7 @@ log = logging.getLogger("astro-app")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
 # Optionaler Schutz schreibender Endpunkte: env ASTRO_API_TOKEN setzen
 API_TOKEN = os.environ.get("ASTRO_API_TOKEN", "")
-BACKEND_VERSION = "v1.1.9"
+BACKEND_VERSION = "v1.1.10"
 # Cloudflare-Access M2M-Token: liegt AUSSERHALB des Repos (gitignored)
 # und wird der App erst zur Laufzeit ueber /updates/app-bootstrap.json
 # zugestellt - kein Secret mehr im APK-/Frontend-Code.
@@ -780,6 +780,10 @@ def api_app_bootstrap():
     CORS + no-store von der Middleware): Die App kann hierhin ohne
     Token und zieht sich bei jedem Kaltstart die aktuellen Credentials.
     Quelle: ~/.astro_secrets/cf_access.json (ausserhalb des Git-Repos).
+    CORS: Die /updates-Middlewares senden ACAO:* + GET/OPTIONS. WICHTIG:
+    Cloudflare beantwortet OPTIONS-Preflights auf dieser Domain mit 400 —
+    der Client MUSS einen Simple Request senden (keine Custom-Header, nur
+    Query-Cache-Buster), sonst stirbt der Browser-Bootstrap am Preflight.
     BEWUSSTE Rest-Risiko-Abwaegung: Der Endpoint ist - wie bundle.zip -
     oeffentlich erreichbar; wer die URL kennt, bekommt die Tokens. Das
     schuetzt vor Mitlaeufern, nicht vor zielgerichteten Angreifern -
