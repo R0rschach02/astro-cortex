@@ -1104,10 +1104,17 @@ def api_version_check():
         if os.path.isdir(apk_dir) else []
     latest_apk = sorted(apk_files)[-1] if apk_files else "unbekannt"
     # Neueste versionierte APK im Home-Verzeichnis (physischer Download)
-    home_apks = sorted(
-        f for f in os.listdir(os.path.expanduser("~"))
-        if f.startswith("astro-cortex-v") and f.endswith(".apk"))
-    latest_home_apk = home_apks[-1] if home_apks else "unbekannt"
+    # — NUMERISCH sortieren: String-Sortierung waehlt "1.1.9" ueber
+    # "1.1.10" ("0" < "9" in der Lexikographie)
+    import re
+    def _apk_ver(name):
+        mm = re.search(r"v(\d+)\.(\d+)\.(\d+)\.apk$", name)
+        return tuple(map(int, mm.groups())) if mm else (0, 0, 0)
+    home_apks = [f for f in os.listdir(os.path.expanduser("~"))
+                 if f.startswith("astro-cortex-v")
+                 and f.endswith(".apk")]
+    latest_home_apk = (max(home_apks, key=_apk_ver)
+                       if home_apks else "unbekannt")
     return {"backend_version": BACKEND_VERSION,
             "apk_build_file": latest_apk,
             "apk_download": latest_home_apk,
