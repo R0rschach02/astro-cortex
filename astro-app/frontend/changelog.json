@@ -606,6 +606,12 @@
       "title": "v1.1.11 — FCM Push: Native Lockscreen-Alarme",
       "desc": "Firebase Cloud Messaging als dritter Benachrichtigungs-Kanal (parallel Telegram + App-lokale Notifs): Die App fragt nach dem Auth-Bootstrap um Push-Berechtigung, registriert sich bei FCM und lädt das Device-Token an POST /api/telemetry/fcm_token (mit CF-Access-Headern; Upsert in neuer fcm_tokens-Tabelle, kein Token-Spam). Der Crawler feuert bei jedem Dual-Profile-Window (LUNAR/DEEP SKY) parallel zum Telegram einen nativen OS-Push an ALLE registrierten Geräte — firebase-admin SDK mit Service-Account aus ~/.astro_secrets (außerhalb des Repos), tote Tokens werden automatisch aus der DB entfernt. Energie-Kosten null: Der Push kommt über den OS-Kanal, die App schläft weiter (appStateChange-Standby bleibt unverändert wirksam). versionCode 10102111.",
       "usage": "Einmalig nach Update: Beim ersten Start Push erlauben — ab dann kommen Windows auf den Lockscreen"
+    },
+    {
+      "date": "2026-10-12",
+      "title": "v1.1.12 — ALERT SEL: 3-Stufen-Push-Filter",
+      "desc": "Taktischer Drehschalter (Boeing-Engine-Start-Selector-Optik) im DATALINK-Dock: LUNAR (links) / BOTH (Mitte) / DEEP (rechts). Die Präferenz wandert bei jedem Umlegen sofort per POST /api/telemetry/fcm_token an den Server (fcm_tokens.notif_pref Spalte, Upsert — ein Body ohne Präferenz lässt die gespeicherte unangetastet). Der Crawler filtert jetzt jeden FCM-Push serverseitig pro Gerät: LUNAR-Geräte sehen keine Deep-Sky-Pushes und umgekehrt, BOTH sieht alles. Die Telegram-Gruppe bleibt bewusst ungefiltert. Ohne FCM-Token (Browser) bleibt die Präferenz lokal und geht mit der nächsten Registrierung raus. Responsive: Desktop fixed im Dock links (2px Luft über dem T-Track), Mobile wandert der Schalter mit dem Dock ins ◄SENS-Overlay — kein Overflow bei 390px (Playwright-bewiesen). versionCode 10102112.",
+      "usage": "ALERT SEL drehen → Push-Filter greift ab dem nächsten Window"
     }
   ]
 }

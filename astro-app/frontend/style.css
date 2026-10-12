@@ -1112,6 +1112,48 @@ body.night .basemap-tile { filter: none; }
 #datalink-dock .guard-caption { line-height: 1.5; }
 #datalink-dock .guard-caption small { font-size: 8px;
   color: var(--dim); letter-spacing: 1px; }
+
+/* ALERT SELECTOR (v1.1.12): 3-Stufen-Rotary im DATALINK-Dock, Bauform
+   angelehnt an Boeing-Engine-Start-Selector. Reine CSS-Drehung: Der
+   Zeiger rotiert um das Knopfzentrum (transform-origin unten), die
+   Stufe haengt als Klasse am Container (.rp-lunar/.rp-both/.rp-deep). */
+#notif-rotary { display: flex; flex-direction: column; align-items: center;
+  gap: 3px; margin-top: 2px; width: 100%; }
+.rot-plate { position: relative; width: 100%; max-width: 112px; height: 70px;
+  display: flex; align-items: flex-end; justify-content: space-between;
+  padding: 0 2px 6px; box-sizing: border-box;
+  border: 1px solid var(--line); border-radius: 4px;
+  background: linear-gradient(180deg, #232a31 0%, #171c21 55%, #12161a 100%);
+  box-shadow: 0 3px 8px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06); }
+.rot-label { font-family: inherit; font-size: 8px; font-weight: 700;
+  letter-spacing: .5px; color: #5d6a78; background: none; border: none;
+  padding: 2px 1px; cursor: pointer; z-index: 2;
+  text-shadow: none; transition: color .2s; }
+.rot-label:hover { color: #93a1b3; }
+.rot-label.active { color: #ffd24a; text-shadow: 0 0 6px rgba(255,210,74,.55); }
+.rot-knob { position: absolute; left: 50%; bottom: 7px;
+  transform: translateX(-50%); width: 42px; height: 42px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #6a747f 0%, #454e56 45%,
+              #2b3238 75%, #191e23 100%);
+  border: 2px solid #0d1013;
+  box-shadow: 0 3px 6px rgba(0,0,0,.65), inset 0 1px 1px rgba(255,255,255,.18); }
+.rot-knob::after { content: ""; position: absolute; inset: 7px;
+  border-radius: 50%; border: 1px solid rgba(255,255,255,.10); }
+.rot-pointer { position: absolute; top: 3px; left: 50%; width: 4px;
+  height: 17px; margin-left: -2px; border-radius: 2px;
+  background: linear-gradient(180deg, #fdfefe 0%, #b9c3cc 60%, #7d8791 100%);
+  box-shadow: 0 0 3px rgba(255,255,255,.4);
+  transform-origin: 50% 18px;   /* = Knopfzentrum */
+  transition: transform .28s cubic-bezier(.3, 1.5, .5, 1); }  /* Feder-Einschnappen */
+.rp-lunar .rot-pointer { transform: rotate(-45deg); }
+.rp-both  .rot-pointer { transform: rotate(0deg); }
+.rp-deep  .rot-pointer { transform: rotate(45deg); }
+/* Skalenstriche links/mitte/rechts ueber dem Knopf */
+.rot-tick { position: absolute; bottom: 10px; width: 8px; height: 2px;
+  background: #4a545f; border-radius: 1px; }
+.rot-tick-l { left: calc(50% - 30px); transform: rotate(45deg); }
+.rot-tick-c { left: calc(50% - 4px); bottom: 52px; width: 8px; height: 2px; }
+.rot-tick-r { right: calc(50% - 30px); transform: rotate(-45deg); }
 @media (max-width: 980px) {
   /* Mobil: DATALINK-Dock sitzt IM <SENS-Overlay unten (JS zieht es
      dort hinein) - Panel-Ende, spiegelbildlich zum OBS-Dock rechts */
@@ -1119,6 +1161,10 @@ body.night .basemap-tile { filter: none; }
   #datalink-dock { position: static; width: 100%; max-width: none;
     margin-top: auto; border-left: 1px solid var(--line); }
   #datalink-dock .bat-switch { width: 42px; height: 62px; }
+  /* ALERT SELECTOR mobil: Platte maximal breit, aber gekappt - der
+     Rotary bleibt im Fluss des Docks, kein Overflow/Umbruch */
+  #notif-rotary .rot-plate { max-width: 180px; }
+  #notif-rotary .rot-label { font-size: 9px; }
 }
 
 /* Comms mobil: Meldungen umbrechen statt abschneiden (Report: Zeilen

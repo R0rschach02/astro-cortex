@@ -276,7 +276,7 @@ function initMap() {
   checkOtaUpdate();
   checkPrimeWindowNotifications();
   scheduleDailyReminders();
-  commsLog("BUILD 2026-10-11 (v1.1.11) \u00b7 ORIGIN " + location.origin
+  commsLog("BUILD 2026-10-12 (v1.1.12) \u00b7 ORIGIN " + location.origin
     + " \u00b7 BASE " + (BASE || "(same-origin)")
     + " \u00b7 NATIVE " + isNativeApp());
   if (!isNativeApp()) {
@@ -1448,11 +1448,13 @@ async function initPushNotifications() {
     }
     await PN.addListener("registration", async (t) => {
       try {
+        localStorage.setItem("astro_fcm_token", t.value);   // fuer Pref-Wechsel
         await api("/api/telemetry/fcm_token", {
           method: "POST",
           headers: {"Content-Type": "application/json"},
           body: JSON.stringify({
             token: t.value,
+            notif_pref: getNotifPref(),
             device: (navigator.userAgent || "").slice(0, 100)})});
         commsLog("FCM: Device-Token registriert ("
           + String(t.value).slice(0, 12) + "\u2026)");
@@ -1472,6 +1474,64 @@ async function initPushNotifications() {
     commsLog("FCM: Init fehlgeschlagen (" + (e.message || e) + ")",
       "alert");
   }
+}
+
+/* ============================================================
+   ALERT SELECTOR (v1.1.12): 3-Stufen-Drehschalter LUNAR/BOTH/DEEP
+   im DATALINK-Dock. Filtert die FCM-Pushes pro Geraet serverseitig
+   (Telegram bleibt ungefiltert fuer die Gruppe). Die Praferenz geht
+   sofort via POST /api/telemetry/fcm_token raus (api() setzt die
+   CF-Access-Header); ohne FCM-Token (Browser/kein Push) wird sie
+   lokal gehalten und mit der naechsten Registrierung mitgesendet.
+   ============================================================ */
+const NOTIF_PREFS = ["LUNAR", "BOTH", "DEEP"];
+
+function getNotifPref() {
+  const p = localStorage.getItem("astro_notif_pref");
+  return NOTIF_PREFS.includes(p) ? p : "BOTH";
+}
+
+function setNotifPref(pref, upload) {
+  if (!NOTIF_PREFS.includes(pref)) return;
+  localStorage.setItem("astro_notif_pref", pref);
+  const el = document.getElementById("notif-rotary");
+  if (el) {
+    el.classList.remove("rp-lunar", "rp-both", "rp-deep");
+    el.classList.add("rp-" + pref.toLowerCase());
+    el.querySelectorAll(".rot-label").forEach(b =>
+      b.classList.toggle("active", b.dataset.pref === pref));
+  }
+  commsLog("ALERT SEL: " + pref
+    + (pref === "BOTH" ? " — alle Push-Profile" :
+       pref === "LUNAR" ? " — nur Mond-Fenster" : " — nur Deep-Sky-Fenster"));
+  if (upload) uploadNotifPref(pref);
+}
+
+async function uploadNotifPref(pref) {
+  const token = localStorage.getItem("astro_fcm_token");
+  if (!token) {
+    commsLog("ALERT SEL: kein FCM-Token — Praferenz lokal, "
+      + "geht mit naechster Registrierung raus");
+    return;
+  }
+  try {
+    await api("/api/telemetry/fcm_token", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({token: token, notif_pref: pref})});
+    commsLog("ALERT SEL: Server uebernommen (" + pref + ")");
+  } catch (e) {
+    commsLog("ALERT SEL: Upload fehlgeschlagen ("
+      + (e.message || e) + ")", "alert");
+  }
+}
+
+function initAlertSelector() {
+  const el = document.getElementById("notif-rotary");
+  if (!el) return;
+  el.querySelectorAll(".rot-label").forEach(b =>
+    b.addEventListener("click", () => setNotifPref(b.dataset.pref, true)));
+  setNotifPref(getNotifPref(), false);   // UI-Stand wiederherstellen
 }
 
 /* ============================================================
@@ -1640,6 +1700,7 @@ window.addEventListener("DOMContentLoaded", () => {
   applyDatalinkMode();
   if (!dataAgeTimer) dataAgeTimer = setInterval(updateDataAge, 60_000);
   initLifecycle();
+  initAlertSelector();
   if ("serviceWorker" in navigator) {
     // Native (Capacitor): KEIN Service Worker - Assets kommen gebuendelt
     // aus der APK; ein SW-Cache wuerde bei App-Updates veraltete

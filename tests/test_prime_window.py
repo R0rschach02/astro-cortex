@@ -44,7 +44,8 @@ def _run(monkeypatch, events, state=None):
     monkeypatch.setattr(ac, "save_state", lambda s: saved.update(s))
     monkeypatch.setattr(ac, "send_telegram", lambda msg: teles.append(msg))
     monkeypatch.setattr(ac, "send_fcm_push",
-                        lambda title, body, data=None: fcms.append(title))
+                        lambda title, body, data=None, notif_type=None:
+                        fcms.append((title, notif_type)))
     monkeypatch.setattr(urllib.request, "urlopen",
                         lambda url, timeout=10:
                         _FakeResp({"events": events}))
@@ -62,7 +63,7 @@ def test_deep_sky_push_feuert_formatiert(monkeypatch):
     assert "Bortle 4" in msg
     # Moon-Doppler-Filter: eigene Moon-Zeile ja, conditions-Moon nein
     assert msg.count("Moon: Set") == 1, msg
-    assert len(fcms) == 1 and "DEEP SKY WINDOW" in fcms[0]
+    assert len(fcms) == 1 and "DEEP SKY WINDOW" in fcms[0][0]
     key = "DEEP_SKY_WINDOW|Katzenbuckel (Odenwald)|2026-10-13|21:00"
     assert key in saved.get("prime_pushed", {})
 
@@ -76,7 +77,7 @@ def test_lunar_push_format(monkeypatch):
     assert "LUNAR WINDOW \u2014 Katzenbuckel (Odenwald)" in teles[0]
     assert "Mond Alt 35\u00b0" in teles[0] and "Illum 78%" in teles[0]
     assert "Start in ~48 h" in teles[0]
-    assert "LUNAR WINDOW" in fcms[0]
+    assert "LUNAR WINDOW" in fcms[0][0]
 
 
 def test_dedup_ein_push_pro_window(monkeypatch):
@@ -113,3 +114,50 @@ def test_backend_down_kein_crash(monkeypatch):
 def test_kurze_restzeit_banner(monkeypatch):
     teles, _, _ = _run(monkeypatch, [_event(hours_until_start=4.2)])
     assert "JETZT DRAN" in teles[0]
+
+
+def test_fcm_notif_type_mapping(monkeypatch):
+    # v1.1.12: FCM bekommt den Alarm-Typ fuer den Pref-Filter:
+    # LUNAR_WINDOW -> "LUNAR", DEEP_SKY_WINDOW -> "DEEP"
+    _, fcms, _ = _run(monkeypatch, [
+        _event(),
+        _event("LUNAR_WINDOW", moon_alt=35, moon_illum=78)])
+    assert [t for _, t in fcms] == ["DEEP", "LUNAR"], fcms
+
+
+def test_send_fcm_push_pref_filter(monkeypatch, tmp_path):
+    # Filter-Logik der Sender-Funktion direkt: 3 Geraete (LUNAR, BOTH,
+    # DEEP) - ein LUNAR-Alarm erreicht nur LUNAR+BOTH. DB per tmp_path.
+    import sqlite3 as _sq
+    db = str(tmp_path / "t.db")
+    conn = _sq.connect(db)
+    conn.execute("""CREATE TABLE fcm_tokens (token TEXT PRIMARY KEY,
+        device TEXT, created_at TEXT, last_seen TEXT,
+        notif_pref TEXT DEFAULT 'BOTH')""")
+    conn.executemany("INSERT INTO fcm_tokens (token, created_at, "
+                     "last_seen, notif_pref) VALUES (?, 'x','x',?)",
+                     [("tok" + "a" * 150, "LUNAR"),
+                      ("tok" + "b" * 150, "BOTH"),
+                      ("tok" + "c" * 150, "DEEP")])
+    conn.commit()
+    conn.close()
+    monkeypatch.setattr(ac, "DB_PATH", db)
+    monkeypatch.setattr(ac, "_fcm_init", lambda: object())
+    import firebase_admin.messaging as _fm
+    seen = {}
+    class _Resp:
+        def __init__(self): self.success = True; self.exception = None
+    def fake_send(msg, app=None):
+        seen["tokens"] = list(msg.tokens)
+        class _R:
+            responses = [_Resp() for _ in msg.tokens]
+        return _R()
+    monkeypatch.setattr(_fm, "send_each_for_multicast", fake_send)
+    n = ac.send_fcm_push("T", "B", notif_type="LUNAR")
+    assert n == 2, seen
+    assert "tok" + "c" * 150 not in seen["tokens"], "DEEP-Geraet gefiltert?"
+    assert len(seen["tokens"]) == 2
+    n2 = ac.send_fcm_push("T", "B", notif_type="DEEP")
+    assert n2 == 2 and len(seen["tokens"]) == 2
+    n3 = ac.send_fcm_push("T", "B")   # ohne Typ: alle Geraete
+    assert n3 == 3, seen

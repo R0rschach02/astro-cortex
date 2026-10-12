@@ -1914,8 +1914,11 @@ def _fcm_init():
     return _FCM_APP
 
 
-def send_fcm_push(title, body, data=None):
-    """Ein FCM-Push an ALLE registrierten Geraete (fcm_tokens-Tabelle).
+def send_fcm_push(title, body, data=None, notif_type=None):
+    """Ein FCM-Push an die GERAETE, die diesen Alarm-Typ abonniert
+    haben (fcm_tokens.notif_pref: LUNAR/BOTH/DEEP, v1.1.12). Ein
+    LUNAR-Geraet sieht keine DEEP-Sky-Pushes und umgekehrt; BOTH sieht
+    alles. Telegram bleibt bewusst ungefiltert (Gruppenkanal).
     Ungueltige Tokens (deinstallierte Geraete) meldet FCM zurueck und
     werden aus der DB entfernt. Liefert die Anzahl erreichter Geraete."""
     app_ = _fcm_init()
@@ -1926,8 +1929,22 @@ def send_fcm_push(title, body, data=None):
     conn = None
     try:
         conn = _sq.connect(DB_PATH)
-        tokens = [r[0] for r in conn.execute(
-            "SELECT token FROM fcm_tokens").fetchall()]
+        if notif_type:
+            try:
+                rows = conn.execute(
+                    "SELECT token, COALESCE(notif_pref, 'BOTH') "
+                    "FROM fcm_tokens").fetchall()
+            except _sq.OperationalError:   # alte DB ohne notif_pref
+                rows = [(r[0], "BOTH") for r in conn.execute(
+                    "SELECT token FROM fcm_tokens").fetchall()]
+            tokens = [r[0] for r in rows
+                      if r[1] == "BOTH" or r[1] == notif_type]
+            if len(tokens) < len(rows):
+                log.info("[FCM] Filter %s: %d/%d Geraete (Rest-Pref "
+                         "faellt aus)", notif_type, len(tokens), len(rows))
+        else:
+            tokens = [r[0] for r in conn.execute(
+                "SELECT token FROM fcm_tokens").fetchall()]
     except Exception as e:                     # Tabelle evtl. noch leer
         log.info("[FCM] noch keine Token-Tabelle (%s)", e)
         return 0
@@ -2044,7 +2061,8 @@ def check_prime_window_push(hours_ahead: int = 48):
         send_telegram(f"ASTRO-CRAWLER DUAL-PROFILE\n"
                       f"{datetime.now():%d.%m. %H:%M}\n\n{body}")
         # Parallel: nativer OS-Push auf alle Lockscreens (FCM), Titel/
-        # Body bewusst kompakt - Telegram hat die Langform
+        # Body bewusst kompakt - Telegram hat die Langform. notif_type
+        # filtert serverseitig nach dem ALERT-SEL-Schalter je Geraet.
         send_fcm_push(
             (f"\U0001F319 LUNAR WINDOW \u2014 {ev.get('location')}"
              if etype == "LUNAR_WINDOW" else
@@ -2052,7 +2070,8 @@ def check_prime_window_push(hours_ahead: int = 48):
             f"Nacht {date_de}, {ev.get('start')}-{ev.get('end')}"
             f" Uhr \u00b7 {lead} \u00b7 {conds}",
             {"type": etype, "location": str(ev.get("location")),
-             "night": str(ev.get("night")), "start": str(ev.get("start"))})
+             "night": str(ev.get("night")), "start": str(ev.get("start"))},
+            notif_type=("LUNAR" if etype == "LUNAR_WINDOW" else "DEEP"))
         state["prime_pushed"][key] = datetime.now()\
             .isoformat(timespec="minutes")
         log.info("[DualProfile] Push %s (%s, Start in %s h)", key,

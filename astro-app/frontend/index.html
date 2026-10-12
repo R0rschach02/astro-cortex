@@ -218,6 +218,21 @@ als Pitch - die Horizontlinie sinkt, je hoeher der Mond steht"></div>
           </span>
         </label>
       <div class="guard-caption mono">DATALINK&nbsp;MODE<br><small>SYNC:&nbsp;ON-DEMAND&nbsp;/&nbsp;CONT</small></div>
+      <!-- ALERT SELECTOR (v1.1.12): 3-Stufen-Drehschalter nach Boeing-
+           Engine-Start-Selector-Art. Steuert den FCM-Push-Filter
+           (LUNAR / BOTH / DEEP) serverseitig pro Geraet. -->
+      <div id="notif-rotary" title="Push-Alarm-Filter: LUNAR = nur Mond-Fenster, BOTH = alles, DEEP = nur Deep-Sky-Fenster">
+        <div class="rot-plate">
+          <span class="rot-tick rot-tick-l"></span>
+          <span class="rot-tick rot-tick-c"></span>
+          <span class="rot-tick rot-tick-r"></span>
+          <button type="button" class="rot-label rot-l" data-pref="LUNAR">LUNAR</button>
+          <button type="button" class="rot-label rot-c" data-pref="BOTH">BOTH</button>
+          <button type="button" class="rot-label rot-r" data-pref="DEEP">DEEP</button>
+          <div class="rot-knob"><div class="rot-pointer"></div></div>
+        </div>
+        <div class="guard-caption mono">ALERT&nbsp;SEL<br><small>PUSH&nbsp;LUNAR/BOTH/DEEP</small></div>
+      </div>
     </div>
     <footer id="bottom-panel">
 

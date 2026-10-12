@@ -53,7 +53,7 @@ log = logging.getLogger("astro-app")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
 # Optionaler Schutz schreibender Endpunkte: env ASTRO_API_TOKEN setzen
 API_TOKEN = os.environ.get("ASTRO_API_TOKEN", "")
-BACKEND_VERSION = "v1.1.11"
+BACKEND_VERSION = "v1.1.12"
 # Cloudflare-Access M2M-Token: liegt AUSSERHALB des Repos (gitignored)
 # und wird der App erst zur Laufzeit ueber /updates/app-bootstrap.json
 # zugestellt - kein Secret mehr im APK-/Frontend-Code.
@@ -926,49 +926,67 @@ def api_ground_truth_list(limit: int = 100):
 class FcmTokenBody(BaseModel):
     token: str
     device: Optional[str] = None
+    notif_pref: Optional[str] = None   # LUNAR | BOTH | DEEP (v1.1.12)
 
 
 def _fcm_tokens_table(conn):
     """fcm_tokens anlegen (idempotent) - dieselbe Tabelle liest der
-    Crawler fuer den FCM-Versand der Dual-Profile-Windows."""
+    Crawler fuer den FCM-Versand der Dual-Profile-Windows. v1.1.12:
+    notif_pref-Spalte nachziehen, falls eine aeltere Tabelle existiert."""
     conn.execute("""
         CREATE TABLE IF NOT EXISTS fcm_tokens (
             token TEXT PRIMARY KEY,
             device TEXT,
             created_at TEXT NOT NULL,
-            last_seen TEXT NOT NULL
+            last_seen TEXT NOT NULL,
+            notif_pref TEXT DEFAULT 'BOTH'
         )""")
+    cols = [r[1] for r in conn.execute(
+        "PRAGMA table_info(fcm_tokens)").fetchall()]
+    if "notif_pref" not in cols:
+        conn.execute("ALTER TABLE fcm_tokens "
+                     "ADD COLUMN notif_pref TEXT DEFAULT 'BOTH'")
 
 
 @app.post("/api/telemetry/fcm_token")
 def api_fcm_token(body: FcmTokenBody):
-    """Device-Token der App (FCM 'registration'-Event). Upsert: dasselbe
-    Geraet aktualisiert statt dupliziert - kein Token-Spam. Der Crawler
-    sendet Dual-Profile-Pushes an alle Zeilen. Auth laeuft wie bei jedem
-    api()-Call der App ueber die CF-Access-Service-Token-Header."""
+    """Device-Token der App (FCM 'registration'-Event) + Push-Präferenz
+    (ALERT-SEL-Drehschalter, v1.1.12). Upsert: dasselbe Geraet
+    aktualisiert statt dupliziert. Ein Body OHNE notif_pref laesst die
+    gespeicherte Praferenz unangetastet (COALESCE). Der Crawler
+    filtert LUNAR/DEEP-Sky-Pushes serverseitig je Token. Auth laeuft
+    wie bei jedem api()-Call der App ueber CF-Access-Header."""
     import sqlite3 as _sql
     from datetime import datetime as _dt
     tok = (body.token or "").strip()
     if len(tok) < 20 or len(tok) > 4096:
         raise HTTPException(400, "Token ungueltig")
+    pref = (body.notif_pref or "").strip().upper()
+    if pref and pref not in ("LUNAR", "BOTH", "DEEP"):
+        raise HTTPException(400, f"notif_pref ungueltig: {pref}")
     now = _dt.now().isoformat(timespec="seconds")
     conn = _sql.connect("/home/enigma/.astro_crawler.db")
     try:
         _fcm_tokens_table(conn)
         conn.execute("""
-            INSERT INTO fcm_tokens (token, device, created_at, last_seen)
-            VALUES (?,?,?,?)
+            INSERT INTO fcm_tokens
+                (token, device, created_at, last_seen, notif_pref)
+            VALUES (?,?,?,?,?)
             ON CONFLICT(token) DO UPDATE SET
                 last_seen = excluded.last_seen,
-                device = excluded.device
-        """, (tok, (body.device or "")[:120], now, now))
+                device = excluded.device,
+                notif_pref = COALESCE(excluded.notif_pref,
+                                      fcm_tokens.notif_pref)
+        """, (tok, (body.device or "")[:120], now, now,
+              pref or None))   # NULL = "unveraendert lassen" (COALESCE);
+                              # NULL liest jede Consumeroese als BOTH
         conn.commit()
         n = conn.execute("SELECT COUNT(*) FROM fcm_tokens").fetchone()[0]
     finally:
         conn.close()
-    log.info("[FCM] Token gespeichert (%s..., Geraete gesamt: %d)",
-             tok[:10], n)
-    return {"ok": True, "devices": n}
+    log.info("[FCM] Token gespeichert (%s..., pref=%s, Geraete: %d)",
+             tok[:10], pref or "(unveraendert)", n)
+    return {"ok": True, "devices": n, "notif_pref": pref or None}
 
 
 @app.get("/api/telemetry/fcm_token")
@@ -979,10 +997,12 @@ def api_fcm_token_list():
     try:
         _fcm_tokens_table(conn)
         rows = conn.execute(
-            "SELECT token, device, last_seen FROM fcm_tokens").fetchall()
+            "SELECT token, device, last_seen, notif_pref "
+            "FROM fcm_tokens").fetchall()
         return {"devices": len(rows), "tokens": [
             {"token": r[0][:8] + "...", "device": (r[1] or "")[:30],
-             "last_seen": r[2]} for r in rows]}
+             "last_seen": r[2],
+             "notif_pref": r[3] or "BOTH"} for r in rows]}
     finally:
         conn.close()
 
