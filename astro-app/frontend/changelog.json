@@ -612,6 +612,12 @@
       "title": "v1.1.12 — ALERT SEL: 3-Stufen-Push-Filter",
       "desc": "Taktischer Drehschalter (Boeing-Engine-Start-Selector-Optik) im DATALINK-Dock: LUNAR (links) / BOTH (Mitte) / DEEP (rechts). Die Präferenz wandert bei jedem Umlegen sofort per POST /api/telemetry/fcm_token an den Server (fcm_tokens.notif_pref Spalte, Upsert — ein Body ohne Präferenz lässt die gespeicherte unangetastet). Der Crawler filtert jetzt jeden FCM-Push serverseitig pro Gerät: LUNAR-Geräte sehen keine Deep-Sky-Pushes und umgekehrt, BOTH sieht alles. Die Telegram-Gruppe bleibt bewusst ungefiltert. Ohne FCM-Token (Browser) bleibt die Präferenz lokal und geht mit der nächsten Registrierung raus. Responsive: Desktop fixed im Dock links (2px Luft über dem T-Track), Mobile wandert der Schalter mit dem Dock ins ◄SENS-Overlay — kein Overflow bei 390px (Playwright-bewiesen). versionCode 10102112.",
       "usage": "ALERT SEL drehen → Push-Filter greift ab dem nächsten Window"
+    },
+    {
+      "date": "2026-10-14",
+      "title": "v1.1.13 — Dock-Layout nebeneinander + Seeing-Höhenphysik",
+      "desc": "Zwei Fixes: (1) DESKTOP-LAYOUT: DATALINK MODE und ALERT SEL stehen in der Desktop-Ansicht jetzt NEBENEINANDER statt untereinander — das Dock links belegt nur noch ~126px Höhe statt ~⅓ der Kante; im mobilen ◄SENS-Overlay bleibt das vertikale Stacking unverändert (Playwright-bewiesen: Desktop row, Mobile column, kein Overflow bei 390px). (2) SEEING-HÖHENSPREIZUNG: Die Wettermodelle interpolieren das Seeing flach über die Region (~1.5-1.7\" überall) — physikalisch falsch bei Inversionswetterlagen. Das Backend spreizt jetzt den rohen API-Wert algorithmisch nach der hinterlegten Standort-Elevation: Potenzgesetz (elev/150m)^-0.35 für den Grenzschichtanteil plus Urban-Penalty ×1.22 ab Bortle 7. Katzenbuckel (626m): ×0.61 → deutlich besser; Mannheim (95m, urban): ×1.43 → deutlich schlechter. Live-Beweis: Spanne 1.1\" bis 3.49\" statt flacher Werte. Wirkt konsistent auf /api/spots UND /api/forecast (vor der Bias-Korrektur), das Rating rechnet automatisch mit. Rohwert bleibt als seeing_api_raw in der API dokumentiert. versionCode 10102113.",
+      "usage": "Seeing-Panel zeigt jetzt echte Standort-Physik: Odenwald klar vor dem Rheingraben"
     }
   ]
 }

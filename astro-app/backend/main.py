@@ -53,7 +53,7 @@ log = logging.getLogger("astro-app")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
 # Optionaler Schutz schreibender Endpunkte: env ASTRO_API_TOKEN setzen
 API_TOKEN = os.environ.get("ASTRO_API_TOKEN", "")
-BACKEND_VERSION = "v1.1.12"
+BACKEND_VERSION = "v1.1.13"
 # Cloudflare-Access M2M-Token: liegt AUSSERHALB des Repos (gitignored)
 # und wird der App erst zur Laufzeit ueber /updates/app-bootstrap.json
 # zugestellt - kein Secret mehr im APK-/Frontend-Code.
@@ -80,6 +80,48 @@ def _age_minutes(ts_iso: str) -> Optional[int]:
         return None
 
 
+# --- v1.1.13: Seeing-Hoehen-/Urban-Spreizung (Luecke 5) ---------------
+# Die Wettermodelle interpolieren das Seeing fuer ~2 m Bodennaehe grob
+# ueber die Region - alle Standorte melden fast identische 1.5-1.7".
+# Physikalisch falsch: Der Grossteil der naechtlichen Turbulenz steckt
+# in der atmosphaerischen Grenzschicht UNTER der Inversion. Hoehen-
+# standorte (Odenwald/Koenigsstuhl) laufen ueber der Schicht, der
+# Rheingraben liegt in ihr - zusaetzlich UHI + Talfeuchte im Stadtrand.
+# Wir spreizen den ROHWERT algorithmisch nach der hinterlegten Elevation
+# (locations.json) als Potenzgesetz; Urban-Penalty ab Bortle 7.
+SEEING_REF_M = 150.0          # Referenzhoehe = Grabensohle (Weinheim)
+SEEING_EXP = -0.35            # ~55-60% Grenzschichtanteil nachts
+SEEING_URBAN_PENALTY = 1.22   # UHI/Feuchteadvektion am Stadtrand
+SEEING_URBAN_BORTLE = 7       # ab dieser Bortle-Klasse "urban"
+SEEING_FLOOR, SEEING_CEIL = 0.4, 5.0
+
+
+def _seeing_elevation_adjusted(loc: dict, seeing_raw):
+    """Spreizt das rohe API-Seeing nach Standort-Elevation.
+
+    f_elev = (elevation_m / 150 m) ^ -0.35, Urban-Faktor 1.22 ab
+    Bortle 7. Beispiele bei 1.6" Rohwert:
+      Katzenbuckel (626 m, B4): x0.61 -> 0.97"   starker Bonus
+      Koenigsstuhl (550 m, B4): x0.63 -> 1.01"   starker Bonus
+      Weinheim     (150 m, B6): x1.00 -> 1.60"   Referenz
+      Hemsbach     (120 m, B6): x1.08 -> 1.73"
+      Mannheim     ( 95 m, B7): x1.43 -> 2.29"   deutlicher Penalty
+    Liefert (angepasster Wert | Gesamt-Faktor) oder (None, None)."""
+    if seeing_raw is None:
+        return None, None
+    try:
+        h = float(loc.get("elevation_m") or 100)
+        raw = float(seeing_raw)
+    except (TypeError, ValueError):
+        return None, None
+    f_elev = (max(h, 1.0) / SEEING_REF_M) ** SEEING_EXP
+    f_urban = (SEEING_URBAN_PENALTY
+               if (loc.get("bortle_class")
+                   or 6) >= SEEING_URBAN_BORTLE else 1.0)
+    adj = max(SEEING_FLOOR, min(SEEING_CEIL, raw * f_elev * f_urban))
+    return round(adj, 2), round(f_elev * f_urban, 3)
+
+
 def _spot_state(loc: dict, profile: str = "dso") -> dict:
     """Kombinierte Sicht pro Standort:
     - Seeing/Wolken/Rating aus dem juengsten HEAVY-Crawl (30-Min-Takt)
@@ -104,13 +146,21 @@ def _spot_state(loc: dict, profile: str = "dso") -> dict:
         conn.close()
     src = heavy or latest
     if src:
+        # v1.1.13: Seeing-Hoehenspreizung - der ausgegebene Wert ist der
+        # standortkorrigierte, seeing_api_raw dokumentiert die API-Basis.
+        seeing_adj, seeing_f = _seeing_elevation_adjusted(
+            loc, src["seeing"])
         out.update({
             "ts": src["ts"], "age_min": _age_minutes(src["ts"]),
             "clouds_total": src["clouds_total"],
             "clouds_lmh": [src["clouds_low"], src["clouds_mid"], src["clouds_high"]],
             "clouds_source": src["clouds_source"],
             "rain_prob": src["rain_prob"],
-            "seeing": src["seeing"], "seeing_index": src["seeing_index"],
+            "seeing": (seeing_adj if seeing_adj is not None
+                       else src["seeing"]),
+            "seeing_api_raw": src["seeing"],
+            "seeing_elev_factor": seeing_f,
+            "seeing_index": src["seeing_index"],
             "jetstream": src["jetstream"],
         })
     if latest:
@@ -1803,6 +1853,22 @@ def _forecast_payload(entry: dict, key: str) -> dict:
     cutoff = now.strftime("%Y-%m-%dT%H:00")
     series = out.get("series") or []
     trimmed = [h for h in series if (h.get("ts") or "") >= cutoff]
+    # v1.1.13: Seeing-Hoehenspreizung je Serie (dieselbe Physik wie
+    # /api/spots) - VOR der Bias-Korrektur, damit die empirische
+    # Korrektur auf dem standortgespreizten Wert aufsetzt.
+    try:
+        _locs = ac.active_locations(ac.DEFAULT_LOCATIONS) \
+            + ac.load_watchlist()
+    except Exception:  # noqa: BLE001 - Seeing bleibt dann ungespreizt
+        _locs = []
+    _loc = next((l for l in _locs if l.get("name") == key), None)
+    if _loc:
+        for h in trimmed:
+            if h.get("seeing") is not None:
+                adj, _ = _seeing_elevation_adjusted(_loc, h["seeing"])
+                if adj is not None:
+                    h["seeing_api_raw"] = h["seeing"]
+                    h["seeing"] = adj
     bias = _load_bias()
     trimmed, bias_applied = _apply_bias_to_series(trimmed, bias, now)
     out["series"] = trimmed

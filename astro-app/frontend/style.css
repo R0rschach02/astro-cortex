@@ -1099,16 +1099,22 @@ body.night .basemap-tile { filter: none; }
 
 /* DATALINK-Dock (links, ueber dem T-Track): gleiche Bauweise wie das
    ASTRO-OBSERVATION-Dock rechts - aber Warnstreifen schwarz-gelb statt
-   der roten OBS-Symbolik. Beschriftung analog rechts. */
+   der roten OBS-Symbolik. Beschriftung analog rechts.
+   v1.1.13: Desktop zeigt die Schalter-Einheiten (DATALINK MODE +
+   ALERT SEL) NEBENEINANDER (row) - das Dock bleibt flach statt ein
+   Drittel der linken Kante zu belegen. Mobil kehrt die Media-Query
+   auf column zurueck (Stacking im Slide-Overlay). */
 #datalink-dock { position: fixed; left: 0; bottom: 54px; z-index: 960;
-  display: flex; flex-direction: column; align-items: center;
-  gap: 4px; padding: 8px 6px 6px;
-  max-width: 130px; text-align: center;
+  display: flex; flex-direction: row; align-items: stretch;
+  gap: 6px; padding: 8px 8px 6px;
+  text-align: center;
   border: 1px solid var(--line); border-left: none;
   background: repeating-linear-gradient(-45deg,
     rgba(255,210,74,.16) 0 10px, rgba(0,0,0,.55) 10px 20px), var(--panel2);
   box-shadow: 0 4px 14px rgba(0,0,0,.55), inset 0 0 10px rgba(0,0,0,.5);
   border-top: 2px solid #4a3f14; }
+.dock-unit { display: flex; flex-direction: column; align-items: center;
+  gap: 4px; min-width: 96px; }
 #datalink-dock .guard-caption { line-height: 1.5; }
 #datalink-dock .guard-caption small { font-size: 8px;
   color: var(--dim); letter-spacing: 1px; }
@@ -1156,10 +1162,13 @@ body.night .basemap-tile { filter: none; }
 .rot-tick-r { right: calc(50% - 30px); transform: rotate(-45deg); }
 @media (max-width: 980px) {
   /* Mobil: DATALINK-Dock sitzt IM <SENS-Overlay unten (JS zieht es
-     dort hinein) - Panel-Ende, spiegelbildlich zum OBS-Dock rechts */
+     dort hinein) - Panel-Ende, spiegelbildlich zum OBS-Dock rechts.
+     Schalter-Einheiten kehren auf VERTIKALES STACKING zurueck. */
   #left-panel { display: flex; flex-direction: column; }
   #datalink-dock { position: static; width: 100%; max-width: none;
+    flex-direction: column; align-items: center; gap: 4px;
     margin-top: auto; border-left: 1px solid var(--line); }
+  .dock-unit { min-width: 0; width: 100%; }
   #datalink-dock .bat-switch { width: 42px; height: 62px; }
   /* ALERT SELECTOR mobil: Platte maximal breit, aber gekappt - der
      Rotary bleibt im Fluss des Docks, kein Overflow/Umbruch */

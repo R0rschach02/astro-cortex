@@ -172,7 +172,11 @@ als Pitch - die Horizontlinie sinkt, je hoeher der Mond steht"></div>
     <!-- DATALINK-Dock: Kommunikation links (OBS/Sensoren rechts).
          Fest verankert ueber der T-Track-Leiste, Warnstreifen schwarz-gelb. -->
     <div id="datalink-dock">
-<label class="guard-switch guard-master" title="Datalink: AUTO = 60s-Polling (Netzbetrieb), MAN = stumm, UPLINK-Button holt einmalig">
+      <!-- Desktop: beide Schalter-Einheiten NEBENEINANDER (row), Mobil:
+           untereinander (column, siehe Media Query) - jede Einheit ist
+           eine .dock-unit (Schalter + Caption vertikal gepaart). -->
+      <div class="dock-unit">
+      <label class="guard-switch guard-master" title="Datalink: AUTO = 60s-Polling (Netzbetrieb), MAN = stumm, UPLINK-Button holt einmalig">
           <input type="checkbox" id="datalink-sw">
           <span class="guard-frame">
             <span class="guard-on dl-auto">AUTO</span>
@@ -218,10 +222,11 @@ als Pitch - die Horizontlinie sinkt, je hoeher der Mond steht"></div>
           </span>
         </label>
       <div class="guard-caption mono">DATALINK&nbsp;MODE<br><small>SYNC:&nbsp;ON-DEMAND&nbsp;/&nbsp;CONT</small></div>
+      </div>
       <!-- ALERT SELECTOR (v1.1.12): 3-Stufen-Drehschalter nach Boeing-
            Engine-Start-Selector-Art. Steuert den FCM-Push-Filter
            (LUNAR / BOTH / DEEP) serverseitig pro Geraet. -->
-      <div id="notif-rotary" title="Push-Alarm-Filter: LUNAR = nur Mond-Fenster, BOTH = alles, DEEP = nur Deep-Sky-Fenster">
+      <div id="notif-rotary" class="dock-unit" title="Push-Alarm-Filter: LUNAR = nur Mond-Fenster, BOTH = alles, DEEP = nur Deep-Sky-Fenster">
         <div class="rot-plate">
           <span class="rot-tick rot-tick-l"></span>
           <span class="rot-tick rot-tick-c"></span>
