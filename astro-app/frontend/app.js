@@ -276,7 +276,7 @@ function initMap() {
   checkOtaUpdate();
   checkPrimeWindowNotifications();
   scheduleDailyReminders();
-  commsLog("BUILD 2026-10-14 (v1.1.13) \u00b7 ORIGIN " + location.origin
+  commsLog("BUILD 2026-10-14 (v1.1.14) \u00b7 ORIGIN " + location.origin
     + " \u00b7 BASE " + (BASE || "(same-origin)")
     + " \u00b7 NATIVE " + isNativeApp());
   if (!isNativeApp()) {
@@ -402,7 +402,7 @@ const TH = {
   precip:    (v) => v == null ? null : v <= 0.1 ? "g" : v <= 1.0 ? "y" : "r",
   wind:      (v) => v == null ? null : v <= 15  ? "g" : v <= 30  ? "y" : "r",
   gusts:     (v) => v == null ? null : v <= 25  ? "g" : v <= 40  ? "y" : "r",
-  tau:       (v) => v == null ? null : v >= 6   ? "g" : v >= 3   ? "y" : "r",
+  tau:       (v) => v == null ? null : v >= 2   ? "g" : v >= 0.5 ? "y" : "r",  // v1.1.14: Optik geschuetzt, <0.5K = Bodennebel
   temp:      (v) => v == null ? null : v <= 18  ? "g" : v <= 25  ? "y" : "r",  // 600D ungekuehlt
   rh:        (v) => v == null ? null : v <= 80  ? "g" : v <= 90  ? "y" : "r",
   moonIll:   (v) => v == null ? null : v <= 25  ? "g" : v <= 60  ? "y" : "r",
@@ -1107,8 +1107,8 @@ function panelHtml(s) {
     + (s.radar_status ? `<span class="badge">${esc(s.radar_status)}</span>` : "")
     + (s.is_live ? `<span class="badge">LIVE</span>` : "")
     + (s.dew_risk ? `<span class="badge dew-${esc(s.dew_risk)}">${
-        s.dew_risk === "hoch" ? "⚠ Beschlag: Fangspiegel!" :
-        s.dew_risk === "mittel" ? "Beschlag: mittel" : "Beschlag: gering"}</span>` : "");
+        s.dew_risk === "hoch" ? "⚠ Bodennebel: Transparenz!" :
+        s.dew_risk === "mittel" ? "Tau: bodennah kritisch" : "Tau: unkritisch (Schutz aktiv)"}</span>` : "");
 
   const heavyAge = s.age_min != null ? `Heavy vor ${s.age_min} Min` : "Heavy: n/a";
   const radarAge = s.radar_age_min != null ? `Radar vor ${s.radar_age_min} Min` : "Radar: n/a";
@@ -2032,12 +2032,14 @@ function updateAstroInstruments(data) {
   setNeedle("tau-needle",
     -90 + (Math.min(Math.max(tau ?? 7.5, 0), 15) / 15) * 180, "needle-cyan");
   // DEW: invers, 10K sicher (rechts) bis 0K Frost (links)
+  // v1.1.14: Optik geschuetzt (Dew Shield + Heizmanschette) - kritisch
+  // ist nur noch Bodennebel/Dunst unter 0.5K Spread (Transparenz)
   if (tau != null) {
     const clamped = Math.min(Math.max(tau, 0), 10);
-    setGaugeVal("dew-val", tau.toFixed(1) + " K" + (tau < 1.5 ? " !" : ""),
-      tau < 1.5 ? "gv-danger" : tau < 3 ? "gv-warn" : "");
+    setGaugeVal("dew-val", tau.toFixed(1) + " K" + (tau < 0.5 ? " !" : ""),
+      tau < 0.5 ? "gv-danger" : tau < 1.5 ? "gv-warn" : "");
     setNeedle("dew-needle", -90 + (clamped / 10) * 180,
-      tau < 1.5 ? "needle-red" : tau < 3 ? "needle-amber" : "needle-cyan");
+      tau < 0.5 ? "needle-red" : tau < 1.5 ? "needle-amber" : "needle-cyan");
   }
   // ZENITH SQM: Nadel 15-22 mag/arcsec^2, Box = Bortle-Klasse
   const bortle = s.bortle_class;

@@ -178,13 +178,18 @@ PROFILE_RULES = {
         "jet_nogo": 30.0,       # Stunden-K.o. (gemeinsam, wie vor dem
                                 # PROFILE_RULES-Umbau); rate() prueft DSO-
                                 # Jetstream weiterhin nicht (siehe rate())
-        "tau_nogo": 3.0,        # <  -> Beschlagrisiko (Stunden-K.o.)
-        "tau_good": 6.0,        # >= -> Stundengrund
+        "tau_nogo": 0.5,        # <  -> BODENNEBEL/Dunst (Transparenz-
+                                # K.o., v1.1.14: Optik via Dew Shield +
+                                # Heizmanschette geschaetzt - Beschlag
+                                # allein ist KEIN Kriterium mehr)
+        "tau_good": 2.0,        # >= -> Stundengrund (Fokus seit v1.1.14
+                                # auf Seeing-Hoehenspreizung + Wolken/
+                                # Bias; Tau nur noch Luftklarheits-Indik.)
         "wind_nogo": 30.0,
         "rain_nogo": 30,
         "precip_nogo": 0.1,
         "need_dark": True,
-        "dew_relevant": True,   # Beschlag 'hoch' = hartes K.o. (keine Tauheizung)
+        "dew_relevant": True,   # 'hoch' = Bodennebel-Grenze (v1.1.14)
         "need_planet": False,
     },
     "planet": {
@@ -195,7 +200,7 @@ PROFILE_RULES = {
         "seeing_good": 1.5,
         "moon_maybe": None,
         "jet_nogo": 30.0,
-        "tau_nogo": 3.0,
+        "tau_nogo": 0.5,        # v1.1.14: Bodennebel-Grenze (Optik geschuetzt)
         "tau_good": None,
         "wind_nogo": 30.0,
         "rain_nogo": 30,
@@ -262,16 +267,20 @@ class SiteReport:
     errors: list = field(default_factory=list)
 
     def compute_dew_risk(self):
-        """Beschlags-Score fuer den offenen 150P-Newton OHNE Tauheizung.
+        """Bodennebel-/Transparenz-Score v1.1.14 - Optik ist GESCHUETZT.
 
-        Physik: Der Fangspiegel strahlt nach KLAREM Himmel in den Weltraum ab
-        (radiative cooling) und faellt 2-6 K unter die Lufttemperatur -
-        Beschlag entsteht deshalb BEREITS bei Spread < 4-6 K, solange es klar
-        und schwachwindig ist (Wind wuerde konvektiv nachheizen).
+        Ausruestungs-Upgrade 10/2026: Omegon Tauschutzkappe (passiv,
+        verzoegert Strahlungsabkuehlung) + ZWO Anti-Dew Heating Strap
+        (aktiv, haelt die Frontlinse ueber Taupunkt). Kondensation an
+        der OPTIK ist damit kein Rating-Kriterium mehr. Was bleibt, ist
+        echte Luftfeuchte-Kondensation am BODEN: Ab Spread < 0.5 K
+        bildet sich Dunst/Bodennebel, der die atmosphaerische
+        Transparenz ruiniert - das ist die neue harte Grenze.
 
-        hoch   = klar (<30% Wolken) + Schwachwind (<10 km/h) + Spread < 4 K
-        mittel = klar + Spread < 6 K (Vorlauf-Warnung)
-        gering = sonst
+        hoch   = klar (<30% Wolken) + Schwachwind (<10 km/h) + Spread < 0.5 K
+                 (Bodennebel/Dunst -> Transparenz zusammengebrochen)
+        mittel = klar + Spread < 1.5 K (Vorlauf-Warnung Bodennebel)
+        gering = sonst (Optik-Schutz aktiv, Luft noch klar genug)
         """
         clouds = self.night_cloud_min if self.night_cloud_min is not None \
             else self.clouds_total
@@ -282,9 +291,9 @@ class SiteReport:
             return self.dew_risk
         clear = clouds < 30
         calm = wind < 10
-        if clear and calm and spread < 4:
+        if clear and calm and spread < 0.5:
             self.dew_risk = "hoch"
-        elif clear and spread < 6:
+        elif clear and spread < 1.5:
             self.dew_risk = "mittel"
         else:
             self.dew_risk = "gering"

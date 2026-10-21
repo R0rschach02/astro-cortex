@@ -618,6 +618,12 @@
       "title": "v1.1.13 — Dock-Layout nebeneinander + Seeing-Höhenphysik",
       "desc": "Zwei Fixes: (1) DESKTOP-LAYOUT: DATALINK MODE und ALERT SEL stehen in der Desktop-Ansicht jetzt NEBENEINANDER statt untereinander — das Dock links belegt nur noch ~126px Höhe statt ~⅓ der Kante; im mobilen ◄SENS-Overlay bleibt das vertikale Stacking unverändert (Playwright-bewiesen: Desktop row, Mobile column, kein Overflow bei 390px). (2) SEEING-HÖHENSPREIZUNG: Die Wettermodelle interpolieren das Seeing flach über die Region (~1.5-1.7\" überall) — physikalisch falsch bei Inversionswetterlagen. Das Backend spreizt jetzt den rohen API-Wert algorithmisch nach der hinterlegten Standort-Elevation: Potenzgesetz (elev/150m)^-0.35 für den Grenzschichtanteil plus Urban-Penalty ×1.22 ab Bortle 7. Katzenbuckel (626m): ×0.61 → deutlich besser; Mannheim (95m, urban): ×1.43 → deutlich schlechter. Live-Beweis: Spanne 1.1\" bis 3.49\" statt flacher Werte. Wirkt konsistent auf /api/spots UND /api/forecast (vor der Bias-Korrektur), das Rating rechnet automatisch mit. Rohwert bleibt als seeing_api_raw in der API dokumentiert. versionCode 10102113.",
       "usage": "Seeing-Panel zeigt jetzt echte Standort-Physik: Odenwald klar vor dem Rheingraben"
+    },
+    {
+      "date": "2026-10-14",
+      "title": "v1.1.14 — Teleskop-Upgrade: DEW-Logik entschärft",
+      "desc": "Ausrüstungs-Upgrade (Omegon Tauschutzkappe + ZWO Anti-Dew Heating Strap + ZWO EAF mit Temperatursensor, alle in equipment.json dokumentiert) ändert die Rating-Physik: Kondensation an der Optik ist kein K.o.-Kriterium mehr. compute_dew_risk bewertet jetzt BODENNEBEL/Dunst statt Linsenbeschlag — hartes NO-GO nur noch bei klar+windstill+Spread<0.5K (Transparenz-Zusammenbruch), Vorlauf-Warnung <1.5K, sonst unkritisch. Golden-Window-Stundenk.o. tau_nogo von 3.0K auf 0.5K gesenkt (beide Profile); tau_good von 6.0K auf 2.0K — die Fensterbegründung stützt sich primär auf Seeing-Höhenpreizung, Wolken und Transparenz. Frontend-Ampeln synchron mitgezogen (Tau-Spalte grün ab 2K, DEW-Gauge rot erst unter 0.5K, Badge-Texte sprechen jetzt Bodennebel statt Fangspiegel). 7 neue Tests (136 gesamt).",
+      "usage": "Tau-Status zeigt 'Schutz aktiv' — knappe Spreads degradieren das Rating nicht mehr"
     }
   ]
 }
