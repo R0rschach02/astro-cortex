@@ -276,7 +276,7 @@ function initMap() {
   checkOtaUpdate();
   checkPrimeWindowNotifications();
   scheduleDailyReminders();
-  commsLog("BUILD 2026-10-21 (v1.1.15) \u00b7 ORIGIN " + location.origin
+  commsLog("BUILD 2026-10-21 (v1.1.16) \u00b7 ORIGIN " + location.origin
     + " \u00b7 BASE " + (BASE || "(same-origin)")
     + " \u00b7 NATIVE " + isNativeApp());
   if (!isNativeApp()) {
@@ -1187,19 +1187,24 @@ function renderSpots(data) {
     const mm = s.precip_2h || 0;
     const rainNew = mm > 0 && (lastRainMm[s.name] ?? 0) <= 0;   // trocken -> nass
     const mk = L.marker([s.lat, s.lon], { icon: markerIcon(s, rainNew) });
-    mk.on("click", () => {
-      currentSpot = s;
-      setTelemetry(s.name);
-      $("panel").classList.remove("hidden");
-      setStickHidden(true);   // Panel offen = Stick weicht dem Sheet
-      showTab("now");
-      fetchBortle(s);
-    });
+    mk.on("click", () => openSpot(s));
     mk.__spot = s;
     markersLayer.addLayer(mk);
     lastRainMm[s.name] = mm;
   }
   updateTargetLock();
+}
+
+/* Standort vollstaendig oeffnen - identisch fuer Marker-Klick und
+   Tastatur-Select [S] (v1.1.16): Panel auf, Telemetrie setzen,
+   Stick weicht dem Sheet, Jetzt-Tab + Bortle nachladen. */
+function openSpot(s) {
+  currentSpot = s;
+  setTelemetry(s.name);
+  $("panel").classList.remove("hidden");
+  setStickHidden(true);   // Panel offen = Stick weicht dem Sheet
+  showTab("now");
+  fetchBortle(s);
 }
 
 /* ---------- Daten + Aktualitaet ---------- */
@@ -1730,6 +1735,7 @@ window.addEventListener("DOMContentLoaded", () => {
   initLifecycle();
   initAlertSelector();
   initLaptopDefaults();
+  initKeyboardStick();
   if ("serviceWorker" in navigator) {
     // Native (Capacitor): KEIN Service Worker - Assets kommen gebuendelt
     // aus der APK; ein SW-Cache wuerde bei App-Updates veraltete
@@ -2321,7 +2327,7 @@ function initFlightstick() {
         stroke="#3a444e" stroke-width="0.7"/>
       <circle cx="51.4" cy="45.5" r="1.1" fill="#5d6d7d"/>
       <!-- Feuer-/Trim-Knopf an der Griffspitze -->
-      <circle cx="51" cy="34.5" r="4.6" fill="url(#fs-fire-grad)"
+      <circle id="fs-fire" cx="51" cy="34.5" r="4.6" fill="url(#fs-fire-grad)"
         stroke="#4a0a05" stroke-width="1"/>
       <circle cx="49.8" cy="33.2" r="1.3" fill="#ffc2ae" opacity=".85"/>
       <circle cx="51" cy="34.5" r="7" fill="none"
@@ -2375,6 +2381,84 @@ function initFlightstick() {
   fs.addEventListener("pointermove", e => { if (dragging) move(e); });
   fs.addEventListener("pointerup", release);
   fs.addEventListener("pointercancel", release);
+}
+
+/* ============================================================
+   TASTATUR-FLIGHTSTICK (v1.1.16, Desktop/Laptop): Pfeiltasten
+   Links/Rechts blaettern durch die Crawler-Standorte (Telemetrie-
+   Link + Gauges + Target-Brackets wandern mit, der Stick knickt
+   in die Peilung des Standorts aus - dieselbe Transform-Formel
+   wie beim Pointer-Drag). [S] = Select: Der rote Feuerknopf
+   spielt eine Klick-Animation und das Panel oeffnet den Standort
+   exakt wie ein Marker-Klick (openSpot).
+   ============================================================ */
+let stickIdx = 0;
+
+function animateStickTo(deg) {
+  const fs = document.getElementById("flightstick");
+  const g = document.getElementById("fs-grip");
+  const degEl = document.getElementById("fs-deg");
+  if (!fs || !g) return;
+  const r = fs.getBoundingClientRect();
+  const len = (r.width / 2 - 16) * 0.7;
+  const rad = deg * Math.PI / 180;
+  const ux = len * Math.sin(rad);
+  const uy = -len * Math.cos(rad);
+  g.setAttribute("transform",
+    `translate(${(ux * 0.38).toFixed(1)} ${(uy * 0.38).toFixed(1)}) `
+    + `rotate(${(deg * 0.22 - (deg > 180 ? 79.2 : 0)).toFixed(1)} 50 80)`);
+  if (degEl) degEl.textContent = deg.toFixed(0).padStart(3, "0") + "\u00b0";
+  fs.classList.add("fs-active");
+  clearTimeout(animateStickTo._t);
+  animateStickTo._t = setTimeout(() => {
+    g.setAttribute("transform", "translate(0 0) rotate(0 50 80)");
+    fs.classList.remove("fs-active");
+  }, 900);
+}
+
+function selectSpotByOffset(off) {
+  const targets = (lastSpots && lastSpots.spots) || [];
+  if (!targets.length) return;
+  stickIdx = (stickIdx + off + targets.length) % targets.length;
+  const s = targets[stickIdx];
+  setTelemetry(s.name);
+  // Stick-Richtung = Peilung Kartenmitte -> Standort (wie pick())
+  const c = map.getCenter();
+  animateStickTo(_bearingDeg(c.lat, c.lng, s.lat, s.lon));
+  commsLog("STICK \u25b6 " + s.name.toUpperCase() + " \u2014 [S] waehlt");
+}
+
+function confirmStickSelection() {
+  const targets = (lastSpots && lastSpots.spots) || [];
+  if (!targets.length) return;
+  const s = targets[stickIdx];
+  // Feuerknopf-Klick: kurz komprimieren zurueck in den Griff
+  const fire = document.getElementById("fs-fire");
+  if (fire) {
+    fire.setAttribute("transform",
+      "translate(51 34.5) scale(.68) translate(-51 -34.5)");
+    setTimeout(() => fire.removeAttribute("transform"), 190);
+  }
+  openSpot(s);
+  commsLog("STICK SELECT: " + s.name.toUpperCase() + " \u2014 Panel offen");
+}
+
+function initKeyboardStick() {
+  document.addEventListener("keydown", (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.target;
+    if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();                 // Seite/Karte soll nicht scrollen
+      selectSpotByOffset(-1);
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      selectSpotByOffset(1);
+    } else if (e.key === "s" || e.key === "S") {
+      confirmStickSelection();
+    }
+  });
+  commsLog("STICK: \u25c0\u25b6 Standort, [S] Select");
 }
 
 function initCockpitStatus() {

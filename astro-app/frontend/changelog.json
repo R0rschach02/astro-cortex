@@ -630,6 +630,12 @@
       "title": "v1.1.15 — Responsive Laptop-Layout (981–1440px)",
       "desc": "Laptops (13-15\", 1280-1440px) bekommen erstmals ein eigenes Layout statt eines gequetschten Desktops: (1) Neuer Media-Query-Block 981-1440px: rechte Spalte flexibel minmax(236px, 24vw) statt fixer 340px — die Karte (1fr) wächst von 56-58% auf 77-84% der Breite. (2) INTEL-Panel startet auf Laptops eingeklappt (initLaptopDefaults; Nutzer-Präferenz via Pin-Toggle persistiert in astro_intel_pref und gewinnt beim nächsten Start). (3) Topbar-Gauges ~20% kleiner (clamp 56-84px statt 70-110px) — Topbar-Höhe von 241px auf 105px. (4) DATALINK/ALERT-SEL-Dock auf allen Desktop-Größen skaliert (scale .82) und wrap-fähig — der 48px-Überhang in die Karte ist überall verschwunden. (5) Action-Buttons kompakt im 2er-Wrap statt 240px-Vertikalstapel; #freshness weicht im Laptop-Bereich (inhaltlich von DATA-Alter gedeckt). Playwright-bewiesen über 981/1100/1280/1366/1440/1920 + Mobile-Regression 390px unverändert.",
       "usage": "Auf dem Laptop: Karte deutlich größer, alles atmet — INTEL► klappt das Panel bei Bedarf wieder auf"
+    },
+    {
+      "date": "2026-10-21",
+      "title": "v1.1.16 — UI-Feinschliff + Tastatur-Flightstick",
+      "desc": "Drei UX-Fixes: (1) LINKES PANEL/DOCK: Der gelb-schwarze Warnstreifen ist jetzt ein dezenter 7px-Akzent oben statt Vollfläche — das Dock bleibt einzeilig kompakt (105px statt 178px: width:100% des ALERT-SEL zwang ihn in eine zweite Zeile) und der Sensoren-Content scrollt nicht mehr hinter dem fixierten Dock ab (padding-bottom 122px auf Desktop). (2) SCROLLBARS: komplett dunkel umgebaut (::-webkit-scrollbar + scrollbar-color/width für Firefox) — Track fast schwarz, Thumb dunkelblau-grau mit Hover, nahtlos im Command-Center-Look. (3) TASTATUR-FLIGHTSTICK: Pfeiltasten ◀/▶ blättern durch die Crawler-Standorte (Telemetrie-Link, Gauges und Target-Brackets wandern mit), der Stick knickt synchron in die Peilung des Standorts (gleiche Transform-Formel wie beim Drag). [S] = Select: Der rote Feuerknopf spielt eine Klick-Animation und das Standort-Panel öffnet exakt wie ein Marker-Klick. Alles Playwright-bewiesen (Link-Wechsel, Stick-Transform 086°, Panel-Öffnung, Fire-Animation).",
+      "usage": "◀/▶ Standort durchschalten, [S] öffnet das Panel — Maus optional"
     }
   ]
 }

@@ -410,6 +410,17 @@ body.night .iw-toggle-row { border-color: #3a2020; }
 }
 .mono, .tp-label, .ct-line, .hw-btn, .panel-hdr, .tl-label { font-family: var(--mono); }
 
+/* ---------- Scrollbars (v1.1.16): dunkel statt Browser-Weiss ----------
+   Das Command-Center ist tiefschwarz - Standard-Scrollbars brechen den
+   Vibe. Track fast schwarz, Thumb dunkelblau-grau mit Hover-Feedback. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #0a0d12; }
+::-webkit-scrollbar-thumb { background: #233240; border-radius: 5px;
+  border: 2px solid #0a0d12; }
+::-webkit-scrollbar-thumb:hover { background: #34495e; }
+::-webkit-scrollbar-corner { background: #0a0d12; }
+* { scrollbar-width: thin; scrollbar-color: #233240 #0a0d12; }
+
 #cockpit {
   position: fixed; inset: 0; display: grid;
   grid-template-areas: "top top top" "left map right" "bottom bottom bottom";
@@ -454,6 +465,13 @@ body.night .iw-toggle-row { border-color: #3a2020; }
 #left-panel, #right-panel {
   background: var(--panel); border: 1px solid var(--line);
   border-radius: 0; padding: 10px; overflow-y: auto;
+}
+/* v1.1.16: Desktop - das fixe DATALINK-Dock ueberlappt die unteren
+   ~120px des linken Panels. Ohne padding-bottom laeuft der Sensoren-
+   Content dahinter weg und wirkt 'abgeschnitten'; mit ihm scrollt er
+   saeber ueber dem Dock aus. */
+@media (min-width: 981px) {
+  #left-panel { padding-bottom: 122px; }
 }
 .panel-hdr { font-size: 10.5px; letter-spacing: 3px; color: var(--amber);
   border-bottom: 1px solid var(--line-hi); padding-bottom: 4px;
@@ -1106,18 +1124,26 @@ body.night .basemap-tile { filter: none; }
    auf column zurueck (Stacking im Slide-Overlay). */
 #datalink-dock { position: fixed; left: 0; bottom: 54px; z-index: 960;
   display: flex; flex-direction: row; align-items: stretch;
-  gap: 6px; padding: 8px 8px 6px;
+  gap: 5px; padding: 12px 6px 5px;
   text-align: center;
   border: 1px solid var(--line); border-left: none;
-  background: repeating-linear-gradient(-45deg,
-    rgba(255,210,74,.16) 0 10px, rgba(0,0,0,.55) 10px 20px), var(--panel2);
+  background: var(--panel2);
   box-shadow: 0 4px 14px rgba(0,0,0,.55), inset 0 0 10px rgba(0,0,0,.5);
-  border-top: 2px solid #4a3f14;
-  /* v1.1.15: Der nebeneinander-Lauf darf das linke Panel (max-content,
-     ~223px) nie ueberragen - skaliert + wrap-faehig auf ALLEN Desktop-
-     Groessen (271px x .82 = 222px <= Panelbreite) */
+  /* v1.1.16: Warnstreifen nur noch als schmaler akzent oben statt
+     Vollflaeche - das Dock bleibt kompakt und klobt nicht.
+     max-width gilt fuer die UNSKALIERTE Layout-Box (271px Inhalt):
+     Bei 280px bleibt der Lauf EINZEILIG - die sichtbare Breite macht
+     die scale(.82)-Transformation (271x.82=222px <= Panelbreite) */
   transform: scale(.82); transform-origin: left bottom;
-  flex-wrap: wrap; row-gap: 4px; max-width: 244px; }
+  flex-wrap: wrap; row-gap: 4px; max-width: 280px; }
+#datalink-dock::before { content: ""; position: absolute; top: 0; left: 0;
+  right: 0; height: 7px;
+  background: repeating-linear-gradient(-45deg,
+    rgba(255,210,74,.6) 0 7px, #0a0d12 7px 14px); }
+/* width:100% der v1.1.12-Regel wuerde die ALERT-SEL-Unit auf Desktop
+   in eine eigene Zeile zwingen (Dock zweizeilig/hoch) - hier auto;
+   mobil setzt die Media-Query .dock-unit wieder auf 100% */
+#datalink-dock #notif-rotary { width: auto; }
 .dock-unit { display: flex; flex-direction: column; align-items: center;
   gap: 4px; min-width: 96px; }
 #datalink-dock .guard-caption { line-height: 1.5; }
