@@ -624,6 +624,12 @@
       "title": "v1.1.14 — Teleskop-Upgrade: DEW-Logik entschärft",
       "desc": "Ausrüstungs-Upgrade (Omegon Tauschutzkappe + ZWO Anti-Dew Heating Strap + ZWO EAF mit Temperatursensor, alle in equipment.json dokumentiert) ändert die Rating-Physik: Kondensation an der Optik ist kein K.o.-Kriterium mehr. compute_dew_risk bewertet jetzt BODENNEBEL/Dunst statt Linsenbeschlag — hartes NO-GO nur noch bei klar+windstill+Spread<0.5K (Transparenz-Zusammenbruch), Vorlauf-Warnung <1.5K, sonst unkritisch. Golden-Window-Stundenk.o. tau_nogo von 3.0K auf 0.5K gesenkt (beide Profile); tau_good von 6.0K auf 2.0K — die Fensterbegründung stützt sich primär auf Seeing-Höhenpreizung, Wolken und Transparenz. Frontend-Ampeln synchron mitgezogen (Tau-Spalte grün ab 2K, DEW-Gauge rot erst unter 0.5K, Badge-Texte sprechen jetzt Bodennebel statt Fangspiegel). 7 neue Tests (136 gesamt).",
       "usage": "Tau-Status zeigt 'Schutz aktiv' — knappe Spreads degradieren das Rating nicht mehr"
+    },
+    {
+      "date": "2026-10-21",
+      "title": "v1.1.15 — Responsive Laptop-Layout (981–1440px)",
+      "desc": "Laptops (13-15\", 1280-1440px) bekommen erstmals ein eigenes Layout statt eines gequetschten Desktops: (1) Neuer Media-Query-Block 981-1440px: rechte Spalte flexibel minmax(236px, 24vw) statt fixer 340px — die Karte (1fr) wächst von 56-58% auf 77-84% der Breite. (2) INTEL-Panel startet auf Laptops eingeklappt (initLaptopDefaults; Nutzer-Präferenz via Pin-Toggle persistiert in astro_intel_pref und gewinnt beim nächsten Start). (3) Topbar-Gauges ~20% kleiner (clamp 56-84px statt 70-110px) — Topbar-Höhe von 241px auf 105px. (4) DATALINK/ALERT-SEL-Dock auf allen Desktop-Größen skaliert (scale .82) und wrap-fähig — der 48px-Überhang in die Karte ist überall verschwunden. (5) Action-Buttons kompakt im 2er-Wrap statt 240px-Vertikalstapel; #freshness weicht im Laptop-Bereich (inhaltlich von DATA-Alter gedeckt). Playwright-bewiesen über 981/1100/1280/1366/1440/1920 + Mobile-Regression 390px unverändert.",
+      "usage": "Auf dem Laptop: Karte deutlich größer, alles atmet — INTEL► klappt das Panel bei Bedarf wieder auf"
     }
   ]
 }

@@ -276,7 +276,7 @@ function initMap() {
   checkOtaUpdate();
   checkPrimeWindowNotifications();
   scheduleDailyReminders();
-  commsLog("BUILD 2026-10-14 (v1.1.14) \u00b7 ORIGIN " + location.origin
+  commsLog("BUILD 2026-10-21 (v1.1.15) \u00b7 ORIGIN " + location.origin
     + " \u00b7 BASE " + (BASE || "(same-origin)")
     + " \u00b7 NATIVE " + isNativeApp());
   if (!isNativeApp()) {
@@ -380,7 +380,12 @@ function initMap() {
     setDatalinkMode(e.target.checked ? "auto" : "man"));
   $("right-panel-pin")?.addEventListener("click", () => {
     if (isMobileUI()) return toggleHud("right");
-    document.getElementById("cockpit").classList.toggle("collapse-right");
+    const cp = document.getElementById("cockpit");
+    cp.classList.toggle("collapse-right");
+    // v1.1.15: Praferenz persistieren - Nutzer-Entscheid schlaegt den
+    // Laptop-Default (INTEL eingeklappt) beim naechsten Start
+    localStorage.setItem("astro_intel_pref",
+      cp.classList.contains("collapse-right") ? "collapsed" : "open");
     setTimeout(() => map.invalidateSize(), 200);
   });
   // Raster folgt dem Ausschnitt (debounced); Cache im Backend faengt Pan an
@@ -1535,6 +1540,29 @@ function initAlertSelector() {
 }
 
 /* ============================================================
+   LAPTOP-LAYOUT (v1.1.15): Auf 981-1440px startet das INTEL-Panel
+   eingeklappt - die Karte (1fr) bekommt den Platz. Eine gesetzte
+   Nutzer-Praferenz (astro_intel_pref, via Pin-Toggle) gewinnt
+   gegen den Default. Mobil ist die Funktion bewusst inaktiv
+   (dort regelt das Slide-HUD).
+   ============================================================ */
+function initLaptopDefaults() {
+  if (window.matchMedia("(max-width: 980px)").matches) return;
+  const laptop = window.matchMedia(
+    "(min-width: 981px) and (max-width: 1440px)").matches;
+  const pref = localStorage.getItem("astro_intel_pref");
+  const cp = document.getElementById("cockpit");
+  if (!cp) return;
+  const collapsed = pref ? pref === "collapsed" : laptop;
+  cp.classList.toggle("collapse-right", collapsed);
+  if (collapsed) {
+    commsLog("LAYOUT: Laptop-Modus — INTEL eingeklappt "
+      + "(INTEL► offnet wieder)");
+    setTimeout(() => map.invalidateSize(), 100);
+  }
+}
+
+/* ============================================================
    GPS-PING (Phase 2): ein Tap = eine Messung. Native nutzt das vom
    Capacitor-Runtime injizierte window.Capacitor.Plugins.Geolocation
    (kein Bundler noetig), Browser bleibt bei navigator.geolocation.
@@ -1701,6 +1729,7 @@ window.addEventListener("DOMContentLoaded", () => {
   if (!dataAgeTimer) dataAgeTimer = setInterval(updateDataAge, 60_000);
   initLifecycle();
   initAlertSelector();
+  initLaptopDefaults();
   if ("serviceWorker" in navigator) {
     // Native (Capacitor): KEIN Service Worker - Assets kommen gebuendelt
     // aus der APK; ein SW-Cache wuerde bei App-Updates veraltete

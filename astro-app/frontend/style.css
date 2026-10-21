@@ -1112,7 +1112,12 @@ body.night .basemap-tile { filter: none; }
   background: repeating-linear-gradient(-45deg,
     rgba(255,210,74,.16) 0 10px, rgba(0,0,0,.55) 10px 20px), var(--panel2);
   box-shadow: 0 4px 14px rgba(0,0,0,.55), inset 0 0 10px rgba(0,0,0,.5);
-  border-top: 2px solid #4a3f14; }
+  border-top: 2px solid #4a3f14;
+  /* v1.1.15: Der nebeneinander-Lauf darf das linke Panel (max-content,
+     ~223px) nie ueberragen - skaliert + wrap-faehig auf ALLEN Desktop-
+     Groessen (271px x .82 = 222px <= Panelbreite) */
+  transform: scale(.82); transform-origin: left bottom;
+  flex-wrap: wrap; row-gap: 4px; max-width: 244px; }
 .dock-unit { display: flex; flex-direction: column; align-items: center;
   gap: 4px; min-width: 96px; }
 #datalink-dock .guard-caption { line-height: 1.5; }
@@ -1174,6 +1179,41 @@ body.night .basemap-tile { filter: none; }
      Rotary bleibt im Fluss des Docks, kein Overflow/Umbruch */
   #notif-rotary .rot-plate { max-width: 180px; }
   #notif-rotary .rot-label { font-size: 9px; }
+}
+
+/* ============================================================
+   LAPTOP-BREAKPOINT (v1.1.15, 981-1440px): Kein gequetschter
+   Desktop! 13-15"-Laptops bekommen ihr eigenes Layout:
+   - Rechte Spalte flexibel minmax(236px, 24vw) statt fix 340px
+   - Karte bleibt 1fr = nimmt den Rest aggressiv (INTEL-Panel
+     startet zudem eingeklappt, siehe initLaptopDefaults in app.js)
+   - Topbar-Gauges ~20% kleiner (5.4vw), dichtere Abstaende
+   - DATALINK-Dock verkleinert (scale .82) + wrap-faehig, damit
+     DATALINK/ALERT SEL nicht in die Karte ragen
+   ============================================================ */
+@media (min-width: 981px) and (max-width: 1440px) {
+  #cockpit, #cockpit.collapse-left {
+    grid-template-columns: minmax(168px, max-content) 1fr
+                           minmax(236px, 24vw); }
+  #cockpit.collapse-right,
+  #cockpit.collapse-left.collapse-right {
+    grid-template-columns: minmax(168px, max-content) 1fr 0; }
+  /* Topbar kompakt: Instrumenten-Radius ca. -20%, engere Reihung */
+  #topbar { gap: 8px; padding: 0 8px; }
+  #topbar .glareshield-gauges .gauge-wrap {
+    width: clamp(56px, 5.4vw, 84px); }
+  #topbar .glareshield-gauges .gauge-row { gap: 6px; }
+  #title { font-size: 15px; }
+  .tp-block { font-size: 11px; padding-left: 8px; }
+  /* Action-Buttons: Bei knappem Platz wuerde der 48px-Satz vertikal
+     auf 240px stapeln - hier kompakte Icons im geordneten 2er-Wrap.
+     #freshness ist inhaltlich von #data-age gedeckt (beide zeigen das
+     Daten-Alter) und weicht im Laptop-Bereich dem Platz. */
+  #freshness { display: none; }
+  .tp-actions { flex-wrap: wrap; max-width: 84px; gap: 4px;
+    justify-content: flex-end; flex-shrink: 0; }
+  .tp-actions .hbtn { min-width: 34px; width: 34px; height: 34px;
+    font-size: 14px; border-radius: 6px; }
 }
 
 /* Comms mobil: Meldungen umbrechen statt abschneiden (Report: Zeilen
