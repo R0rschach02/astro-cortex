@@ -276,7 +276,7 @@ function initMap() {
   checkOtaUpdate();
   checkPrimeWindowNotifications();
   scheduleDailyReminders();
-  commsLog("BUILD 2026-10-21 (v1.1.16) \u00b7 ORIGIN " + location.origin
+  commsLog("BUILD 2026-10-21 (v1.1.17) \u00b7 ORIGIN " + location.origin
     + " \u00b7 BASE " + (BASE || "(same-origin)")
     + " \u00b7 NATIVE " + isNativeApp());
   if (!isNativeApp()) {
@@ -367,15 +367,8 @@ function initMap() {
   });
   $("left-hud-btn")?.addEventListener("click", () => toggleHud("left"));
   $("uplink-btn")?.addEventListener("click", uplinkNow);
-  // Mobile: Das DATALINK-Dock lebt IM <SENS-Overlay (die linke Spalte
-  // ist auf dem Handy das Slide-in, nicht dauerhaft sichtbar wie am
-  // Desktop) - kompakt am Panel-Ende, spiegelbildlich zum OBS-Dock rechts.
-  if (isMobileUI()) {
-    const dock = document.getElementById("datalink-dock");
-    const left = document.getElementById("left-panel");
-    if (dock && left && dock.parentElement !== left)
-      left.appendChild(dock);
-  }
+  // v1.1.17: Das DATALINK-Dock lebt jetzt IM linken Panel (HTML-Markup)
+  // - der Mobile-Umzug per JS entfaellt, es wandert mit dem Overlay mit.
   $("datalink-sw")?.addEventListener("change", (e) =>
     setDatalinkMode(e.target.checked ? "auto" : "man"));
   $("right-panel-pin")?.addEventListener("click", () => {
@@ -2384,15 +2377,18 @@ function initFlightstick() {
 }
 
 /* ============================================================
-   TASTATUR-FLIGHTSTICK (v1.1.16, Desktop/Laptop): Pfeiltasten
-   Links/Rechts blaettern durch die Crawler-Standorte (Telemetrie-
-   Link + Gauges + Target-Brackets wandern mit, der Stick knickt
-   in die Peilung des Standorts aus - dieselbe Transform-Formel
-   wie beim Pointer-Drag). [S] = Select: Der rote Feuerknopf
-   spielt eine Klick-Animation und das Panel oeffnet den Standort
-   exakt wie ein Marker-Klick (openSpot).
+   TASTATUR-FLIGHTSTICK (v1.1.17, Game-Menu-Logik):
+   KARTEN-KONTEXT: Alle vier Pfeiltasten sind Richtungs-Slots im
+   Kompass (▲=0°, ▶=90°, ▼=180°, ◀=270° ab Kartenmitte) und waehlen
+   den besten Standort in diesem Sektor - derselbe Algorithmus wie
+   beim Pointer-Drag (pick). Der Stick knickt in die Tastenrichtung
+   aus und federt zurueck. [S] = Select: Feuerknopf-Klick + Panel.
+   PANEL-KONTEXT (offene Datenansicht blockiert die Karte!):
+   ▲/▼ scrollen den Inhalt, ◀/▶ wechseln Jetzt/Vorausschau,
+   [ESC] schliesst und gibt die Karte zurueck.
    ============================================================ */
-let stickIdx = 0;
+const STICK_DIRECTIONS = {
+  ArrowUp: 0, ArrowRight: 90, ArrowDown: 180, ArrowLeft: 270 };
 
 function animateStickTo(deg) {
   const fs = document.getElementById("flightstick");
@@ -2416,22 +2412,31 @@ function animateStickTo(deg) {
   }, 900);
 }
 
-function selectSpotByOffset(off) {
+function selectSpotByDirection(deg) {
+  animateStickTo(deg);                      // Feedback IMMER, auch ohne Treffer
   const targets = (lastSpots && lastSpots.spots) || [];
   if (!targets.length) return;
-  stickIdx = (stickIdx + off + targets.length) % targets.length;
-  const s = targets[stickIdx];
-  setTelemetry(s.name);
-  // Stick-Richtung = Peilung Kartenmitte -> Standort (wie pick())
   const c = map.getCenter();
-  animateStickTo(_bearingDeg(c.lat, c.lng, s.lat, s.lon));
-  commsLog("STICK \u25b6 " + s.name.toUpperCase() + " \u2014 [S] waehlt");
+  let bestS = null, bestDiff = 65;          // Sektor-Fenster +/-65 Grad
+  for (const s of targets) {
+    const b = _bearingDeg(c.lat, c.lng, s.lat, s.lon);
+    const diff = Math.abs(((b - deg + 540) % 360) - 180);
+    if (diff < bestDiff) { bestDiff = diff; bestS = s; }
+  }
+  if (!bestS) {
+    commsLog("STICK \u2191\u2192\u2193\u2190: kein Standort in dieser "
+      + "Richtung (" + deg.toFixed(0) + "\u00b0)");
+    return;
+  }
+  setTelemetry(bestS.name);
+  commsLog("STICK " + deg.toFixed(0) + "\u00b0 \u2192 "
+    + bestS.name.toUpperCase() + " \u2014 [S] waehlt");
 }
 
 function confirmStickSelection() {
   const targets = (lastSpots && lastSpots.spots) || [];
   if (!targets.length) return;
-  const s = targets[stickIdx];
+  const s = targets.find(t => t.name === telemetryTarget) || targets[0];
   // Feuerknopf-Klick: kurz komprimieren zurueck in den Griff
   const fire = document.getElementById("fs-fire");
   if (fire) {
@@ -2440,7 +2445,19 @@ function confirmStickSelection() {
     setTimeout(() => fire.removeAttribute("transform"), 190);
   }
   openSpot(s);
-  commsLog("STICK SELECT: " + s.name.toUpperCase() + " \u2014 Panel offen");
+  commsLog("STICK SELECT: " + s.name.toUpperCase()
+    + " \u2014 \u25b2\u25bc scrollen, \u25c0\u25b6 Tabs, [ESC] zurueck");
+}
+
+function closeSpotPanel() {
+  $("panel").classList.add("hidden");
+  setStickHidden(false);    // Stick kehrt zurueck
+  commsLog("PANEL zu — Karte/Flightstick wieder aktiv");
+}
+
+function spotPanelOpen() {
+  const p = $("panel");
+  return !!p && !p.classList.contains("hidden");
 }
 
 function initKeyboardStick() {
@@ -2448,17 +2465,37 @@ function initKeyboardStick() {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const t = e.target;
     if (t && /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
-    if (e.key === "ArrowLeft") {
+
+    // === PANEL-KONTEXT: Datenansicht steuert, Karte blockiert ===
+    if (spotPanelOpen()) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        $("panel").scrollBy({top: e.key === "ArrowDown" ? 160 : -160,
+                             behavior: "smooth"});
+      } else if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        showTab("now");
+        commsLog("TAB \u25c0 Jetzt");
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        showTab("fc");
+        commsLog("TAB \u25b6 Vorausschau");
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        closeSpotPanel();
+      }
+      return;   // Karten-Steuerung bleibt bewusst gesperrt
+    }
+
+    // === KARTEN-KONTEXT: 4-Wege-Richtungswahl + Select ===
+    if (STICK_DIRECTIONS[e.key] !== undefined) {
       e.preventDefault();                 // Seite/Karte soll nicht scrollen
-      selectSpotByOffset(-1);
-    } else if (e.key === "ArrowRight") {
-      e.preventDefault();
-      selectSpotByOffset(1);
+      selectSpotByDirection(STICK_DIRECTIONS[e.key]);
     } else if (e.key === "s" || e.key === "S") {
       confirmStickSelection();
     }
   });
-  commsLog("STICK: \u25c0\u25b6 Standort, [S] Select");
+  commsLog("STICK: \u25b2\u25bc\u25c0\u25b6 Richtung, [S] Select, [ESC] Panel zu");
 }
 
 function initCockpitStatus() {

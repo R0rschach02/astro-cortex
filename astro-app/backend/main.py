@@ -53,7 +53,7 @@ log = logging.getLogger("astro-app")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
 # Optionaler Schutz schreibender Endpunkte: env ASTRO_API_TOKEN setzen
 API_TOKEN = os.environ.get("ASTRO_API_TOKEN", "")
-BACKEND_VERSION = "v1.1.16"
+BACKEND_VERSION = "v1.1.17"
 # Cloudflare-Access M2M-Token: liegt AUSSERHALB des Repos (gitignored)
 # und wird der App erst zur Laufzeit ueber /updates/app-bootstrap.json
 # zugestellt - kein Secret mehr im APK-/Frontend-Code.

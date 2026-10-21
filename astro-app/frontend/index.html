@@ -75,7 +75,77 @@ als Pitch - die Horizontlinie sinkt, je hoeher der Mond steht"></div>
         <div id="tl-moon" class="tl-line tl-pending">[STANDBY] MOON | ALT: --</div>
         <div id="tl-secondary" class="tl-secondary mono"></div>
       </div>
-    </aside>
+        <!-- DATALINK-Dock: Kommunikation links (OBS/Sensoren rechts).
+         Fest verankert ueber der T-Track-Leiste, Warnstreifen schwarz-gelb. -->
+    <div id="datalink-dock">
+      <!-- Desktop: beide Schalter-Einheiten NEBENEINANDER (row), Mobil:
+           untereinander (column, siehe Media Query) - jede Einheit ist
+           eine .dock-unit (Schalter + Caption vertikal gepaart). -->
+      <div class="dock-unit">
+      <label class="guard-switch guard-master" title="Datalink: AUTO = 60s-Polling (Netzbetrieb), MAN = stumm, UPLINK-Button holt einmalig">
+          <input type="checkbox" id="datalink-sw">
+          <span class="guard-frame">
+            <span class="guard-on dl-auto">AUTO</span>
+            <svg class="bat-switch" viewBox="0 0 60 90">
+              <defs>
+                <linearGradient id="dl-plate" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stop-color="#3a4147"/>
+                  <stop offset=".5" stop-color="#565f68"/>
+                  <stop offset="1" stop-color="#2a3036"/>
+                </linearGradient>
+                <linearGradient id="dl-nut" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0" stop-color="#79838e"/>
+                  <stop offset=".5" stop-color="#4a525a"/>
+                  <stop offset="1" stop-color="#5d666f"/>
+                </linearGradient>
+                <linearGradient id="dl-chrome" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0" stop-color="#f2f5f8"/>
+                  <stop offset=".35" stop-color="#c3ccd4"/>
+                  <stop offset=".55" stop-color="#8b959e"/>
+                  <stop offset=".8" stop-color="#d8dee4"/>
+                  <stop offset="1" stop-color="#6d7680"/>
+                </linearGradient>
+              </defs>
+              <rect x="5" y="4" width="50" height="82" rx="4"
+                fill="url(#dl-plate)" stroke="#14181c" stroke-width="1.5"/>
+              <rect x="9" y="8" width="42" height="74" rx="3" fill="none"
+                stroke="#1d2227" stroke-width="1"/>
+              <polygon points="30,32 42,39 42,53 30,60 18,53 18,39"
+                fill="url(#dl-nut)" stroke="#0d1013" stroke-width="1.2"/>
+              <circle cx="30" cy="46" r="6" fill="#0a0d11"
+                stroke="#2c3136" stroke-width="1"/>
+              <g class="bat-lever">
+                <rect x="26.6" y="15" width="6.8" height="34" rx="3.4"
+                  fill="url(#dl-chrome)" stroke="#3d444b" stroke-width=".8"/>
+                <circle cx="30" cy="13.5" r="5.6" fill="url(#dl-chrome)"
+                  stroke="#3d444b" stroke-width=".8"/>
+                <circle cx="28.4" cy="12" r="1.6" fill="#ffffff" opacity=".75"/>
+                <line x1="28.2" y1="20" x2="28.2" y2="44"
+                  stroke="#ffffff" stroke-width="1" opacity=".55"/>
+              </g>
+            </svg>
+            <span class="guard-off dl-man">MAN</span>
+          </span>
+        </label>
+      <div class="guard-caption mono">DATALINK&nbsp;MODE<br><small>SYNC:&nbsp;ON-DEMAND&nbsp;/&nbsp;CONT</small></div>
+      </div>
+      <!-- ALERT SELECTOR (v1.1.12): 3-Stufen-Drehschalter nach Boeing-
+           Engine-Start-Selector-Art. Steuert den FCM-Push-Filter
+           (LUNAR / BOTH / DEEP) serverseitig pro Geraet. -->
+      <div id="notif-rotary" class="dock-unit" title="Push-Alarm-Filter: LUNAR = nur Mond-Fenster, BOTH = alles, DEEP = nur Deep-Sky-Fenster">
+        <div class="rot-plate">
+          <span class="rot-tick rot-tick-l"></span>
+          <span class="rot-tick rot-tick-c"></span>
+          <span class="rot-tick rot-tick-r"></span>
+          <button type="button" class="rot-label rot-l" data-pref="LUNAR">LUNAR</button>
+          <button type="button" class="rot-label rot-c" data-pref="BOTH">BOTH</button>
+          <button type="button" class="rot-label rot-r" data-pref="DEEP">DEEP</button>
+          <div class="rot-knob"><div class="rot-pointer"></div></div>
+        </div>
+        <div class="guard-caption mono">ALERT&nbsp;SEL<br><small>PUSH&nbsp;LUNAR/BOTH/DEEP</small></div>
+      </div>
+    </div>
+</aside>
 
     <!-- ============ ZENTRUM: WINDSCHUTZSCHEIBE ============ -->
     <main id="map-wrap"><div id="map"></div>
@@ -169,76 +239,6 @@ als Pitch - die Horizontlinie sinkt, je hoeher der Mond steht"></div>
       <div id="flightstick" title="Flightstick: ziehen = Standort anvisieren">
         <div class="fs-deg mono" id="fs-deg">---&deg;</div>
       </div>
-    <!-- DATALINK-Dock: Kommunikation links (OBS/Sensoren rechts).
-         Fest verankert ueber der T-Track-Leiste, Warnstreifen schwarz-gelb. -->
-    <div id="datalink-dock">
-      <!-- Desktop: beide Schalter-Einheiten NEBENEINANDER (row), Mobil:
-           untereinander (column, siehe Media Query) - jede Einheit ist
-           eine .dock-unit (Schalter + Caption vertikal gepaart). -->
-      <div class="dock-unit">
-      <label class="guard-switch guard-master" title="Datalink: AUTO = 60s-Polling (Netzbetrieb), MAN = stumm, UPLINK-Button holt einmalig">
-          <input type="checkbox" id="datalink-sw">
-          <span class="guard-frame">
-            <span class="guard-on dl-auto">AUTO</span>
-            <svg class="bat-switch" viewBox="0 0 60 90">
-              <defs>
-                <linearGradient id="dl-plate" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0" stop-color="#3a4147"/>
-                  <stop offset=".5" stop-color="#565f68"/>
-                  <stop offset="1" stop-color="#2a3036"/>
-                </linearGradient>
-                <linearGradient id="dl-nut" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0" stop-color="#79838e"/>
-                  <stop offset=".5" stop-color="#4a525a"/>
-                  <stop offset="1" stop-color="#5d666f"/>
-                </linearGradient>
-                <linearGradient id="dl-chrome" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0" stop-color="#f2f5f8"/>
-                  <stop offset=".35" stop-color="#c3ccd4"/>
-                  <stop offset=".55" stop-color="#8b959e"/>
-                  <stop offset=".8" stop-color="#d8dee4"/>
-                  <stop offset="1" stop-color="#6d7680"/>
-                </linearGradient>
-              </defs>
-              <rect x="5" y="4" width="50" height="82" rx="4"
-                fill="url(#dl-plate)" stroke="#14181c" stroke-width="1.5"/>
-              <rect x="9" y="8" width="42" height="74" rx="3" fill="none"
-                stroke="#1d2227" stroke-width="1"/>
-              <polygon points="30,32 42,39 42,53 30,60 18,53 18,39"
-                fill="url(#dl-nut)" stroke="#0d1013" stroke-width="1.2"/>
-              <circle cx="30" cy="46" r="6" fill="#0a0d11"
-                stroke="#2c3136" stroke-width="1"/>
-              <g class="bat-lever">
-                <rect x="26.6" y="15" width="6.8" height="34" rx="3.4"
-                  fill="url(#dl-chrome)" stroke="#3d444b" stroke-width=".8"/>
-                <circle cx="30" cy="13.5" r="5.6" fill="url(#dl-chrome)"
-                  stroke="#3d444b" stroke-width=".8"/>
-                <circle cx="28.4" cy="12" r="1.6" fill="#ffffff" opacity=".75"/>
-                <line x1="28.2" y1="20" x2="28.2" y2="44"
-                  stroke="#ffffff" stroke-width="1" opacity=".55"/>
-              </g>
-            </svg>
-            <span class="guard-off dl-man">MAN</span>
-          </span>
-        </label>
-      <div class="guard-caption mono">DATALINK&nbsp;MODE<br><small>SYNC:&nbsp;ON-DEMAND&nbsp;/&nbsp;CONT</small></div>
-      </div>
-      <!-- ALERT SELECTOR (v1.1.12): 3-Stufen-Drehschalter nach Boeing-
-           Engine-Start-Selector-Art. Steuert den FCM-Push-Filter
-           (LUNAR / BOTH / DEEP) serverseitig pro Geraet. -->
-      <div id="notif-rotary" class="dock-unit" title="Push-Alarm-Filter: LUNAR = nur Mond-Fenster, BOTH = alles, DEEP = nur Deep-Sky-Fenster">
-        <div class="rot-plate">
-          <span class="rot-tick rot-tick-l"></span>
-          <span class="rot-tick rot-tick-c"></span>
-          <span class="rot-tick rot-tick-r"></span>
-          <button type="button" class="rot-label rot-l" data-pref="LUNAR">LUNAR</button>
-          <button type="button" class="rot-label rot-c" data-pref="BOTH">BOTH</button>
-          <button type="button" class="rot-label rot-r" data-pref="DEEP">DEEP</button>
-          <div class="rot-knob"><div class="rot-pointer"></div></div>
-        </div>
-        <div class="guard-caption mono">ALERT&nbsp;SEL<br><small>PUSH&nbsp;LUNAR/BOTH/DEEP</small></div>
-      </div>
-    </div>
     <footer id="bottom-panel">
 
       <span class="tl-label mono">T-TRACK&nbsp;<b id="tl-value">NOW</b></span>

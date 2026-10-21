@@ -636,6 +636,12 @@
       "title": "v1.1.16 — UI-Feinschliff + Tastatur-Flightstick",
       "desc": "Drei UX-Fixes: (1) LINKES PANEL/DOCK: Der gelb-schwarze Warnstreifen ist jetzt ein dezenter 7px-Akzent oben statt Vollfläche — das Dock bleibt einzeilig kompakt (105px statt 178px: width:100% des ALERT-SEL zwang ihn in eine zweite Zeile) und der Sensoren-Content scrollt nicht mehr hinter dem fixierten Dock ab (padding-bottom 122px auf Desktop). (2) SCROLLBARS: komplett dunkel umgebaut (::-webkit-scrollbar + scrollbar-color/width für Firefox) — Track fast schwarz, Thumb dunkelblau-grau mit Hover, nahtlos im Command-Center-Look. (3) TASTATUR-FLIGHTSTICK: Pfeiltasten ◀/▶ blättern durch die Crawler-Standorte (Telemetrie-Link, Gauges und Target-Brackets wandern mit), der Stick knickt synchron in die Peilung des Standorts (gleiche Transform-Formel wie beim Drag). [S] = Select: Der rote Feuerknopf spielt eine Klick-Animation und das Standort-Panel öffnet exakt wie ein Marker-Klick. Alles Playwright-bewiesen (Link-Wechsel, Stick-Transform 086°, Panel-Öffnung, Fire-Animation).",
       "usage": "◀/▶ Standort durchschalten, [S] öffnet das Panel — Maus optional"
+    },
+    {
+      "date": "2026-10-21",
+      "title": "v1.1.17 — Game-Menu-Logik + Dock im Panel-Fluss",
+      "desc": "Die Tastatur-Steuerung ist konsequent zu Ende gedacht: (1) 4-WEGE-FLIGHTSTICK: Alle vier Pfeiltasten sind Kompass-Slots (▲=0°, ▶=90°, ▼=180°, ◀=270° ab Kartenmitte) und wählen den besten Standort im jeweiligen Sektor — derselbe Algorithmus wie beim Stick-Drag. Der Stick knickt in alle vier Richtungen aus (translate ±11px je Achse, Playwright-bewiesen). (2) STATE MACHINE nach Videospiel-Menü-Art: Mit [S] öffnet die Datenansicht und der Tastatur-Kontext wechselt — die Karten-Auswahl ist blockiert; ▲/▼ scrollen den Panel-Inhalt (±160px smooth), ◀/▶ wechseln zwischen Jetzt und Vorausschau, [ESC] schließt und gibt Karte/Flightstick zurück. (3) DATALINK-DOCK: sitzt jetzt wie das ASTRO-OBSERVATION-Dock rechts IM PANEL-FLUSS (HTML verschoben, margin-top:auto, dezente Warnstreifenfläche rgba(255,210,74,.07) + border-top) statt fixiert über der Karte — Overlay-Hacks (Skalierung, padding-bottom, Mobile-Umzug per JS) entfallen komplett. Sauber auf Desktop, Laptop und Mobile.",
+      "usage": "▲▼◀▶ Standort anvisieren, [S] öffnen, ▲▼ scrollen, ◀▶ Tabs, [ESC] zurück"
     }
   ]
 }
