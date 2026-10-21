@@ -467,9 +467,23 @@ body.night .iw-toggle-row { border-color: #3a2020; }
   border-radius: 0; padding: 10px; overflow-y: auto;
 }
 /* v1.1.17: Desktop - Panel als flex-column, damit das DATALINK-Dock
-   (im Flow, wie OBS rechts) mit margin-top:auto unten andockt */
+   (im Flow, wie OBS rechts) mit margin-top:auto unten andockt.
+   v1.1.18: Beide Schalter-Einheiten EINE Ebene - der Desktop-Block
+   verbietet den Umbruch und staucht die Einheiten dock-spezifisch
+   (die 132px-OBS-Rahmenbreite rechts bleibt unberuehrt). */
 @media (min-width: 981px) {
   #left-panel { display: flex; flex-direction: column; }
+  #datalink-dock { flex-wrap: nowrap; }
+  /* v1.1.12-Basis setzt #notif-rotary auf width:100% (mobil gut) -
+     auf Desktop wuerde das die Unit in eine eigene Zeile zwingen */
+  #datalink-dock #notif-rotary { width: auto; }
+  .dock-unit { min-width: 0; }
+  #datalink-dock .guard-frame { width: 100px; }
+  #datalink-dock .guard-on, #datalink-dock .guard-off {
+    font-size: 11px; line-height: 38px; letter-spacing: 1px; }
+  #datalink-dock .bat-switch { width: 46px; height: 68px; }
+  #datalink-dock .rot-plate { max-width: 96px; height: 64px; }
+  #datalink-dock .rot-label { font-size: 7.5px; }
 }
 .panel-hdr { font-size: 10.5px; letter-spacing: 3px; color: var(--amber);
   border-bottom: 1px solid var(--line-hi); padding-bottom: 4px;
@@ -1119,12 +1133,12 @@ body.night .basemap-tile { filter: none; }
    zentrierte Units. Kein Overlay = kein Abschneiden, keine Skalierung. */
 #datalink-dock {
   margin-top: auto; width: 100%;
-  padding: 10px 8px; box-sizing: border-box;
+  padding: 10px 4px; box-sizing: border-box;
   border-top: 2px solid #4a3f14;
   background: repeating-linear-gradient(-45deg,
     rgba(255,210,74,.07) 0 10px, transparent 10px 20px), var(--panel2);
   display: flex; flex-direction: row; align-items: stretch;
-  justify-content: center; gap: 10px; row-gap: 4px;
+  justify-content: space-evenly; gap: 6px; row-gap: 4px;
   flex-wrap: wrap; text-align: center;
 }
 .dock-unit { display: flex; flex-direction: column; align-items: center;

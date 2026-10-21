@@ -642,6 +642,12 @@
       "title": "v1.1.17 — Game-Menu-Logik + Dock im Panel-Fluss",
       "desc": "Die Tastatur-Steuerung ist konsequent zu Ende gedacht: (1) 4-WEGE-FLIGHTSTICK: Alle vier Pfeiltasten sind Kompass-Slots (▲=0°, ▶=90°, ▼=180°, ◀=270° ab Kartenmitte) und wählen den besten Standort im jeweiligen Sektor — derselbe Algorithmus wie beim Stick-Drag. Der Stick knickt in alle vier Richtungen aus (translate ±11px je Achse, Playwright-bewiesen). (2) STATE MACHINE nach Videospiel-Menü-Art: Mit [S] öffnet die Datenansicht und der Tastatur-Kontext wechselt — die Karten-Auswahl ist blockiert; ▲/▼ scrollen den Panel-Inhalt (±160px smooth), ◀/▶ wechseln zwischen Jetzt und Vorausschau, [ESC] schließt und gibt Karte/Flightstick zurück. (3) DATALINK-DOCK: sitzt jetzt wie das ASTRO-OBSERVATION-Dock rechts IM PANEL-FLUSS (HTML verschoben, margin-top:auto, dezente Warnstreifenfläche rgba(255,210,74,.07) + border-top) statt fixiert über der Karte — Overlay-Hacks (Skalierung, padding-bottom, Mobile-Umzug per JS) entfallen komplett. Sauber auf Desktop, Laptop und Mobile.",
       "usage": "▲▼◀▶ Standort anvisieren, [S] öffnen, ▲▼ scrollen, ◀▶ Tabs, [ESC] zurück"
+    },
+    {
+      "date": "2026-10-21",
+      "title": "v1.1.18 — Spatial Navigation + Dock auf einer Ebene",
+      "desc": "(1) SPATIAL NAVIGATION: Die Pfeilsteuerung feuert nicht mehr absolute Kompassrichtungen ab, sondern navigiert MARKER-ZU-MARKER — Bezugspunkt ist der aktuell gewählte Standort, die Pfeiltaste sucht den physisch nächsten Marker im ±45°-Kegel dieser Richtung (professionelle Game-Menü-Logik; Nahes vor Fernem, Kegel-Disziplin, ohne Treffer bleibt die Auswahl und der Stick gibt trotzdem Richtungs-Feedback). Playwright-bewiesen mit Standort-Riegel: Ost-Kette Mitte→Nah→Fern, Rückweg West, Nord/Süd-Wechsel, kein Fehlsprung außerhalb des Kegels. (2) DOCK: DATALINK MODE und ALERT SEL sitzen auf Desktop/Laptop jetzt auf EINER Ebene nebeneinander (flex-direction:row + justify-content:space-evenly, nowrap) — dock-spezifisch kompakte Maße (Guard-Frame 100px, Rotary-Platte 96px), 126px einzeilig statt gestapelt. Die v1.1.12-width:100%-Falle der ALERT-SEL-Unit ist im Desktop-Block überschrieben. Mobile bleibt zweizeilig im Overlay (bewusst).",
+      "usage": "◀▶▲▼ springt Marker-zu-Marker relativ zur aktuellen Auswahl — Orte zwischen den Hauptrichtungen sind erreichbar"
     }
   ]
 }

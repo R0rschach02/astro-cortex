@@ -276,7 +276,7 @@ function initMap() {
   checkOtaUpdate();
   checkPrimeWindowNotifications();
   scheduleDailyReminders();
-  commsLog("BUILD 2026-10-21 (v1.1.17) \u00b7 ORIGIN " + location.origin
+  commsLog("BUILD 2026-10-21 (v1.1.18) \u00b7 ORIGIN " + location.origin
     + " \u00b7 BASE " + (BASE || "(same-origin)")
     + " \u00b7 NATIVE " + isNativeApp());
   if (!isNativeApp()) {
@@ -2412,25 +2412,36 @@ function animateStickTo(deg) {
   }, 900);
 }
 
+/* SPATIAL NAVIGATION (v1.1.18): Relativ, nicht absolut. Bezugspunkt
+   ist der AKTUELL gewaehlte Standort - die Pfeiltaste sucht den
+   physisch NAECHSTEN Marker im +/-45-Grad-Kegel dieser Richtung
+   (Marker-zu-Marker wie in echten Game-Menues). Ohne Treffer im
+   Kegel: Auswahl bleibt, Stick gibt trotzdem Richtungs-Feedback. */
 function selectSpotByDirection(deg) {
   animateStickTo(deg);                      // Feedback IMMER, auch ohne Treffer
   const targets = (lastSpots && lastSpots.spots) || [];
   if (!targets.length) return;
-  const c = map.getCenter();
-  let bestS = null, bestDiff = 65;          // Sektor-Fenster +/-65 Grad
+  const cur = targets.find(t => t.name === telemetryTarget) || targets[0];
+  let bestS = null, bestD = Infinity;
   for (const s of targets) {
-    const b = _bearingDeg(c.lat, c.lng, s.lat, s.lon);
+    if (s.name === cur.name) continue;
+    const b = _bearingDeg(cur.lat, cur.lon, s.lat, s.lon);
+    // diff = Abweichung von der Zielrichtung (0 = exakt, 180 = entgegen)
     const diff = Math.abs(((b - deg + 540) % 360) - 180);
-    if (diff < bestDiff) { bestDiff = diff; bestS = s; }
+    if (diff > 45) continue;                // nur der +/-45-Grad-Kegel
+    const d = Math.hypot(s.lat - cur.lat, s.lon - cur.lon);
+    if (d < bestD) { bestD = d; bestS = s; }
   }
+  const dirName = deg === 0 ? "NORD" : deg === 90 ? "OST"
+    : deg === 180 ? "SUED" : "WEST";
   if (!bestS) {
-    commsLog("STICK \u2191\u2192\u2193\u2190: kein Standort in dieser "
-      + "Richtung (" + deg.toFixed(0) + "\u00b0)");
+    commsLog("STICK " + dirName + ": kein Standort neben "
+      + cur.name.toUpperCase() + " in diesem Kegel");
     return;
   }
   setTelemetry(bestS.name);
-  commsLog("STICK " + deg.toFixed(0) + "\u00b0 \u2192 "
-    + bestS.name.toUpperCase() + " \u2014 [S] waehlt");
+  commsLog("STICK " + dirName + " \u2192 " + bestS.name.toUpperCase()
+    + " \u2014 [S] waehlt");
 }
 
 function confirmStickSelection() {
