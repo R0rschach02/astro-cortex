@@ -130,17 +130,26 @@ TELEMETRY_DISABLED = False                 # --no-telegram setzt das auf True
 HEALTHCHECK_PING_URL = os.environ.get("HEALTHCHECK_PING_URL", "")
 
 
-def ping_healthchecks(url: str, label: str = "radar"):
-    """Ein einzelner GET an die healthchecks-URL. Absichtlich nebenwirkungs-
-    frei: Fehler (kein Netz etc.) werden geloggt und verschluckt - ein
+def ping_healthchecks(url: str, label: str = "radar",
+                      msg: str = "", fail: bool = False):
+    """Success-Ping bzw. Fail-Ping (/fail) an healthchecks.io. Bei fail
+    wird die Meldung als POST-Body mitgeschickt und im Dashboard direkt
+    lesbar (statt nur 'Down' ohne Kontext). Absichtlich nebenwirkungs-
+    frei: Fehler beim Ping werden geloggt und verschluckt - ein
     gescheiterter Ping darf den Tick niemals rot machen."""
     if not url:
         return
+    full = url + ("/fail" if fail else "")
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        data = msg[:10000].encode() if msg else None
+        req = urllib.request.Request(
+            full, data=data,
+            headers={"User-Agent": USER_AGENT,
+                     "Content-Type": "text/plain"})
         urllib.request.urlopen(req, timeout=10).read()
-        log.info("[Healthcheck] %s-Ping OK", label)
-    except Exception as e:
+        log.info("[Healthcheck] %s-Ping %s", label,
+                 "FAIL gemeldet" if fail else "OK")
+    except Exception as e:                     # BLE001: bewusst, s.o.
         log.warning("[Healthcheck] %s-Ping fehlgeschlagen: %s",
                     label, type(e).__name__)
 
@@ -715,19 +724,27 @@ def poly_contains(geometry: dict, lon: float, lat: float) -> bool:
 
 
 def http_get_json(url: str, timeout: int = 15, retries: int = 2) -> dict:
-    """HTTP-GET mit Retry: fängt kurzzeitige Aussetzer (Standby-Wakeup,
-    WLAN-Reconnect, DNS-Hickser) ab, damit ein Lauf nicht gleich abbricht."""
+    """HTTP-GET mit hartem Socket-Timeout + Retry: faengt kurzzeitige
+    Aussetzer (Standby-Wakeup, WLAN-Reconnect, DNS-Hickser) ab, damit
+    ein Lauf nicht gleich abbricht. Nach Erschluesspfung der Versuche
+    wird endgueltig GEWORFEN (Aufrufer entscheidet) - der Fehler landet
+    mit URL im Log, still verstummen war gestern (Healthchecks-Down-
+    Welle 10/2026: haengende Requests liefen bis zum systemd-Kill)."""
     last_exc = None
     for attempt in range(1, retries + 1):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
             return json.loads(urllib.request.urlopen(req, timeout=timeout).read())
-        except Exception as e:
+        except Exception as e:                 # BLE001: bewusst, s.u.
             last_exc = e
             if attempt < retries:
                 log.info("[HTTP] Versuch %d/%d fehlgeschlagen (%s) - Retry in 5 s",
                          attempt, retries, type(e).__name__)
                 time.sleep(5)
+            else:
+                log.error("[HTTP] %s endgueltig fehlgeschlagen nach %d "
+                          "Versuchen (%s: %.120s)",
+                          url, retries, type(e).__name__, e)
     raise last_exc
 
 
@@ -4379,15 +4396,29 @@ async def main() -> int:
                                 radar_only=args.radar_only)
             except asyncio.CancelledError:
                 raise
-            except Exception as e:
+            except Exception as e:             # BLE001: Bewusst breit - der
+                # Dauermodus ueberlebt alles; Healthchecks kriegt den
+                # Fehler aktiv als /fail mit Traceback-Schwanz
+                ping_healthchecks(HEALTHCHECK_PING_URL, "radar",
+                                  traceback.format_exc()[-3000:], fail=True)
                 log.error("Zyklus fehlgeschlagen (%s) - naechster Versuch im "
                           "naechsten Intervall", type(e).__name__)
                 log.debug("Traceback:\n%s", traceback.format_exc())
             await asyncio.sleep(args.interval * 60)
 
-    reports = await run_cycle(locations, headless=not args.no_headless,
-                              send_dashboard=not args.alert_only,
-                              radar_only=args.radar_only)
+    try:
+        reports = await run_cycle(locations, headless=not args.no_headless,
+                                  send_dashboard=not args.alert_only,
+                                  radar_only=args.radar_only)
+    except Exception:                          # BLE001: Bewusst breit
+        # Aktiver Fail-Ping: Healthchecks zeigt 'Fail' MIT Fehlermeldung
+        # (Traceback-Schwanz im Dashboard-Body) statt nur 'Down' - und
+        # das sofort, nicht erst nach Ablauf der Grace-Time.
+        ping_healthchecks(HEALTHCHECK_PING_URL, "radar",
+                          traceback.format_exc()[-3000:], fail=True)
+        log.exception("Zyklus abgestuerzt - Fail-Ping an Healthchecks "
+                      "gesendet, Exit 1 fuer systemd")
+        return 1
 
     # Exit 0 = Lauf technisch OK (fuer systemd-Timer). Ein Crash (ungefangene
     # Exception) fuehrt automatisch zu Exit != 0 und markiert den Service rot.
