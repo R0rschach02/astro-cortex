@@ -53,7 +53,7 @@ log = logging.getLogger("astro-app")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "..", "frontend")
 # Optionaler Schutz schreibender Endpunkte: env ASTRO_API_TOKEN setzen
 API_TOKEN = os.environ.get("ASTRO_API_TOKEN", "")
-BACKEND_VERSION = "v1.1.18"
+BACKEND_VERSION = "v1.1.19"
 # Cloudflare-Access M2M-Token: liegt AUSSERHALB des Repos (gitignored)
 # und wird der App erst zur Laufzeit ueber /updates/app-bootstrap.json
 # zugestellt - kein Secret mehr im APK-/Frontend-Code.
@@ -1032,11 +1032,19 @@ def api_fcm_token(body: FcmTokenBody):
                               # NULL liest jede Consumeroese als BOTH
         conn.commit()
         n = conn.execute("SELECT COUNT(*) FROM fcm_tokens").fetchone()[0]
+        # SSOT (v1.1.19): Der EFFEKTIV gespeicherte Wert geht zurueck -
+        # die App synchronisiert Schalter + localStorage daraus. Der
+        # Server ist die eine Wahrheit pro Geraet, nicht der Client-
+        # localStorage (der kann durch fehlgeschlagene Uploads oder
+        # Neuinstallationen auseinanderlaufen).
+        eff = (conn.execute("SELECT notif_pref FROM fcm_tokens "
+                            "WHERE token = ?", (tok,)).fetchone()
+               or ["BOTH"])[0] or "BOTH"
     finally:
         conn.close()
-    log.info("[FCM] Token gespeichert (%s..., pref=%s, Geraete: %d)",
-             tok[:10], pref or "(unveraendert)", n)
-    return {"ok": True, "devices": n, "notif_pref": pref or None}
+    log.info("[FCM] Token gespeichert (%s..., pref=%s->%s, Geraete: %d)",
+             tok[:10], pref or "(unveraendert)", eff, n)
+    return {"ok": True, "devices": n, "notif_pref": eff}
 
 
 @app.get("/api/telemetry/fcm_token")

@@ -276,7 +276,7 @@ function initMap() {
   checkOtaUpdate();
   checkPrimeWindowNotifications();
   scheduleDailyReminders();
-  commsLog("BUILD 2026-10-21 (v1.1.18) \u00b7 ORIGIN " + location.origin
+  commsLog("BUILD 2026-10-28 (v1.1.19) \u00b7 ORIGIN " + location.origin
     + " \u00b7 BASE " + (BASE || "(same-origin)")
     + " \u00b7 NATIVE " + isNativeApp());
   if (!isNativeApp()) {
@@ -1452,7 +1452,7 @@ async function initPushNotifications() {
     await PN.addListener("registration", async (t) => {
       try {
         localStorage.setItem("astro_fcm_token", t.value);   // fuer Pref-Wechsel
-        await api("/api/telemetry/fcm_token", {
+        const r = await api("/api/telemetry/fcm_token", {
           method: "POST",
           headers: {"Content-Type": "application/json"},
           body: JSON.stringify({
@@ -1461,6 +1461,15 @@ async function initPushNotifications() {
             device: (navigator.userAgent || "").slice(0, 100)})});
         commsLog("FCM: Device-Token registriert ("
           + String(t.value).slice(0, 12) + "\u2026)");
+        // SSOT (v1.1.19): Der Server antwortet mit dem EFFEKTIV
+        // gespeicherten Filter dieses Geraets - Schalter + localStorage
+        // synchronisieren sich daraus (Upload-Fehler und Neu-
+        // installationen koennen localStorage veralten lassen).
+        if (r && r.notif_pref && r.notif_pref !== getNotifPref()) {
+          setNotifPref(r.notif_pref, false);
+          commsLog("ALERT SEL: Server-Filter uebernommen ("
+            + r.notif_pref + ")");
+        }
       } catch (e) {
         commsLog("FCM: Token-Upload fehlgeschlagen ("
           + (e.message || e) + ")", "alert");
@@ -1513,16 +1522,27 @@ function setNotifPref(pref, upload) {
 async function uploadNotifPref(pref) {
   const token = localStorage.getItem("astro_fcm_token");
   if (!token) {
-    commsLog("ALERT SEL: kein FCM-Token — Praferenz lokal, "
-      + "geht mit naechster Registrierung raus");
+    // SSOT-Klarheit (v1.1.19): Ohne Push-Registrierung (Desktop-
+    // Browser) steuert dieser Schalter NUR die lokale Ansicht - die
+    // Push-Filter der Geraete (Handy) bleiben unberuehrt, deren
+    // Drehschalter wirken auf ihrem eigenen Token.
+    commsLog("ALERT SEL: kein Push-Geraet — Filter gilt nur lokal "
+      + "fuer diese Ansicht (Handy-Pushs unberuehrt)");
     return;
   }
   try {
-    await api("/api/telemetry/fcm_token", {
+    const r = await api("/api/telemetry/fcm_token", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({token: token, notif_pref: pref})});
     commsLog("ALERT SEL: Server uebernommen (" + pref + ")");
+    // SSOT: Bestätigung mit dem effektiv gespeicherten Wert — wenn
+    // der Server etwas anderes gemeldet hat als gesendet, gewinnt er.
+    if (r && r.notif_pref && r.notif_pref !== pref) {
+      setNotifPref(r.notif_pref, false);
+      commsLog("ALERT SEL: Server-Korrektur -> " + r.notif_pref,
+        "alert");
+    }
   } catch (e) {
     commsLog("ALERT SEL: Upload fehlgeschlagen ("
       + (e.message || e) + ")", "alert");
@@ -2412,35 +2432,54 @@ function animateStickTo(deg) {
   }, 900);
 }
 
-/* SPATIAL NAVIGATION (v1.1.18): Relativ, nicht absolut. Bezugspunkt
-   ist der AKTUELL gewaehlte Standort - die Pfeiltaste sucht den
-   physisch NAECHSTEN Marker im +/-45-Grad-Kegel dieser Richtung
-   (Marker-zu-Marker wie in echten Game-Menues). Ohne Treffer im
-   Kegel: Auswahl bleibt, Stick gibt trotzdem Richtungs-Feedback. */
+/* SPATIAL NAVIGATION (v1.1.18/v1.1.19): Relativ, nicht absolut.
+   Bezugspunkt ist der AKTUELL gewaehlte Standort. Zweistufige Suche:
+   Stufe 1: physisch naechster Marker im +/-45-Grad-Kegel der Richtung
+            (Marker-zu-Marker wie in echten Game-Menues).
+   Stufe 2 (Fallback): Ist der Kegel leer, erweiterter +/-90-Grad-Scan
+            mit Score = Winkelabweichung + Distanzstrafe - das visuell
+            "direkt darunter"-Ziel bei 60 Grad Abweichung springt also
+            trotzdem sinnvoll, statt gar nicht (dichte Rheingraben-
+            Standorte). Jenseits von 90 Grad wird verweigert. */
 function selectSpotByDirection(deg) {
   animateStickTo(deg);                      // Feedback IMMER, auch ohne Treffer
   const targets = (lastSpots && lastSpots.spots) || [];
   if (!targets.length) return;
   const cur = targets.find(t => t.name === telemetryTarget) || targets[0];
-  let bestS = null, bestD = Infinity;
+
+  const cands = [];                          // (diff, dist, spot)
   for (const s of targets) {
     if (s.name === cur.name) continue;
     const b = _bearingDeg(cur.lat, cur.lon, s.lat, s.lon);
     // diff = Abweichung von der Zielrichtung (0 = exakt, 180 = entgegen)
     const diff = Math.abs(((b - deg + 540) % 360) - 180);
-    if (diff > 45) continue;                // nur der +/-45-Grad-Kegel
-    const d = Math.hypot(s.lat - cur.lat, s.lon - cur.lon);
-    if (d < bestD) { bestD = d; bestS = s; }
+    if (diff > 90) continue;                 // Stufe-2-Fenster (+/-90 Grad)
+    cands.push([diff, Math.hypot(s.lat - cur.lat, s.lon - cur.lon), s]);
   }
+  // Stufe 1: engster Kegel, naechster Marker gewinnt
+  const cone = cands.filter(c => c[0] <= 45);
+  let bestS = null, fallback = false;
+  if (cone.length) {
+    bestS = cone.reduce((a, c) => (c[1] < a[1] ? c : a))[2];
+  } else if (cands.length) {
+    // Stufe 2: Score aus Winkel + Distanz (kleiner = besser) - Richtung
+    // dominiert, Distanz bricht Gleichstand. maxDist normiert die Strafe
+    const maxD = Math.max(...cands.map(c => c[1]), 1e-6);
+    bestS = cands.reduce((a, c) =>
+      (c[0] + (c[1] / maxD) * 30 < a[0] + (a[1] / maxD) * 30 ? c : a))[2];
+    fallback = true;
+  }
+
   const dirName = deg === 0 ? "NORD" : deg === 90 ? "OST"
     : deg === 180 ? "SUED" : "WEST";
   if (!bestS) {
     commsLog("STICK " + dirName + ": kein Standort neben "
-      + cur.name.toUpperCase() + " in diesem Kegel");
+      + cur.name.toUpperCase() + " im 90\u00b0-Fenster");
     return;
   }
   setTelemetry(bestS.name);
   commsLog("STICK " + dirName + " \u2192 " + bestS.name.toUpperCase()
+    + (fallback ? " (erweitert)" : "")
     + " \u2014 [S] waehlt");
 }
 
